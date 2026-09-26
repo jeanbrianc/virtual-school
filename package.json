@@ -1,0 +1,39 @@
+{
+  "name": "izzys-virtual-classroom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A local-first 3D homeschool learning world with a parent recordkeeping studio.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.10"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/preview.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "node scripts/lint.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --import tsx --test \"tests/unit/**/*.test.ts\"",
+    "test:e2e": "node scripts/build.mjs --e2e && playwright test",
+    "check": "npm run typecheck && npm run lint && npm run test"
+  },
+  "dependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.186.0",
+    "esbuild": "0.27.7",
+    "playwright": "1.56.1",
+    "prettier": "3.8.1",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2"
+  }
+}
