@@ -8,6 +8,7 @@
  */
 import { DEFAULT_AVATAR, GEORGIA_AVATAR } from '../../domain/avatar';
 import { getSkill } from '../../domain/curriculum';
+import { DEFAULT_SETTINGS } from '../../domain/settings';
 import { updateMasteryRecord } from '../../domain/mastery/masteryEngine';
 import { buildSnapshot } from '../../domain/progress/snapshot';
 import { getCatalogBook } from '../../domain/reading/bookCatalog';
@@ -34,7 +35,6 @@ import { addDays, timestampAt, toDay, type Clock } from '../../domain/util/time'
 import type { Repositories } from '../repositories';
 import { SCHEMA_VERSION } from '../schema';
 import type { WriteOp } from '../storage/types';
-import { DEFAULT_SETTINGS } from '../../services/householdService';
 
 export const DEMO_CHILD_ID = 'child_izzy';
 export const DEMO_SIBLING_ID = 'child_georgia';
@@ -167,7 +167,9 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
       difficulty: { band: cat.band },
       shelfIndex: index,
       ...(p.catalogId === 'mercy-watson' ? { parentNotes: 'Laughed out loud at the toast parts — read it twice.' } : {}),
-      ...(p.catalogId === 'frog-and-toad' ? { comprehensionNotes: 'Explained why Toad was sad without prompting; connected it to waiting for Grandma’s letters.' } : {}),
+      ...(p.catalogId === 'frog-and-toad'
+        ? { comprehensionNotes: 'Explained why Toad was sad without prompting; connected it to waiting for Grandma’s letters.' }
+        : {}),
       isDemo: true,
     });
     sessions.push({
@@ -249,7 +251,14 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
         source: 'parent',
         isDemo: true,
       });
-      ev('read.chapter-stamina', ago ?? 0, { independent: 1 }, { type: 'book', id: 'book_charlottes-web', label: cw.title }, `Read ${ch} chapters of Charlotte’s Web independently.`, { hour: 9 });
+      ev(
+        'read.chapter-stamina',
+        ago ?? 0,
+        { independent: 1 },
+        { type: 'book', id: 'book_charlottes-web', label: cw.title },
+        `Read ${ch} chapters of Charlotte’s Web independently.`,
+        { hour: 9 },
+      );
     });
   }
 
@@ -285,7 +294,13 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     ev('read.phonics-advanced', ago, { independent: 1 }, obs('Reading lesson', ago), 'Decoded words with vowel teams (ai, ee, oa) independently.');
   }
   ev('read.multisyllable', 16, { supported: 1 }, obs('Reading lesson', 16), 'Decoded three-syllable words with a syllable-clap prompt.');
-  ev('read.multisyllable', 4, { independent: 1, supported: 1 }, obs('Reading lesson', 4), 'Split “caterpillar” into syllables herself; needed help with “especially”.');
+  ev(
+    'read.multisyllable',
+    4,
+    { independent: 1, supported: 1 },
+    obs('Reading lesson', 4),
+    'Split “caterpillar” into syllables herself; needed help with “especially”.',
+  );
   const assessment = { type: 'assessment' as const, id: 'assess_running_record', label: 'Running record (Grade 2–3 passage)' };
   ev('read.fluency', 17, { independent: 1 }, assessment, 'Running record on a Grade 2–3 passage: 97% word accuracy with natural phrasing.', { hour: 10 });
   ev('read.fluency', 3, { independent: 1 }, obs('Read-aloud to Dad', 3), 'Read two pages of Charlotte’s Web aloud with expression and character voices.');
@@ -364,7 +379,8 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     {
       date: day(20),
       title: 'Trip to the natural history museum',
-      narrative: 'We went to the natural history museum. Izzy spent a long time at the Triceratops skeleton and asked how they know what color dinosaurs were. She matched fossils to pictures with a little help.',
+      narrative:
+        'We went to the natural history museum. Izzy spent a long time at the Triceratops skeleton and asked how they know what color dinosaurs were. She matched fossils to pictures with a little help.',
       durationMinutes: 120,
       domains: ['science'],
       skillIds: ['sci.fossils', 'sci.questions', 'sci.observe'],
@@ -384,7 +400,8 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     {
       date: day(12),
       title: 'Planting fall garlic',
-      narrative: 'We planted garlic cloves in the garden bed. Izzy dug the holes, planted them pointy side up, and explained that roots grow down and the shoot grows up toward the sun.',
+      narrative:
+        'We planted garlic cloves in the garden bed. Izzy dug the holes, planted them pointy side up, and explained that roots grow down and the shoot grows up toward the sun.',
       durationMinutes: 40,
       domains: ['science', 'lifeSkills'],
       skillIds: ['sci.plants', 'life.chores'],
@@ -416,13 +433,14 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     ],
     'artwork',
     true,
-    31,
+    12, // kid-art seed % 4 === 0 → sunflowers
   );
   addActivity(
     {
       date: day(8),
       title: 'Baking banana bread',
-      narrative: 'Izzy and I baked banana bread. She mashed the bananas, counted 3 eggs, measured 1 cup of sugar with help, and read the recipe steps aloud to me.',
+      narrative:
+        'Izzy and I baked banana bread. She mashed the bananas, counted 3 eggs, measured 1 cup of sugar with help, and read the recipe steps aloud to me.',
       durationMinutes: 50,
       domains: ['lifeSkills', 'math', 'reading'],
       skillIds: ['life.cooking', 'math.measure-units', 'read.procedural', 'math.count-10'],
@@ -442,7 +460,8 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     {
       date: day(5),
       title: 'Nature walk at Riverside Park',
-      narrative: 'We went on a nature walk at Riverside Park. Izzy collected two acorns, a maple leaf, a pinecone and a blue jay feather. She noticed moss growing on the shady side of a tree and watched a woodpecker.',
+      narrative:
+        'We went on a nature walk at Riverside Park. Izzy collected two acorns, a maple leaf, a pinecone and a blue jay feather. She noticed moss growing on the shady side of a tree and watched a woodpecker.',
       durationMinutes: 60,
       domains: ['science'],
       skillIds: ['sci.observe', 'sci.animals', 'sci.plants', 'sci.habitats'],
@@ -478,7 +497,7 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     ],
     'artwork',
     false,
-    77,
+    31, // kid-art seed % 4 === 3 → map
   );
   addActivity(
     {
@@ -519,7 +538,19 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     summary: string,
   ) => {
     const id = ids('lesson');
-    lessons.push({ id, childId: izzy.id, lessonId, teacherId, startedAt: at(ago, 14), completedAt: at(ago, 14, 12), startTier, endTier, problems, summary, isDemo: true });
+    lessons.push({
+      id,
+      childId: izzy.id,
+      lessonId,
+      teacherId,
+      startedAt: at(ago, 14),
+      completedAt: at(ago, 14, 12),
+      startTier,
+      endTier,
+      problems,
+      summary,
+      isDemo: true,
+    });
     interactions.push({
       id: ids('talk'),
       childId: izzy.id,
@@ -536,7 +567,14 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     });
     return { id, label: lessonId === 'moon-rocks' ? 'Moon Rock Rescue' : 'Sink or Float?' };
   };
-  const p = (skillId: string, tier: number, prompt: string, responses: string[], outcome: 'independent' | 'supported' | 'not_yet', scaffolds: string[] = []) => ({
+  const p = (
+    skillId: string,
+    tier: number,
+    prompt: string,
+    responses: string[],
+    outcome: 'independent' | 'supported' | 'not_yet',
+    scaffolds: string[] = [],
+  ) => ({
     problemId: `${skillId}-${prompt.length}-${tier}`,
     skillId,
     tier,
@@ -561,9 +599,23 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     'Moon Rock Rescue: 3 of 5 solved on the first try, 2 with a hint; Add within 10 → Add & subtract within 20.',
   );
   ev('math.add-10', 6, { independent: 2 }, { type: 'lesson', ...m1 }, 'Moon Rock Rescue: 2 adding-within-10 problems — 2 independently.');
-  ev('math.add-20', 6, { independent: 1, supported: 2 }, { type: 'lesson', ...m1 }, 'Moon Rock Rescue: 3 adding & subtracting within 20 problems — 1 independently, 2 with a hint or visual.');
-  ev('math.word-problems', 6, { independent: 3, supported: 2 }, { type: 'lesson', ...m1 }, 'Moon Rock Rescue: 5 story problems — 3 independently, 2 with a hint.');
-  ev('reason.persistence', 6, { independent: 2 }, { type: 'lesson', ...m1 }, 'Kept going after a hint and solved 2 problems in Moon Rock Rescue.', { kind: 'observation' });
+  ev(
+    'math.add-20',
+    6,
+    { independent: 1, supported: 2 },
+    { type: 'lesson', ...m1 },
+    'Moon Rock Rescue: 3 adding & subtracting within 20 problems — 1 independently, 2 with a hint or visual.',
+  );
+  ev(
+    'math.word-problems',
+    6,
+    { independent: 3, supported: 2 },
+    { type: 'lesson', ...m1 },
+    'Moon Rock Rescue: 5 story problems — 3 independently, 2 with a hint.',
+  );
+  ev('reason.persistence', 6, { independent: 2 }, { type: 'lesson', ...m1 }, 'Kept going after a hint and solved 2 problems in Moon Rock Rescue.', {
+    kind: 'observation',
+  });
   const m2 = lesson(
     'moon-rocks',
     'digit',
@@ -572,15 +624,34 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
       p('math.add-20', 4, 'I have 9 moon rocks. Nova found 4 more! How many do we have now?', ['13'], 'independent'),
       p('math.add-20', 4, 'I have 6 moon rocks. Nova found 7 more! How many do we have now?', ['12', '13'], 'supported', ['hint']),
       p('math.equal-shares', 5, 'Let’s share 14 moon rocks equally between 2 rockets. How many in each rocket?', ['6', '7'], 'supported', ['hint']),
-      p('math.equal-shares', 5, 'Can 11 moon rocks be shared fairly between 2 rockets, with none left over?', ['Yes, it’s fair!', 'One is left over'], 'supported', ['hint']),
+      p(
+        'math.equal-shares',
+        5,
+        'Can 11 moon rocks be shared fairly between 2 rockets, with none left over?',
+        ['Yes, it’s fair!', 'One is left over'],
+        'supported',
+        ['hint'],
+      ),
       p('math.add-20', 4, 'I have 8 moon rocks. Nova found 8 more! How many do we have now?', ['15', '16'], 'supported', ['hint']),
     ],
     4,
     4,
     'Moon Rock Rescue: 1 of 5 solved on the first try, 4 with a hint; stayed at Add & subtract within 20.',
   );
-  ev('math.add-20', 2, { independent: 1, supported: 2 }, { type: 'lesson', ...m2 }, 'Moon Rock Rescue: 3 adding-within-20 problems — 1 independently, 2 with a “make a ten” hint.');
-  ev('math.equal-shares', 2, { supported: 2 }, { type: 'lesson', ...m2 }, 'Moon Rock Rescue: 2 equal-sharing problems — 2 with a hint (dealing rocks one by one).');
+  ev(
+    'math.add-20',
+    2,
+    { independent: 1, supported: 2 },
+    { type: 'lesson', ...m2 },
+    'Moon Rock Rescue: 3 adding-within-20 problems — 1 independently, 2 with a “make a ten” hint.',
+  );
+  ev(
+    'math.equal-shares',
+    2,
+    { supported: 2 },
+    { type: 'lesson', ...m2 },
+    'Moon Rock Rescue: 2 equal-sharing problems — 2 with a hint (dealing rocks one by one).',
+  );
   const s1 = lesson(
     'sink-float',
     'nova',
@@ -596,8 +667,20 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
     'Sink or Float?: 1 of 2 explained on the first try, 1 with a hint.',
   );
   ev('sci.predict', 4, { independent: 2 }, { type: 'lesson', ...s1 }, 'Made 2 predictions before testing in Sink or Float? with Nova.');
-  ev('sci.materials', 4, { independent: 1, supported: 1 }, { type: 'lesson', ...s1 }, 'Sink or Float?: explained floating/sinking by material — 1 independently, 1 after a hint.');
-  ev('sci.explain', 4, { independent: 1, supported: 1 }, { type: 'lesson', ...s1 }, 'Used material evidence to explain results — 1 independently, 1 after a hint.');
+  ev(
+    'sci.materials',
+    4,
+    { independent: 1, supported: 1 },
+    { type: 'lesson', ...s1 },
+    'Sink or Float?: explained floating/sinking by material — 1 independently, 1 after a hint.',
+  );
+  ev(
+    'sci.explain',
+    4,
+    { independent: 1, supported: 1 },
+    { type: 'lesson', ...s1 },
+    'Used material evidence to explain results — 1 independently, 1 after a hint.',
+  );
 
   interactions.push({
     id: ids('talk'),
@@ -650,7 +733,10 @@ export async function seedDemoData(repos: Repositories, clock: Clock): Promise<S
   }
 
   // ── Rewards earned by the seeded progress (evaluated, not hand-picked) ─
-  const snapshot = buildSnapshot({ books: books.filter((b) => b.childId === izzy.id), evidence, activities, lessons, portfolio, mastery }, (id) => getSkill(id)?.domainId);
+  const snapshot = buildSnapshot(
+    { books: books.filter((b) => b.childId === izzy.id), evidence, activities, lessons, portfolio, mastery },
+    (id) => getSkill(id)?.domainId,
+  );
   const earned = evaluateNewRewards(snapshot, new Set());
   const unlocks: RewardUnlock[] = earned.map((r, i) => ({
     id: ids('unlock'),

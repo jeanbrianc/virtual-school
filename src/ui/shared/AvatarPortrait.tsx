@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react';
 import type { AvatarConfig } from '../../domain/types';
 
 /** Lazily renders the 3D avatar into a portrait image (engine chunk loads on demand). */
-export function AvatarPortrait({ avatar, size = 96, framing = 'head', className = '' }: { avatar: AvatarConfig | undefined; size?: number; framing?: 'head' | 'full'; className?: string }) {
+export function AvatarPortrait({
+  avatar,
+  size = 96,
+  framing = 'head',
+  className = '',
+}: {
+  avatar: AvatarConfig | undefined;
+  size?: number;
+  framing?: 'head' | 'full';
+  className?: string;
+}) {
   const [src, setSrc] = useState<string>('');
   useEffect(() => {
     if (!avatar) return;

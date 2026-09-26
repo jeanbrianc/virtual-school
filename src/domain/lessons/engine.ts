@@ -39,11 +39,7 @@ interface MainState {
   ladderStep: number;
 }
 
-export const ENCOURAGEMENTS_RETRY = [
-  'Almost! Let’s try another way.',
-  'Good thinking — let’s look again together.',
-  'Ooh, close! Let’s use a clue.',
-] as const;
+export const ENCOURAGEMENTS_RETRY = ['Almost! Let’s try another way.', 'Good thinking — let’s look again together.', 'Ooh, close! Let’s use a clue.'] as const;
 
 export class LessonRun {
   readonly definition: LessonDefinition;
@@ -110,9 +106,7 @@ export class LessonRun {
       this.main.scaffolds.push(right ? 'simpler:solved' : 'simpler:modeled');
       return {
         correct: right,
-        message: right
-          ? `${stone.success} Now let’s try the first one again.`
-          : `${stone.model} Now let’s try the first one again.`,
+        message: right ? `${stone.success} Now let’s try the first one again.` : `${stone.model} Now let’s try the first one again.`,
         scaffold: {
           type: 'alternate',
           text: this.main.problem.hints[1] ?? this.main.problem.hints[0] ?? '',
@@ -176,11 +170,7 @@ export class LessonRun {
     return { correct: false, message, scaffold, problemFinished: false, tierChange: null, lessonComplete: false };
   }
 
-  private finishProblem(
-    outcome: ProblemAttemptRecord['outcome'],
-    message: string,
-    scaffold: ActiveScaffold | null = null,
-  ): LessonFeedback {
+  private finishProblem(outcome: ProblemAttemptRecord['outcome'], message: string, scaffold: ActiveScaffold | null = null): LessonFeedback {
     const state = this.main;
     if (!state) throw new Error('No active problem');
     const p = state.problem;

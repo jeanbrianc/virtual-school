@@ -4,7 +4,7 @@
  * base confidence and a parent-facing statement template.
  */
 import type { EvidenceKind, Independence } from '../types';
-import { NUMBER_WORD_PATTERN, parseNumber } from './numbers';
+import { NUMBER_WORD_PATTERN, numbersIn, parseNumber } from './numbers';
 
 export type SentenceContext = 'reading' | 'cooking' | 'nature' | 'art' | 'science' | 'math' | 'general';
 
@@ -74,8 +74,7 @@ export const RULES: Rule[] = [
       {
         skillId: 'read.chapter-stamina',
         confidence: 0.8,
-        statement: (s, m) =>
-          `Read ${clause(m, 2)} ${clause(m, 3)}${s.bookTitle ? ` of ${s.bookTitle}` : ''}${indepPhrase(s.independence ?? 'independent')}.`,
+        statement: (s, m) => `Read ${clause(m, 2)} ${clause(m, 3)}${s.bookTitle ? ` of ${s.bookTitle}` : ''}${indepPhrase(s.independence ?? 'independent')}.`,
       },
       {
         skillId: 'read.fluency',
@@ -114,7 +113,8 @@ export const RULES: Rule[] = [
   },
   {
     id: 'reading.retell',
-    pattern: /\b(summari[sz]ed|summari[sz]e|retold|retell|re-told|told (me|us|her dad|grandma) (what happened|about (it|the (story|chapter|book)))|narrated|recapped|told it back)\b/i,
+    pattern:
+      /\b(summari[sz]ed|summari[sz]e|retold|retell|re-told|told (me|us|her dad|grandma) (what happened|about (it|the (story|chapter|book)))|narrated|recapped|told it back)\b/i,
     notIn: ['cooking'],
     skills: [
       {
@@ -131,13 +131,15 @@ export const RULES: Rule[] = [
   },
   {
     id: 'reading.explainWhy',
-    pattern: /\b(?:explained|explain|understood|figured out|knew|told me|could say|described)\s+(why|how|what)\s+([^.;!?]+?)(?=\s+and\s+(?:she|he|then)\b|[.;!?]|$)/i,
+    pattern:
+      /\b(?:explained|explain|understood|figured out|knew|told me|could say|described)\s+(why|how|what)\s+([^.;!?]+?)(?=\s+and\s+(?:she|he|then)\b|[.;!?]|$)/i,
     onlyIn: ['reading'],
     skills: [
       {
         skillId: 'read.inference',
         confidence: 0.7,
-        statement: (s, m) => `${s.affirmed ? 'Correctly e' : 'E'}xplained ${clause(m, 1)} ${clause(m, 2)}${indepPhrase(s.independence)} — reasoning beyond literal recall.`,
+        statement: (s, m) =>
+          `${s.affirmed ? 'Correctly e' : 'E'}xplained ${clause(m, 1)} ${clause(m, 2)}${indepPhrase(s.independence)} — reasoning beyond literal recall.`,
       },
       {
         skillId: 'read.feelings',
@@ -177,7 +179,8 @@ export const RULES: Rule[] = [
       {
         skillId: 'read.procedural',
         confidence: 0.85,
-        statement: (s, m) => `Read ${clause(m, 1) === 'steps' ? 'recipe/procedure steps' : `the ${clause(m, 1)}`} aloud and followed along${indepPhrase(s.independence ?? 'independent')}.`,
+        statement: (s, m) =>
+          `Read ${clause(m, 1) === 'steps' ? 'recipe/procedure steps' : `the ${clause(m, 1)}`} aloud and followed along${indepPhrase(s.independence ?? 'independent')}.`,
       },
       {
         skillId: 'reason.sequencing',
@@ -216,7 +219,8 @@ export const RULES: Rule[] = [
       {
         skillId: 'vocab.context',
         confidence: 0.65,
-        statement: (s, m) => (m[1] ? `Worked on the meaning of “${clause(m, 1)}”${indepPhrase(s.independence)}.` : `Learned new vocabulary${indepPhrase(s.independence)}.`),
+        statement: (s, m) =>
+          m[1] ? `Worked on the meaning of “${clause(m, 1)}”${indepPhrase(s.independence)}.` : `Learned new vocabulary${indepPhrase(s.independence)}.`,
       },
     ],
   },
@@ -255,7 +259,8 @@ export const RULES: Rule[] = [
       {
         skillId: 'write.composing',
         confidence: 0.75,
-        statement: (s, m) => `Composed a ${clause(m, 3).replace(/ to$/, '')}${m[1]?.toLowerCase() === 'dictated' ? ' by dictation' : ''}${indepPhrase(s.independence)}.`,
+        statement: (s, m) =>
+          `Composed a ${clause(m, 3).replace(/ to$/, '')}${m[1]?.toLowerCase() === 'dictated' ? ' by dictation' : ''}${indepPhrase(s.independence)}.`,
       },
       {
         skillId: 'write.sentences',
@@ -268,7 +273,10 @@ export const RULES: Rule[] = [
   // ── Math ────────────────────────────────────────────────────────────────
   {
     id: 'math.count',
-    pattern: new RegExp(`\\bcount(?:ed|ing|s)?\\s+(?:out\\s+|up\\s+|to\\s+|all\\s+)?(?:the\\s+)?(${NUM})(?:\\s+([a-z]+))?`, 'i'),
+    pattern: new RegExp(
+      `\\bcount(?:ed|ing|s)?\\s+(?:out\\s+|up\\s+|up to\\s+|to\\s+|past\\s+|all\\s+|backwards? from\\s+)?(?:the\\s+)?(${NUM})(?:\\s+([a-z]+))?`,
+      'i',
+    ),
     skills: [
       {
         skillId: 'math.count-10',
@@ -280,13 +288,14 @@ export const RULES: Rule[] = [
   {
     id: 'math.skipCount',
     pattern: /\b(skip[- ]count\w*|count(?:ed|ing)? by (tens|10s|fives|5s|twos|2s)|counted to (a hundred|one hundred|100))\b/i,
-    skills: [
-      { skillId: 'math.count-100', confidence: 0.8, statement: (s, m) => `${cap(clause(m, 1))}${indepPhrase(s.independence)}.` },
-    ],
+    skills: [{ skillId: 'math.count-100', confidence: 0.8, statement: (s, m) => `${cap(clause(m, 1))}${indepPhrase(s.independence)}.` }],
   },
   {
     id: 'math.measure',
-    pattern: /\b(measur(?:ed|ing|e)|cups?|tablespoons?|teaspoons?|tbsp|tsp|ruler|tape measure|inches|centimeters|weigh(?:ed|ing)?|kitchen scale)\b/i,
+    // A unit only counts when it is a quantity ("2 cups", "a cup of", "half a teaspoon") —
+    // "planted seeds in cups" is a container, not a measurement.
+    pattern:
+      /\b(measur(?:ed|ing|e)|(?:\d+(?:[./]\d+)?|one|two|three|four|five|six|half(?: a)?|a quarter|a third)\s+(?:cups?|tablespoons?|teaspoons?|tbsp|tsp|inch(?:es)?|feet|foot|centimeters?|cm|pounds?|ounces?|grams?)\b|an? (?:cup|tablespoon|teaspoon) of|ruler|tape measure|weigh(?:ed|ing)?|kitchen scale)/i,
     label: () => null,
     skills: [
       {
@@ -300,16 +309,23 @@ export const RULES: Rule[] = [
     id: 'math.compareAttr',
     pattern: /\b(longer|shorter|taller|heavier|lighter|biggest|smallest|compared (the )?(size|length|weight))\b/i,
     notIn: ['reading'],
-    skills: [{ skillId: 'math.measure-compare', confidence: 0.6, statement: (s) => `Compared objects by a measurable attribute${indepPhrase(s.independence)}.` }],
+    skills: [
+      { skillId: 'math.measure-compare', confidence: 0.6, statement: (s) => `Compared objects by a measurable attribute${indepPhrase(s.independence)}.` },
+    ],
   },
   {
     id: 'math.addSub',
-    pattern: /\b(add(?:ed|ing)?|plus|altogether|in all|how many (?:were )?left|subtract\w*|minus|take away|took away|more makes|equals)\b/i,
+    pattern:
+      /\b(add(?:ed|ing)?|plus|altogether|in all|how many (?:were )?left|(?:were|was|are|is) left|left over|subtract\w*|minus|take away|took away|more makes|equals)\b/i,
     skills: [
       {
         skillId: 'math.add-10',
         confidence: 0.7,
-        statement: (s, m) => `Solved an addition/subtraction problem (${clause(m, 1)})${indepPhrase(s.independence ?? 'independent')}.`,
+        statement: (s) => {
+          const nums = numbersIn(s.lower).slice(0, 3);
+          const sub = /\b(subtract\w*|minus|take away|took away|left|fewer)\b/i.test(s.text);
+          return `Solved ${sub ? 'a subtraction' : 'an addition'} problem${nums.length >= 2 ? ` (${nums.join(', ')})` : ''}${indepPhrase(s.independence ?? 'independent')}.`;
+        },
       },
     ],
   },
@@ -361,15 +377,20 @@ export const RULES: Rule[] = [
   },
   {
     id: 'math.share',
-    pattern: /\b(shared? (?:them |it )?(?:out )?(?:equally|fairly|evenly)|split (?:them |it )?(?:evenly|equally)|even (?:or|and) odd|odd (?:or|and) even|fair shares?)\b/i,
-    skills: [{ skillId: 'math.equal-shares', confidence: 0.75, statement: (s, m) => `Shared a quantity equally (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
+    pattern:
+      /\b(shared? (?:them |it )?(?:out )?(?:equally|fairly|evenly)|split (?:them |it )?(?:evenly|equally)|even (?:or|and) odd|odd (?:or|and) even|fair shares?)\b/i,
+    skills: [
+      { skillId: 'math.equal-shares', confidence: 0.75, statement: (s, m) => `Shared a quantity equally (${clause(m, 1)})${indepPhrase(s.independence)}.` },
+    ],
   },
   {
     id: 'math.groups',
     pattern: /\b(groups of|rows of|times|multipl\w+|arrays?)\b/i,
     notIn: ['reading'],
     exclude: /\b(many times|some times|sometimes|two times a|at times|times when)\b/i,
-    skills: [{ skillId: 'math.equal-groups', confidence: 0.55, statement: (s, m) => `Worked with equal groups (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
+    skills: [
+      { skillId: 'math.equal-groups', confidence: 0.55, statement: (s, m) => `Worked with equal groups (${clause(m, 1)})${indepPhrase(s.independence)}.` },
+    ],
   },
   {
     id: 'math.placeValue',
@@ -383,18 +404,15 @@ export const RULES: Rule[] = [
     notIn: ['reading'],
     topics: ['plants'],
     label: (_s, m) => (/garden|plant/i.test(m[1] ?? '') ? 'Gardening' : null),
-    skills: [
-      { skillId: 'sci.plants', confidence: 0.8, statement: (s, m) => `Explored how plants grow (${clause(m, 1)})${indepPhrase(s.independence)}.` },
-    ],
+    skills: [{ skillId: 'sci.plants', confidence: 0.8, statement: (s, m) => `Explored how plants grow (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
   },
   {
     id: 'science.animals',
-    pattern: /\b(birds?|squirrels?|bugs?|insects?|butterfl(?:y|ies)|caterpillars?|worms?|ants?|bees?|spiders?|frogs?|toads?|deer|rabbits?|ducks?|geese|fish|snails?|ladybugs?|beetles?|animals?|chickens?|chipmunks?|owls?|nest|animal tracks|wildlife)\b/i,
+    pattern:
+      /\b(birds?|squirrels?|bugs?|insects?|butterfl(?:y|ies)|caterpillars?|worms?|ants?|bees?|spiders?|frogs?|toads?|deer|rabbits?|ducks?|geese|fish|snails?|ladybugs?|beetles?|animals?|chickens?|chipmunks?|owls?|nest|animal tracks|wildlife)\b/i,
     notIn: ['reading', 'cooking'],
     topics: ['animals'],
-    skills: [
-      { skillId: 'sci.animals', confidence: 0.65, statement: (s, m) => `Observed living things (${clause(m, 1)})${indepPhrase(s.independence)}.` },
-    ],
+    skills: [{ skillId: 'sci.animals', confidence: 0.65, statement: (s, m) => `Observed living things (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
   },
   {
     id: 'science.lifeCycles',
@@ -417,11 +435,14 @@ export const RULES: Rule[] = [
     id: 'science.dinosaurs',
     pattern: /\b(dinosaurs?|fossils?|t\.? ?rex|tyrannosaurus|triceratops|stegosaurus|brachiosaurus|paleontolog\w*|extinct)\b/i,
     topics: ['dinosaurs'],
-    skills: [{ skillId: 'sci.fossils', confidence: 0.7, statement: (s, m) => `Explored fossils and ancient life (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
+    skills: [
+      { skillId: 'sci.fossils', confidence: 0.7, statement: (s, m) => `Explored fossils and ancient life (${clause(m, 1)})${indepPhrase(s.independence)}.` },
+    ],
   },
   {
     id: 'science.space',
-    pattern: /\b(moon|stars?|planets?|space|astronauts?|telescope|constellations?|solar system|mars|jupiter|saturn|venus|orbit|galaxy|comets?|meteors?|eclipse|planetarium)\b/i,
+    pattern:
+      /\b(moon|stars?|planets?|space|astronauts?|telescope|constellations?|solar system|mars|jupiter|saturn|venus|orbit|galaxy|comets?|meteors?|eclipse|planetarium)\b/i,
     exclude: /\bstar stickers?|gold star|star-shaped|star cookies?\b/i,
     notIn: ['reading'],
     topics: ['space'],
@@ -437,7 +458,8 @@ export const RULES: Rule[] = [
   },
   {
     id: 'science.changes',
-    pattern: /\b(melt(?:ed|ing|s)?|freez(?:e|ing)|froze|boil(?:ed|ing)?|get bigger in the oven|got bigger|rise|rising|rose|dissolv\w*|evaporat\w*|turned (?:into|brown|solid|liquid))\b/i,
+    pattern:
+      /\b(melt(?:ed|ing|s)?|freez(?:e|ing)|froze|boil(?:ed|ing)?|get bigger in the oven|got bigger|rise|rising|rose|dissolv\w*|evaporat\w*|turned (?:into|brown|solid|liquid))\b/i,
     topics: ['changes'],
     skills: [
       { skillId: 'sci.changes', confidence: 0.6, kind: 'exposure', statement: (_s, m) => `Noticed materials changing with heating/cooling (${clause(m, 1)}).` },
@@ -445,11 +467,17 @@ export const RULES: Rule[] = [
   },
   {
     id: 'science.experiment',
-    pattern: /\b(experiment\w*|hypothes\w*|predicted|prediction|tested (?:whether|if|which)|investigat\w*|magnifying glass|microscope|observed|observations?)\b/i,
+    pattern:
+      /\b(experiment\w*|hypothes\w*|predicted|prediction|tested (?:whether|if|which)|investigat\w*|magnifying glass|microscope|observed|observations?)\b/i,
     label: () => 'Science experiment',
     skills: [
       { skillId: 'sci.predict', confidence: 0.65, when: /\bpredict/i, statement: (s) => `Made a prediction and tested it${indepPhrase(s.independence)}.` },
-      { skillId: 'sci.observe', confidence: 0.65, statement: (s) => `Made careful scientific observations${indepPhrase(s.independence)}.` },
+      {
+        skillId: 'sci.observe',
+        confidence: 0.65,
+        when: /\b(observ\w*|magnifying glass|microscope|noticed|watched|looked closely|compared)\b/i,
+        statement: (s) => `Made careful scientific observations${indepPhrase(s.independence)}.`,
+      },
     ],
     notIn: ['reading'],
   },
@@ -458,7 +486,9 @@ export const RULES: Rule[] = [
     pattern: /\b(sink|sank|sinks|float(?:ed|s|ing)?|magnet(?:s|ic)?|absorb\w*|waterproof|made of (?:wood|metal|plastic|glass))\b/i,
     notIn: ['reading'],
     topics: ['water'],
-    skills: [{ skillId: 'sci.materials', confidence: 0.7, statement: (s, m) => `Investigated material properties (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
+    skills: [
+      { skillId: 'sci.materials', confidence: 0.7, statement: (s, m) => `Investigated material properties (${clause(m, 1)})${indepPhrase(s.independence)}.` },
+    ],
   },
   {
     id: 'science.forces',
@@ -476,16 +506,16 @@ export const RULES: Rule[] = [
     id: 'science.question',
     pattern: /\b(?:asked|wondered|wanted to know)\s+(?:me\s+|us\s+)?((?:why|how|what|where|whether|if)\b[^.?!;]*)/i,
     notIn: ['reading'],
-    skills: [
-      { skillId: 'sci.questions', confidence: 0.8, statement: (_s, m) => `Asked a scientific question: “${cap(clause(m, 1))}?”` },
-    ],
+    skills: [{ skillId: 'sci.questions', confidence: 0.8, statement: (_s, m) => `Asked a scientific question: “${cap(clause(m, 1))}?”` }],
   },
   {
     id: 'science.earthMaterials',
     pattern: /\b(rocks?|stones?|pebbles?|minerals?|crystals?|sand|mud|soil samples?)\b/i,
     onlyIn: ['nature', 'science'],
     topics: ['nature'],
-    skills: [{ skillId: 'sci.earth-materials', confidence: 0.5, statement: (s) => `Examined earth materials (rocks, soil or sand)${indepPhrase(s.independence)}.` }],
+    skills: [
+      { skillId: 'sci.earth-materials', confidence: 0.5, statement: (s) => `Examined earth materials (rocks, soil or sand)${indepPhrase(s.independence)}.` },
+    ],
   },
   {
     id: 'science.engineer',
@@ -500,10 +530,13 @@ export const RULES: Rule[] = [
   // ── Life skills ─────────────────────────────────────────────────────────
   {
     id: 'life.cooking',
-    pattern: /\b(bak(?:e|ed|ing)|cook(?:ed|ing)?|recipe|kitchen|stirr?(?:ed|ing)?|cracked (?:the )?eggs?|dough|knead\w*|muffins?|bread|cookies|pancakes|made (?:lunch|dinner|breakfast|a snack|soup))\b/i,
+    pattern:
+      /\b(bak(?:e|ed|ing)|cook(?:ed|ing)?|recipe|kitchen|stirr?(?:ed|ing)?|cracked (?:the )?eggs?|dough|knead\w*|muffins?|bread|cookies|pancakes|made (?:lunch|dinner|breakfast|a snack|soup))\b/i,
     assume: 'supported',
     label: (s) => {
-      const dish = s.lower.match(/\b(?:baked|bake|baking|made|cooked|cooking)\s+(?:some\s+|a\s+|the\s+|homemade\s+)?(banana bread|muffins|bread|cookies|pancakes|soup|pizza|cake|cupcakes|biscuits|granola|dinner|lunch)\b/);
+      const dish = s.lower.match(
+        /\b(?:baked|bake|baking|made|cooked|cooking)\s+(?:some\s+|a\s+|the\s+|homemade\s+)?(banana bread|muffins|bread|cookies|pancakes|soup|pizza|cake|cupcakes|biscuits|granola|dinner|lunch)\b/,
+      );
       return dish ? `Baking ${dish[1]}` : 'Cooking together';
     },
     skills: [
@@ -512,13 +545,17 @@ export const RULES: Rule[] = [
   },
   {
     id: 'life.chores',
-    pattern: /\b(chores?|laundry|set the table|clean(?:ed)? (?:up|her room)|tid(?:y|ied) (?:up)?|folded|swept|vacuum\w*|fed the (?:dog|cat|fish|chickens)|unloaded the dishwasher)\b/i,
+    pattern:
+      /\b(chores?|laundry|set the table|clean(?:ed)? (?:up|her room)|tid(?:y|ied) (?:up)?|folded|swept|vacuum\w*|fed the (?:dog|cat|fish|chickens)|unloaded the dishwasher)\b/i,
     label: () => 'Helping at home',
-    skills: [{ skillId: 'life.chores', confidence: 0.75, statement: (s, m) => `Contributed to the household (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
+    skills: [
+      { skillId: 'life.chores', confidence: 0.75, statement: (s, m) => `Contributed to the household (${clause(m, 1)})${indepPhrase(s.independence)}.` },
+    ],
   },
   {
     id: 'life.selfCare',
-    pattern: /\b(dressed herself|got dressed|brushed (?:her )?teeth|tied (?:her )?shoes|buttoned|zipped (?:up )?(?:her )?(?:coat|jacket)|washed (?:her )?hands)\b/i,
+    pattern:
+      /\b(dressed herself|got dressed|brushed (?:her )?teeth|tied (?:her )?shoes|buttoned|zipped (?:up )?(?:her )?(?:coat|jacket)|washed (?:her )?hands)\b/i,
     skills: [{ skillId: 'life.self-care', confidence: 0.8, statement: (s, m) => `Self-care: ${clause(m, 1)}${indepPhrase(s.independence ?? 'independent')}.` }],
   },
   {
@@ -529,7 +566,8 @@ export const RULES: Rule[] = [
   },
   {
     id: 'life.kindness',
-    pattern: /\b(helped (?:her |his )?(?:sister|brother|friend|georgia|grandma|grandpa|neighbor)|comforted|made a card for|thank-you note|shared (?:her |his )?(?:toys?|snack|crayons))\b/i,
+    pattern:
+      /\b(helped (?:her |his )?(?:sister|brother|friend|georgia|grandma|grandpa|neighbor)|comforted|made a card for|thank-you note|shared (?:her |his )?(?:toys?|snack|crayons))\b/i,
     skills: [{ skillId: 'life.kindness', confidence: 0.65, statement: (_s, m) => `Showed kindness (${clause(m, 1)}).` }],
   },
   // ── Creativity ──────────────────────────────────────────────────────────
@@ -543,7 +581,8 @@ export const RULES: Rule[] = [
   },
   {
     id: 'art.color',
-    pattern: /\b(mix(?:ed|ing)? (?:the )?(?:paint )?colou?rs?|made (?:purple|green|orange|brown|pink)|colou?r mixing)\b/i,
+    pattern:
+      /\b(mix(?:ed|ing)? (?:the )?(?:paint )?colou?rs?|mix(?:ed|ing)? (?:red|yellow|blue|white|black)(?: and (?:red|yellow|blue|white|black))?(?: to (?:make|get) \w+)?|(?:made|make|to make) (?:purple|green|orange|brown|pink)|colou?r mixing)\b/i,
     topics: ['art'],
     skills: [{ skillId: 'art.color', confidence: 0.75, statement: (s, m) => `Explored color mixing (${clause(m, 1)})${indepPhrase(s.independence)}.` }],
   },
@@ -596,7 +635,12 @@ export const RULES: Rule[] = [
     label: (_s, m) => `Trip to the ${clause(m, 1)}`,
     topics: [],
     skills: [
-      { skillId: 'sci.observe', confidence: 0.45, when: /\b(zoo|aquarium|farm|science center|planetarium|botanical|arboretum|museum)\b/i, statement: (_s, m) => `Made observations on a trip to the ${clause(m, 1)}.` },
+      {
+        skillId: 'sci.observe',
+        confidence: 0.45,
+        when: /\b(zoo|aquarium|farm|science center|planetarium|botanical|arboretum|museum)\b/i,
+        statement: (_s, m) => `Made observations on a trip to the ${clause(m, 1)}.`,
+      },
     ],
   },
 ];
@@ -611,6 +655,14 @@ export const TRIP_TOPICS: Record<string, string[]> = {
 };
 
 /** Refines a counting suggestion by magnitude (10 / 20 / 100). */
+/** Picks the add/subtract skill from the numbers involved ("13 minus 5" → within 20). */
+export function refineAddSubSkill(sentence: string): string {
+  const nums = numbersIn(sentence.toLowerCase());
+  const subtracting = /\b(subtract\w*|minus|take away|took away|left|fewer)\b/i.test(sentence);
+  if (nums.some((n) => n > 10) || (!subtracting && nums.length >= 2 && nums.reduce((a, b) => a + b, 0) > 10)) return 'math.add-20';
+  return subtracting ? 'math.sub-10' : 'math.add-10';
+}
+
 export function refineCountSkill(m: RegExpMatchArray): string {
   const n = parseNumber(m[1] ?? '') ?? 0;
   return countSkill(n);
@@ -633,7 +685,8 @@ export const NATURE_ITEMS: [RegExp, string][] = [
 ];
 
 export const FOLLOW_UPS: Record<string, string> = {
-  'sci.changes': 'Try a yeast balloon: warm water, sugar and yeast in a bottle with a balloon on top. Watch gas inflate it — the same thing that makes dough rise.',
+  'sci.changes':
+    'Try a yeast balloon: warm water, sugar and yeast in a bottle with a balloon on top. Watch gas inflate it — the same thing that makes dough rise.',
   'sci.questions': 'Add today’s question to a “wonder wall” and investigate it together this week.',
   'math.measure-units': 'Next time, double the recipe together — 2 cups becomes 4 cups (early multiplication hiding in the kitchen).',
   'math.count-20': 'Count objects into groups of ten (egg cartons work great) to bridge toward place value.',

@@ -40,9 +40,7 @@ export class IndexedDbDatabase implements Database {
       const tx = request.transaction;
       if (!tx) return;
       for (const spec of specs) {
-        const store = db.objectStoreNames.contains(spec.name)
-          ? tx.objectStore(spec.name)
-          : db.createObjectStore(spec.name, { keyPath: spec.keyPath });
+        const store = db.objectStoreNames.contains(spec.name) ? tx.objectStore(spec.name) : db.createObjectStore(spec.name, { keyPath: spec.keyPath });
         for (const idx of spec.indexes) {
           if (!store.indexNames.contains(idx.name)) {
             store.createIndex(idx.name, idx.keyPath, { multiEntry: idx.multiEntry ?? false });

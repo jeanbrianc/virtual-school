@@ -20,7 +20,8 @@ function kidChair(color: string): THREE.Group {
     [0.15, -0.14],
     [-0.15, 0.14],
     [0.15, 0.14],
-  ] as const) g.add(cyl(0.02, 0.02, 0.3, legM, x, 0.15, z, 8));
+  ] as const)
+    g.add(cyl(0.02, 0.02, 0.3, legM, x, 0.15, z, 8));
   return g;
 }
 
@@ -42,7 +43,8 @@ function roundTable(ctx: BuildContext, x: number, z: number, seed: number) {
   const paper = box(0.3, 0.004, 0.22, mat('#fffaf0', { roughness: 0.9 }), -0.15, 0.527, 0.1);
   paper.rotation.y = rng();
   g.add(paper);
-  for (let i = 0; i < 4; i++) g.add(rbox(0.07, 0.07, 0.07, 0.01, mat(CHAIR_COLORS[(i + seed) % 6] ?? '#e07a5f'), -0.25 + i * 0.08, 0.56 + (i === 3 ? 0.07 : 0), -0.2));
+  for (let i = 0; i < 4; i++)
+    g.add(rbox(0.07, 0.07, 0.07, 0.01, mat(CHAIR_COLORS[(i + seed) % 6] ?? '#e07a5f'), -0.25 + i * 0.08, 0.56 + (i === 3 ? 0.07 : 0), -0.2));
   g.position.set(x, 0, z);
   ctx.addStatic(g);
   ctx.addStatic(contactShadow(1.7, 1.7, 0.28, x, z));
@@ -71,12 +73,16 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
   const frame = rbox(4.5, 2.1, 0.08, 0.03, mat(PALETTE.oak, { roughness: 0.5 }), 0, 0, 0);
   const face = new THREE.Mesh(
     new THREE.PlaneGeometry(4.3, 1.9),
-    new THREE.MeshStandardMaterial({ map: chalkboardTexture(['Good morning, Izzy!', 'Let’s explore!'], `${days[today.getDay()]}, ${months[today.getMonth()]} ${today.getDate()}`), roughness: 0.9 }),
+    new THREE.MeshStandardMaterial({
+      map: chalkboardTexture([`Good morning, ${ctx.childName}!`, 'Let’s explore!'], `${days[today.getDay()]}, ${months[today.getMonth()]} ${today.getDate()}`),
+      roughness: 0.9,
+    }),
   );
   face.position.z = 0.045;
   const tray = box(4.3, 0.05, 0.14, mat(PALETTE.oak), 0, -1.02, 0.07);
   board.add(frame, face, tray);
-  for (let i = 0; i < 4; i++) board.add(cyl(0.012, 0.012, 0.08, mat(['#ffffff', '#f7d27a', '#a8d8e0', '#f4a6a6'][i] ?? '#fff'), -1.6 + i * 0.12, -0.98, 0.09, 6).rotateZ(Math.PI / 2));
+  for (let i = 0; i < 4; i++)
+    board.add(cyl(0.012, 0.012, 0.08, mat(['#ffffff', '#f7d27a', '#a8d8e0', '#f4a6a6'][i] ?? '#fff'), -1.6 + i * 0.12, -0.98, 0.09, 6).rotateZ(Math.PI / 2));
   board.position.set(0, 2.35, -9.78);
   ctx.mount('north', board);
 
@@ -154,8 +160,7 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
     ctx.addStatic(l);
   });
 
-
-  // Reward: art line with Izzy's artwork.
+  // Reward: art line with the child's artwork.
   const artLine = new THREE.Group();
   const post = mat(PALETTE.oak, { roughness: 0.6 });
   for (const s of [-1, 1]) artLine.add(cyl(0.04, 0.05, 2.5, post, s * 3.6, 1.25, 0, 10), sphere(0.07, mat(PALETTE.mustard), s * 3.6, 2.55, 0, 12));
@@ -180,7 +185,7 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
       const seed = [31, 77, 12, 45, 90, 23, 64][i] ?? i * 17;
       let tex = photoTextures[i] ?? artTextures.get(seed);
       if (!tex) {
-        tex = kidArtTexture(seed);
+        tex = kidArtTexture(seed, ctx.childName);
         artTextures.set(seed, tex);
       }
       const frame = new THREE.Group();

@@ -34,12 +34,12 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     accent: '#e8b04b',
     voice: { pitch: 0.85, rate: 0.95 },
     greetings: [
-      'Hoo-hoo! Welcome to the library, Izzy!',
+      'Hoo-hoo! Welcome to the library, {name}!',
       'Why, if it isn’t my favorite reader! Hoo-hoo!',
-      'Hello, Izzy! The books have been whispering about you.',
+      'Hello, {name}! The books have been whispering about you.',
     ],
     returnGreetings: ['Hoo-hoo, welcome back!', 'Back again? Wonderful — the library missed you!'],
-    farewells: ['Happy reading, Izzy!', 'Off you go — adventures are waiting between the pages!', 'Hoo-hoo! See you soon!'],
+    farewells: ['Happy reading, {name}!', 'Off you go — adventures are waiting between the pages!', 'Hoo-hoo! See you soon!'],
     praise: ['Magnificent thinking!', 'What a clever reader you are!', 'Hoo-hoo! Splendid!'],
   },
   digit: {
@@ -51,7 +51,7 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#4aa3a8',
     accent: '#ffcf5c',
     voice: { pitch: 1.35, rate: 1.05 },
-    greetings: ['Beep boop! Hello, Izzy!', 'Greetings, Captain Izzy! Systems ready for math!', 'Beep! My number sensors detect… IZZY!'],
+    greetings: ['Beep boop! Hello, {name}!', 'Greetings, Captain {name}! Systems ready for math!', 'Beep! My number sensors detect… {NAME}!'],
     returnGreetings: ['Beep boop! You’re back! My circuits are happy!', 'Welcome back, space helper!'],
     farewells: ['Beep boop, bye for now!', 'Mission complete. See you next launch!'],
     praise: ['Calculations correct! Beep!', 'Excellent counting, Captain!', 'Boop-tastic!'],
@@ -65,12 +65,17 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#c65d3b',
     accent: '#7fc8c0',
     voice: { pitch: 1.15, rate: 1.0 },
-    greetings: ['Izzy! Perfect timing — I was just wondering about something!', 'Hi hi! Want to discover something amazing?'],
+    greetings: ['{name}! Perfect timing — I was just wondering about something!', 'Hi hi! Want to discover something amazing?'],
     returnGreetings: ['You’re back! I have SO many new questions!', 'Welcome back, fellow scientist!'],
-    farewells: ['Keep wondering, Izzy!', 'Stay curious! See you in the lab!'],
+    farewells: ['Keep wondering, {name}!', 'Stay curious! See you in the lab!'],
     praise: ['Now THAT’S scientific thinking!', 'Ooh, great observation!', 'You think like a real scientist!'],
   },
 };
+
+/** Fills the `{name}` / `{NAME}` placeholders in teacher and lesson lines. */
+export function personalize(text: string, name: string): string {
+  return text.replace(/\{NAME\}/g, name.toUpperCase()).replace(/\{name\}/g, name);
+}
 
 export function pickLine(lines: readonly string[], seed: number): string {
   if (lines.length === 0) return '';
@@ -79,6 +84,8 @@ export function pickLine(lines: readonly string[], seed: number): string {
 
 /** Memory-aware opener: teachers remember basic progress, nothing more. */
 export interface TeacherMemory {
+  /** The learner's first name, substituted into greetings. */
+  childName: string;
   visitsToday: number;
   lastLessonSummary?: string;
   currentBookTitle?: string;
@@ -98,5 +105,5 @@ export function teacherOpening(id: TeacherId, memory: TeacherMemory, seed: numbe
   } else if (memory.lastLessonSummary) {
     lines.push(memory.lastLessonSummary);
   }
-  return lines;
+  return lines.map((l) => personalize(l, memory.childName));
 }

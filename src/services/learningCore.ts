@@ -99,12 +99,7 @@ export interface LearningOutcome {
  * Finalizes a unit of work that contains new learning records for a child.
  * Adds mastery updates and reward unlocks to the same atomic commit.
  */
-export async function finalizeLearning(
-  ctx: ServiceContext,
-  childId: string,
-  uow: UnitOfWork,
-  trigger: string,
-): Promise<LearningOutcome> {
+export async function finalizeLearning(ctx: ServiceContext, childId: string, uow: UnitOfWork, trigger: string): Promise<LearningOutcome> {
   const existing = await loadChildRecords(ctx, childId);
   const merged: ChildRecords = {
     books: mergeById(existing.books, uow.staged<Book>('books')),

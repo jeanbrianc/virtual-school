@@ -38,6 +38,8 @@ export interface HootFlowProps {
   onFinishBook: (input: Omit<CompleteBookInput, 'source'>) => void;
   onReadMore: (bookId: string, chapters: number, transcript: TranscriptLine[], startedAt: string) => Promise<string>;
   onClose: (transcript: TranscriptLine[], startedAt: string) => void;
+  /** Optional voice answer (only when a parent enabled speech input and the browser supports it). */
+  listen?: () => Promise<string | null>;
 }
 
 const FEELING_ICONS: Record<string, string> = {
@@ -53,6 +55,7 @@ export function HootFlow(props: HootFlowProps) {
   const { speech, playSfx } = props;
   const startedAt = useRef(new Date().toISOString());
   const transcript = useRef<TranscriptLine[]>([]);
+  const [listening, setListening] = useState(false);
   const seed = useRef(hashString(startedAt.current));
   const [step, setStep] = useState<Step>({ kind: 'menu' });
   const [book, setBook] = useState<Book | null>(null);
@@ -85,6 +88,7 @@ export function HootFlow(props: HootFlowProps) {
     return teacherOpening(
       'hoot',
       {
+        childName: props.childName,
         visitsToday: props.visitsToday,
         booksCompleted: completedCount,
         ...(current ? { currentBookTitle: current.title } : {}),
@@ -174,7 +178,16 @@ export function HootFlow(props: HootFlowProps) {
     playSfx('sparkle');
     const input: Omit<CompleteBookInput, 'source'> = {
       ...(b ? { bookId: b.id } : {}),
-      ...(!b && newBookInput ? { newBook: { title: newBookInput.title, ...(newBookInput.author ? { author: newBookInput.author } : {}), ...(newBookInput.catalogId ? { catalogId: newBookInput.catalogId } : {}), needsParentReview: !newBookInput.catalogId } } : {}),
+      ...(!b && newBookInput
+        ? {
+            newBook: {
+              title: newBookInput.title,
+              ...(newBookInput.author ? { author: newBookInput.author } : {}),
+              ...(newBookInput.catalogId ? { catalogId: newBookInput.catalogId } : {}),
+              needsParentReview: !newBookInput.catalogId,
+            },
+          }
+        : {}),
       answers: run ? [...run.attempts] : [],
       ...(run ? { problems: run.problemIndex } : {}),
       ...(rating ? { rating } : {}),
@@ -220,7 +233,14 @@ export function HootFlow(props: HootFlowProps) {
       content = (
         <div className="book-pick" role="list">
           {list.map((b) => (
-            <button key={b.id} type="button" className="book-pick-item" onClick={() => chooseBook(b)} role="listitem" data-testid={`pick-book-${b.catalogId ?? b.id}`}>
+            <button
+              key={b.id}
+              type="button"
+              className="book-pick-item"
+              onClick={() => chooseBook(b)}
+              role="listitem"
+              data-testid={`pick-book-${b.catalogId ?? b.id}`}
+            >
               <BookCover title={b.title} author={b.author} cover={b.cover} width={92} />
               <span className="book-pick-title">{b.title}</span>
               {b.status === 'reading' && b.totalChapters ? <span className="book-pick-tag">Chapter {b.chaptersRead ?? 0}</span> : null}
@@ -261,7 +281,14 @@ export function HootFlow(props: HootFlowProps) {
             startQuestions(null, undefined);
           }}
         >
-          <input className="big-input" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Book title" aria-label="Book title" autoFocus />
+          <input
+            className="big-input"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="Book title"
+            aria-label="Book title"
+            autoFocus
+          />
           {suggestions.length > 0 && (
             <div className="suggest-row">
               {suggestions.map((s) => (
@@ -290,9 +317,7 @@ export function HootFlow(props: HootFlowProps) {
     }
     case 'questions': {
       const p = runRef.current?.currentProblem();
-      content = p ? (
-        <Choices items={p.choices.map((c) => ({ id: c.id, label: c.label }))} onPick={answer} state={choiceState} columns={1} />
-      ) : null;
+      content = p ? <Choices items={p.choices.map((c) => ({ id: c.id, label: c.label }))} onPick={answer} state={choiceState} columns={1} /> : null;
       break;
     }
     case 'feeling':
@@ -343,17 +368,43 @@ export function HootFlow(props: HootFlowProps) {
       break;
     case 'favorite': {
       const cat = getCatalogBook(book?.catalogId ?? newBookInput?.catalogId);
+      const listen = props.listen;
       content = (
-        <Choices
-          columns={2}
-          items={[...(cat?.moments ?? []).map((m) => ({ id: m, label: m })), { id: '__skip', label: 'Something else!', icon: '✨' }]}
-          onPick={(m) => {
-            playSfx('click');
-            log('child', m === '__skip' ? 'Something else' : m);
-            finish(m === '__skip' ? undefined : m);
-            setStep({ kind: 'bye', line: '' });
-          }}
-        />
+        <>
+          {listen && (
+            <button
+              type="button"
+              className={`mic-btn ${listening ? 'on' : ''}`}
+              disabled={listening}
+              onClick={() => {
+                setListening(true);
+                void listen()
+                  .then((heard) => {
+                    if (heard && heard.trim()) {
+                      log('child', heard.trim());
+                      finish(heard.trim());
+                      setStep({ kind: 'bye', line: '' });
+                    } else {
+                      say('Hoo? I didn’t quite hear that. You can tap one instead!', 'thinking');
+                    }
+                  })
+                  .finally(() => setListening(false));
+              }}
+            >
+              <Icon name="mic" size={28} /> {listening ? 'Listening…' : 'Tell Professor Hoot'}
+            </button>
+          )}
+          <Choices
+            columns={2}
+            items={[...(cat?.moments ?? []).map((m) => ({ id: m, label: m })), { id: '__skip', label: 'Something else!', icon: '✨' }]}
+            onPick={(m) => {
+              playSfx('click');
+              log('child', m === '__skip' ? 'Something else' : m);
+              finish(m === '__skip' ? undefined : m);
+              setStep({ kind: 'bye', line: '' });
+            }}
+          />
+        </>
       );
       break;
     }
@@ -391,9 +442,7 @@ export function HootFlow(props: HootFlowProps) {
       );
       break;
     case 'bye':
-      content = step.line ? (
-        <Choices items={[{ id: 'bye', label: 'Bye, Professor Hoot!', icon: '👋', tone: 'primary' }]} onPick={close} />
-      ) : null;
+      content = step.line ? <Choices items={[{ id: 'bye', label: 'Bye, Professor Hoot!', icon: '👋', tone: 'primary' }]} onPick={close} /> : null;
       break;
   }
 

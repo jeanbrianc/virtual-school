@@ -67,20 +67,7 @@ export function endOfMonth(day: DayString): DayString {
   return toDay(d);
 }
 
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const SHORT_MONTHS = MONTHS.map((m) => m.slice(0, 3));
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -110,4 +97,11 @@ export function ageAt(birthDate: DayString, day: DayString): { years: number; mo
   let months = (d.getFullYear() - b.getFullYear()) * 12 + (d.getMonth() - b.getMonth());
   if (d.getDate() < b.getDate()) months -= 1;
   return { years: Math.floor(months / 12), months: months % 12 };
+}
+
+/** "3 years 8 months", "1 year", "5 months" — parent-facing only. */
+export function ageLabel(age: { years: number; months: number }): string {
+  const y = age.years ? `${age.years} year${age.years === 1 ? '' : 's'}` : '';
+  const m = age.months ? `${age.months} month${age.months === 1 ? '' : 's'}` : '';
+  return [y, m].filter(Boolean).join(' ') || 'newborn';
 }

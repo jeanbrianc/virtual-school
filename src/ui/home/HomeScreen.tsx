@@ -20,11 +20,15 @@ export function HomeScreen() {
   const services = useServices();
   const { ctx } = services;
   const household = useHousehold();
-  const kids = useLiveQuery(async () => {
-    const children = await listChildren(ctx);
-    const avatars = await Promise.all(children.map((c) => ctx.repos.forChild(ctx.repos.avatars, c.id)));
-    return children.map((c, i) => ({ child: c, avatar: avatars[i]?.[0] }));
-  }, [], ['children', 'avatars']);
+  const kids = useLiveQuery(
+    async () => {
+      const children = await listChildren(ctx);
+      const avatars = await Promise.all(children.map((c) => ctx.repos.forChild(ctx.repos.avatars, c.id)));
+      return children.map((c, i) => ({ child: c, avatar: avatars[i]?.[0] }));
+    },
+    [],
+    ['children', 'avatars'],
+  );
   const [gate, setGate] = useState(false);
 
   const enter = (child: Child) => {

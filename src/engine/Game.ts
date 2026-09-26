@@ -50,6 +50,8 @@ export interface GameOptions {
   audio: AudioEngine;
   callbacks: GameCallbacks;
   today: Date;
+  /** The learner's first name (personalizes signs and the shelf plaque). */
+  childName: string;
 }
 
 /** Where the camera goes to show off each reward. */
@@ -149,7 +151,7 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     const canvas = this.renderer.domElement;
     canvas.className = 'game-canvas';
-    canvas.setAttribute('aria-label', 'Izzy’s 3D school. Use arrow keys to walk, or tap where to go.');
+    canvas.setAttribute('aria-label', `${opts.childName}’s 3D school. Use arrow keys to walk, or tap where to go.`);
     canvas.tabIndex = 0;
     opts.container.appendChild(canvas);
 
@@ -185,14 +187,18 @@ export class Game {
     fill.position.set(-4, 9, 14);
     this.scene.add(fill);
 
-    this.world = new SchoolWorld(this.tweens, this.particles, opts.today);
+    this.world = new SchoolWorld(this.tweens, this.particles, opts.today, opts.childName);
     this.scene.add(this.world.root, this.particles.root);
     this.addSunbeams();
 
     this.avatar = new AvatarModel(opts.avatar);
     this.scene.add(this.avatar.root);
     const hall = LAYOUT.hall;
-    const nav = new NavGrid(this.world.structure.collisions, { minX: LAYOUT.nook.minX, maxX: LAYOUT.greenhouse.maxX, minZ: hall.minZ, maxZ: hall.maxZ + 0.5 }, 0.32);
+    const nav = new NavGrid(
+      this.world.structure.collisions,
+      { minX: LAYOUT.nook.minX, maxX: LAYOUT.greenhouse.maxX, minZ: hall.minZ, maxZ: hall.maxZ + 0.5 },
+      0.32,
+    );
     this.player = new PlayerController(this.avatar, this.world.structure.collisions, nav, opts.audio);
     this.player.teleport(LAYOUT.spawn.x, LAYOUT.spawn.z, Math.PI);
 
@@ -233,7 +239,15 @@ export class Game {
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
     });
-    const beamMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, opacity: 0.35, toneMapped: false });
+    const beamMat = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      opacity: 0.35,
+      toneMapped: false,
+    });
     for (const [x, w] of [
       [-3.6, 2.1],
       [3.6, 2.1],
@@ -459,7 +473,11 @@ export class Game {
     const mid = anchor.clone().lerp(new THREE.Vector3(p.x, 1.0, p.z), 0.4);
     const away = new THREE.Vector3(p.x - anchor.x, 0, p.z - anchor.z).normalize();
     const side = new THREE.Vector3(-away.z, 0, away.x);
-    const camPos = mid.clone().add(away.multiplyScalar(3.4)).add(side.multiplyScalar(1.4)).add(new THREE.Vector3(0, 1.3, 0));
+    const camPos = mid
+      .clone()
+      .add(away.multiplyScalar(3.4))
+      .add(side.multiplyScalar(1.4))
+      .add(new THREE.Vector3(0, 1.3, 0));
     this.player.faceToward(anchor);
     // Push the conversation toward the top of the screen (dialogue sits at the bottom).
     await this.rig.shot(camPos, mid.clone().add(new THREE.Vector3(0, -0.35, 0)), 0.9);

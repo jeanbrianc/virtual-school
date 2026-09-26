@@ -8,16 +8,10 @@
  * ActivityInterpretation. Output is validated; anything invalid falls back to
  * the local interpreter so the workflow never breaks.
  */
-import { getSkill } from '../curriculum';
+import { SKILLS, getSkill } from '../curriculum';
 import type { DomainId } from '../curriculum';
 import { interpretLocally } from './localInterpreter';
-import {
-  ACCEPT_THRESHOLD,
-  type ActivityInterpretation,
-  type ActivityInterpretationService,
-  type InterpretationContext,
-  type SkillSuggestion,
-} from './types';
+import { ACCEPT_THRESHOLD, type ActivityInterpretation, type ActivityInterpretationService, type InterpretationContext, type SkillSuggestion } from './types';
 
 export const INTERPRETATION_SYSTEM_PROMPT = `You organize a homeschooling parent's short narrative into learning evidence.
 Return ONLY JSON matching the provided schema. Use only skill ids from the provided catalog.
@@ -131,10 +125,12 @@ export class HttpInterpretationService implements ActivityInterpretationService 
       const res = await this.fetchImpl(this.endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Only the narrative, first name and date are sent — no ids, photos or history.
+        // Only the narrative, first name and date are sent (plus the public skill
+        // catalog so the model can pick valid ids) — no ids, photos or history.
         body: JSON.stringify({
           system: INTERPRETATION_SYSTEM_PROMPT,
           schema: INTERPRETATION_JSON_SCHEMA,
+          catalog: SKILLS.map((k) => ({ id: k.id, domain: k.domainId, name: k.name, can: k.can })),
           narrative,
           childFirstName: context.childName,
           today: context.today,

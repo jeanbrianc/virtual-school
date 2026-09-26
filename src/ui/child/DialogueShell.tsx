@@ -94,7 +94,17 @@ export interface ChoiceItem {
   tone?: 'primary' | 'plain';
 }
 
-export function Choices({ items, onPick, state, columns }: { items: ChoiceItem[]; onPick: (id: string) => void; state?: Record<string, 'right' | 'soft' | 'disabled'>; columns?: number }) {
+export function Choices({
+  items,
+  onPick,
+  state,
+  columns,
+}: {
+  items: ChoiceItem[];
+  onPick: (id: string) => void;
+  state?: Record<string, 'right' | 'soft' | 'disabled'>;
+  columns?: number;
+}) {
   return (
     <div className="choices" style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}>
       {items.map((c) => (

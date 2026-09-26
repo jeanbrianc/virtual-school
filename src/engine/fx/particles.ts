@@ -122,7 +122,11 @@ export class Particles {
     this.pieces = [];
     for (let i = 0; i < 260; i++) {
       this.pieces.push({
-        pos: new THREE.Vector3(center.x + (Math.random() - 0.5) * radius * 2, center.y + 3 + Math.random() * 2.5, center.z + (Math.random() - 0.5) * radius * 2),
+        pos: new THREE.Vector3(
+          center.x + (Math.random() - 0.5) * radius * 2,
+          center.y + 3 + Math.random() * 2.5,
+          center.z + (Math.random() - 0.5) * radius * 2,
+        ),
         vel: new THREE.Vector3((Math.random() - 0.5) * 0.6, -0.8 - Math.random() * 0.8, (Math.random() - 0.5) * 0.6),
         rot: new THREE.Euler(Math.random() * 6, Math.random() * 6, Math.random() * 6),
         spin: new THREE.Vector3(Math.random() * 6, Math.random() * 6, Math.random() * 6),

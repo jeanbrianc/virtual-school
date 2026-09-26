@@ -1,23 +1,6 @@
-export type DomainId =
-  | 'reading'
-  | 'math'
-  | 'science'
-  | 'writing'
-  | 'vocabulary'
-  | 'reasoning'
-  | 'lifeSkills'
-  | 'creativity';
+export type DomainId = 'reading' | 'math' | 'science' | 'writing' | 'vocabulary' | 'reasoning' | 'lifeSkills' | 'creativity';
 
-export type Framework =
-  | 'CCSS-ELA'
-  | 'CCSS-M'
-  | 'CCSS-MP'
-  | 'NGSS'
-  | 'NGSS-DCI'
-  | 'NCAS'
-  | 'CASEL'
-  | 'ELOF'
-  | 'Family';
+export type Framework = 'CCSS-ELA' | 'CCSS-M' | 'CCSS-MP' | 'NGSS' | 'NGSS-DCI' | 'NCAS' | 'CASEL' | 'ELOF' | 'Family';
 
 export interface StandardRef {
   framework: Framework;

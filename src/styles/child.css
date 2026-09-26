@@ -11,7 +11,10 @@
   color: var(--ink);
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.15s var(--ease-out), box-shadow 0.15s, background 0.15s;
+  transition:
+    transform 0.15s var(--ease-out),
+    box-shadow 0.15s,
+    background 0.15s;
 }
 .btn:hover {
   transform: translateY(-1px);
@@ -54,7 +57,9 @@
   background: rgba(122, 82, 54, 0.08);
   color: var(--walnut);
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.15s;
 }
 .icon-btn:hover {
   background: rgba(122, 82, 54, 0.16);
@@ -211,7 +216,9 @@ kbd {
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s var(--ease-spring);
+  transition:
+    background 0.15s,
+    transform 0.15s var(--ease-spring);
 }
 .hud-btn:hover {
   background: rgba(217, 119, 75, 0.12);
@@ -230,7 +237,9 @@ kbd {
   font-size: 1.3rem;
   font-weight: 600;
   box-shadow: var(--shadow-pop);
-  animation: toast-in 0.5s var(--ease-spring), fade-out 0.6s ease 2.9s forwards;
+  animation:
+    toast-in 0.5s var(--ease-spring),
+    fade-out 0.6s ease 2.9s forwards;
   z-index: 11;
 }
 @keyframes toast-in {
@@ -302,7 +311,9 @@ kbd {
   box-shadow: var(--shadow-pop);
   cursor: pointer;
   z-index: 12;
-  animation: prompt-in 0.35s var(--ease-spring), prompt-pulse 2.2s ease-in-out 0.4s infinite;
+  animation:
+    prompt-in 0.35s var(--ease-spring),
+    prompt-pulse 2.2s ease-in-out 0.4s infinite;
 }
 .interact-prompt:hover {
   background: #fff;
@@ -328,10 +339,14 @@ kbd {
 @keyframes prompt-pulse {
   0%,
   100% {
-    box-shadow: var(--shadow-pop), 0 0 0 0 rgba(227, 180, 72, 0.5);
+    box-shadow:
+      var(--shadow-pop),
+      0 0 0 0 rgba(227, 180, 72, 0.5);
   }
   50% {
-    box-shadow: var(--shadow-pop), 0 0 0 10px rgba(227, 180, 72, 0);
+    box-shadow:
+      var(--shadow-pop),
+      0 0 0 10px rgba(227, 180, 72, 0);
   }
 }
 
@@ -368,7 +383,9 @@ kbd {
   width: 112px;
   height: 112px;
   border-radius: 50%;
-  box-shadow: 0 0 0 5px var(--teacher-color, var(--mustard)), var(--shadow-soft);
+  box-shadow:
+    0 0 0 5px var(--teacher-color, var(--mustard)),
+    var(--shadow-soft);
   overflow: hidden;
   align-self: start;
 }
@@ -451,7 +468,11 @@ kbd {
   text-align: left;
   cursor: pointer;
   box-shadow: 0 4px 0 #ecd9b8;
-  transition: transform 0.15s var(--ease-spring), box-shadow 0.15s, border-color 0.15s, background 0.2s;
+  transition:
+    transform 0.15s var(--ease-spring),
+    box-shadow 0.15s,
+    border-color 0.15s,
+    background 0.2s;
 }
 .choice:hover:not(:disabled) {
   transform: translateY(-3px);
@@ -529,7 +550,9 @@ kbd {
   background: #fff;
   cursor: pointer;
   box-shadow: var(--shadow-soft);
-  transition: transform 0.2s var(--ease-spring), border-color 0.2s;
+  transition:
+    transform 0.2s var(--ease-spring),
+    border-color 0.2s;
   font-family: var(--font-child);
 }
 .book-pick-item:hover {
@@ -618,7 +641,9 @@ kbd {
   background: #fff;
   color: #e6d6b8;
   cursor: pointer;
-  transition: transform 0.2s var(--ease-spring), color 0.2s;
+  transition:
+    transform 0.2s var(--ease-spring),
+    color 0.2s;
 }
 .star-btn:hover {
   transform: scale(1.08) rotate(-6deg);
@@ -698,7 +723,8 @@ kbd {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 20%, #fff 50%, transparent 51%),
+  background-image:
+    radial-gradient(1.5px 1.5px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 20%, #fff 50%, transparent 51%),
     radial-gradient(1.5px 1.5px at 85% 70%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 40% 80%, #fff 50%, transparent 51%);
   opacity: 0.6;
   pointer-events: none;
@@ -799,6 +825,18 @@ kbd {
 .stage-objects {
   gap: 16px;
 }
+/* Nova's lab: a bright bench with tiles instead of Digit's night-sky moon. */
+.stage-lab {
+  background:
+    linear-gradient(180deg, transparent 72%, #c79a6b 72%, #b08157 100%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.35) 0 1px, transparent 1px 44px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.35) 0 1px, transparent 1px 44px), linear-gradient(180deg, #d9eee9, #c3e2dc);
+  color: var(--ink);
+}
+.stage-lab .object-card {
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 10px rgba(47, 111, 115, 0.15);
+}
 .object-card {
   position: relative;
   display: grid;
@@ -865,7 +903,9 @@ kbd {
 .tank-object.float,
 .tank-object.drop-float {
   top: 30px;
-  animation: dropfloat 1.6s ease-out, floaty 2.4s ease-in-out 1.6s infinite;
+  animation:
+    dropfloat 1.6s ease-out,
+    floaty 2.4s ease-in-out 1.6s infinite;
 }
 .tank-object.sink,
 .tank-object.drop-sink {
@@ -915,7 +955,9 @@ kbd {
   height: 8px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.7);
-  box-shadow: 14px -30px 0 -1px rgba(255, 255, 255, 0.6), -10px -60px 0 -2px rgba(255, 255, 255, 0.5);
+  box-shadow:
+    14px -30px 0 -1px rgba(255, 255, 255, 0.6),
+    -10px -60px 0 -2px rgba(255, 255, 255, 0.5);
   animation: bubble 1.6s ease-in infinite;
 }
 @keyframes bubble {
@@ -1462,7 +1504,9 @@ button.treasure {
   box-shadow: var(--shadow-pop);
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.25s var(--ease-spring), box-shadow 0.25s;
+  transition:
+    transform 0.25s var(--ease-spring),
+    box-shadow 0.25s;
   font-family: var(--font-child);
 }
 .profile-card:hover {
@@ -1538,4 +1582,31 @@ button.treasure {
   color: #7a4b1f;
   font-family: var(--font-ui);
   font-size: 0.9rem;
+}
+
+/* Optional voice answer (parent-enabled). */
+.mic-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 14px 20px;
+  border-radius: 20px;
+  border: 2px dashed var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-family: var(--font-child);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+.mic-btn.on {
+  border-style: solid;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  50% {
+    box-shadow: 0 0 0 10px rgba(47, 111, 115, 0.15);
+  }
 }

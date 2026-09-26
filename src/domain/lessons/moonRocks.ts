@@ -104,7 +104,10 @@ function addProblem(rng: Rng, tier: number, within: 10 | 20): Problem {
     hints:
       within === 20
         ? [`Make a ten! ${a} needs ${toTen} more to make 10. Then add what’s left.`, `Start at ${Math.max(a, b)} and count on ${Math.min(a, b)} more.`]
-        : ['Push the two groups together and count them all.', `Start at ${Math.max(a, b)} and count on: ${Array.from({ length: Math.min(a, b) }, (_, i) => Math.max(a, b) + i + 1).join(', ')}.`],
+        : [
+            'Push the two groups together and count them all.',
+            `Start at ${Math.max(a, b)} and count on: ${Array.from({ length: Math.min(a, b) }, (_, i) => Math.max(a, b) + i + 1).join(', ')}.`,
+          ],
     model: `${a} and ${b} more makes ${sum}. ${within === 20 ? `(${a} + ${toTen} = 10, then ${b - toTen} more makes ${sum}.)` : ''}`.trim(),
     success: `${sum}! Rocket loaded. Beep-beep hooray!`,
     difficulty: within === 10 ? 1 : 2,
@@ -185,7 +188,10 @@ function groupsProblem(rng: Rng, tier: number): Problem {
     visual: { type: 'arrays', groups, each },
     choices: numberChoices(rng, total, 3),
     answerId: String(total),
-    hints: [`Skip-count by ${each}s: ${Array.from({ length: groups }, (_, i) => each * (i + 1)).join(', ')}…`, `Add the groups: ${Array(groups).fill(each).join(' + ')}.`],
+    hints: [
+      `Skip-count by ${each}s: ${Array.from({ length: groups }, (_, i) => each * (i + 1)).join(', ')}…`,
+      `Add the groups: ${Array(groups).fill(each).join(' + ')}.`,
+    ],
     model: `${groups} groups of ${each} is ${total}.`,
     success: `${total}! You’re a galaxy-class mathematician!`,
     difficulty: 4,
@@ -217,10 +223,7 @@ export const moonRocksLesson: LessonDefinition = {
   title: 'Moon Rock Rescue (adaptive number sense & operations)',
   childTitle: 'Moon Rock Rescue',
   completeTitle: 'Rocket Rescue Complete! 🚀',
-  intro: [
-    'Beep boop, Izzy! Emergency on the moon!',
-    'My moon rocks are everywhere and my rocket can’t launch without them. Will you help me count and load them?',
-  ],
+  intro: ['Emergency on the moon, {name}!', 'My moon rocks are everywhere and my rocket can’t launch without them. Will you help me count and load them?'],
   outro: 'Every rock is safe! My rocket is one step closer to launch. You’re a super space helper!',
   rounds: 5,
   tiers: TIERS.map((t) => ({ skillId: t.skillId, label: t.label })),

@@ -160,7 +160,13 @@ export class Structure {
     const t = LAYOUT.hall.wall;
     const horizontal = side === 'north' || side === 'south';
     const outward =
-      side === 'north' ? new THREE.Vector3(0, 0, -1) : side === 'south' ? new THREE.Vector3(0, 0, 1) : side === 'west' ? new THREE.Vector3(-1, 0, 0) : new THREE.Vector3(1, 0, 0);
+      side === 'north'
+        ? new THREE.Vector3(0, 0, -1)
+        : side === 'south'
+          ? new THREE.Vector3(0, 0, 1)
+          : side === 'west'
+            ? new THREE.Vector3(-1, 0, 0)
+            : new THREE.Vector3(1, 0, 0);
     // Wall center line sits just outside the room edge.
     const center = line + (outward.x + outward.z) * (t / 2);
     const lower = new THREE.Group();
@@ -178,7 +184,13 @@ export class Structure {
       if (s1 - s0 < 0.001 || y1 - y0 < 0.001) return;
       const len = s1 - s0;
       const h = y1 - y0;
-      const geo = worldUVs(new THREE.BoxGeometry(horizontal ? len : depth, h, horizontal ? depth : len), horizontal ? len : depth, h, horizontal ? depth : len, 2.4);
+      const geo = worldUVs(
+        new THREE.BoxGeometry(horizontal ? len : depth, h, horizontal ? depth : len),
+        horizontal ? len : depth,
+        h,
+        horizontal ? depth : len,
+        2.4,
+      );
       const m = new THREE.Mesh(geo, material);
       const mid = (s0 + s1) / 2;
       const off = center - (outward.x + outward.z) * offset;
@@ -280,7 +292,14 @@ export class Structure {
       ctx.fillRect(8, 0, w / 2 - 14, h);
       ctx.fillRect(w / 2 + 6, 0, w / 2 - 14, h);
     });
-    const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, opacity: 0.55 });
+    const m = new THREE.MeshBasicMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      toneMapped: false,
+      opacity: 0.55,
+    });
     for (const [x, w] of [
       [-3.6, 2.2],
       [3.6, 2.2],

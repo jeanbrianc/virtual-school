@@ -110,7 +110,11 @@ export function BookshelfViewer({ books, onClose }: { books: Book[]; onClose: ()
                   {reading.map((b) => (
                     <div key={b.id} className="cover-tile reading">
                       <BookCover title={b.title} author={b.author} cover={b.cover} width={92} />
-                      {b.totalChapters ? <div className="progress-mini"><span style={{ width: `${Math.round(((b.chaptersRead ?? 0) / b.totalChapters) * 100)}%` }} /></div> : null}
+                      {b.totalChapters ? (
+                        <div className="progress-mini">
+                          <span style={{ width: `${Math.round(((b.chaptersRead ?? 0) / b.totalChapters) * 100)}%` }} />
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -219,7 +223,19 @@ export function Treasures({
 
 // ─── Friendly hint bubble (locked doors, exhibits) ─────────────────────────
 
-export function HintCard({ icon, title, text, progress, onClose }: { icon: string; title: string; text: string; progress?: { current: number; target: number }; onClose: () => void }) {
+export function HintCard({
+  icon,
+  title,
+  text,
+  progress,
+  onClose,
+}: {
+  icon: string;
+  title: string;
+  text: string;
+  progress?: { current: number; target: number };
+  onClose: () => void;
+}) {
   useEffect(() => {
     const t = window.setTimeout(onClose, 9000);
     return () => window.clearTimeout(t);

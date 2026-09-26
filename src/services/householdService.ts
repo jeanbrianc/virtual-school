@@ -19,15 +19,7 @@ import { masteryId } from '../domain/util/ids';
 import { nowIso, type ServiceContext } from './context';
 import { loadChildRecords } from './learningCore';
 
-export const DEFAULT_SETTINGS: HouseholdSettings = {
-  parentPin: '1234',
-  audio: { master: 0.8, effects: 0.8, ambience: 0.35, voice: 0.9, muted: false },
-  readAloud: false,
-  speechInput: false,
-  graphicsQuality: 'high',
-  interpretation: { provider: 'local', consentToSend: false },
-  demoTools: true,
-};
+export { DEFAULT_SETTINGS } from '../domain/settings';
 
 export async function getHousehold(ctx: ServiceContext): Promise<Household | undefined> {
   const all = await ctx.repos.households.all();
@@ -133,9 +125,7 @@ export async function setMasteryOverride(
       updatedAt: now,
     } satisfies MasteryRecord);
   const { override: _drop, ...rest } = existing;
-  const next: MasteryRecord = override
-    ? { ...rest, override: { ...override, at: now }, updatedAt: now }
-    : { ...rest, updatedAt: now };
+  const next: MasteryRecord = override ? { ...rest, override: { ...override, at: now }, updatedAt: now } : { ...rest, updatedAt: now };
   if (effectiveLevel(next) !== effectiveLevel(existing)) next.history = [...next.history, { at: now, level: effectiveLevel(next) }];
   await ctx.repos.mastery.put(next);
   return next;

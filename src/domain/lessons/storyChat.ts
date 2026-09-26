@@ -52,7 +52,15 @@ export function storyChatLesson(book: CatalogBook, questions: ComprehensionQuest
     generateRound: (_tier, rng, round) => {
       const q = questions[round];
       if (!q) return [];
-      return [questionToProblem(q, shuffle(rng, q.choices.map((_, i) => i)))];
+      return [
+        questionToProblem(
+          q,
+          shuffle(
+            rng,
+            q.choices.map((_, i) => i),
+          ),
+        ),
+      ];
     },
   };
 }

@@ -41,13 +41,7 @@ export const REASON_TEXT: Record<FloatReason, string> = {
   light: 'It’s made of very light stuff.',
 };
 
-const DISTRACTORS = [
-  'Because of its color.',
-  'Because it is small.',
-  'Because it is big.',
-  'Because it wanted to.',
-  'Because it is shiny.',
-];
+const DISTRACTORS = ['Because of its color.', 'Because it is small.', 'Because it is big.', 'Because it wanted to.', 'Because it is shiny.'];
 
 export function getTestObject(id: string): TestObject | undefined {
   return TEST_OBJECTS.find((o) => o.id === id);
@@ -111,10 +105,7 @@ function explainProblem(obj: TestObject, rng: Rng, tier: number): Problem {
     visual: { type: 'object', objectId: obj.id, showResult: true, floats: obj.floats },
     choices,
     answerId: 'right',
-    hints: [
-      'Think about what it’s made of — not its color or size.',
-      'A giant log floats but a tiny pebble sinks, so size alone can’t be the reason!',
-    ],
+    hints: ['Think about what it’s made of — not its color or size.', 'A giant log floats but a tiny pebble sinks, so size alone can’t be the reason!'],
     model: `${right} That’s why it ${obj.floats ? 'floats' : 'sinks'}.`,
     success: `Yes! ${right} Spoken like a real scientist.`,
     difficulty: 3,
@@ -156,10 +147,7 @@ export const sinkFloatLesson: LessonDefinition = {
   title: 'Sink or Float? (predict, observe, explain — material properties)',
   childTitle: 'Sink or Float?',
   completeTitle: 'Lab Investigation Complete! 🔬',
-  intro: [
-    'Oh! Izzy! Perfect timing — I have a mystery for us.',
-    'Some things sink and some things float. But WHY? Let’s investigate like real scientists!',
-  ],
+  intro: ['I have a mystery for us, {name}.', 'Some things sink and some things float. But WHY? Let’s investigate like real scientists!'],
   outro: 'What an investigation! Scientists predict, test, and explain — and you did all three.',
   rounds: 4,
   tiers: [

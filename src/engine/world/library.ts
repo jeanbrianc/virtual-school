@@ -22,7 +22,16 @@ export function wallSign(text: string, icon: string, bg: string = PALETTE.cream,
   return g;
 }
 
-export function hangingSign(text: string, icon: string, x: number, y: number, z: number, rotY = 0, bg: string = PALETTE.cream, fg: string = PALETTE.walnut): THREE.Group {
+export function hangingSign(
+  text: string,
+  icon: string,
+  x: number,
+  y: number,
+  z: number,
+  rotY = 0,
+  bg: string = PALETTE.cream,
+  fg: string = PALETTE.walnut,
+): THREE.Group {
   const g = new THREE.Group();
   const tex = signTexture(text, { icon, bg, fg });
   const board = rbox(1.9, 0.6, 0.06, 0.04, mat(PALETTE.walnut), 0, 0, 0);
@@ -102,7 +111,8 @@ function armchair(fabric: string): THREE.Group {
     [0.4, -0.35],
     [-0.4, 0.35],
     [0.4, 0.35],
-  ] as const) g.add(cyl(0.035, 0.025, 0.18, legs, x, 0.09, z));
+  ] as const)
+    g.add(cyl(0.035, 0.025, 0.18, legs, x, 0.09, z));
   const pillow = rbox(0.42, 0.34, 0.14, 0.08, mat(PALETTE.teal, { roughness: 0.95 }), 0.1, 0.8, -0.18);
   pillow.rotation.set(-0.2, 0, 0.15);
   g.add(pillow);
@@ -130,11 +140,19 @@ export function buildLibrary(ctx: BuildContext): void {
   ctx.addStatic(chair);
   ctx.addStatic(contactShadow(1.4, 1.3, 0.3, -12.1, -3.3));
   ctx.collide(-12.1, -3.3, 1.0, 1.0);
-  const table = group(cyl(0.3, 0.3, 0.04, mat(PALETTE.oak, { roughness: 0.5 }), 0, 0.6, 0), cyl(0.04, 0.05, 0.58, mat(PALETTE.walnutDark), 0, 0.3, 0), cyl(0.2, 0.22, 0.03, mat(PALETTE.walnutDark), 0, 0.015, 0));
+  const table = group(
+    cyl(0.3, 0.3, 0.04, mat(PALETTE.oak, { roughness: 0.5 }), 0, 0.6, 0),
+    cyl(0.04, 0.05, 0.58, mat(PALETTE.walnutDark), 0, 0.3, 0),
+    cyl(0.2, 0.22, 0.03, mat(PALETTE.walnutDark), 0, 0.015, 0),
+  );
   table.position.set(-12.9, 0, -1.9);
   const cup = group(cyl(0.05, 0.04, 0.08, mat('#f7f2ea', { roughness: 0.3 }), 0.12, 0.66, 0.05), cyl(0.08, 0.08, 0.01, mat('#f7f2ea'), 0.12, 0.625, 0.05));
   table.add(cup);
-  const readingBook = group(box(0.26, 0.05, 0.34, mat('#d8c3a5', { roughness: 0.6 }), -0.06, 0.645, 0), box(0.24, 0.045, 0.32, mat('#fbf4e4'), -0.06, 0.65, 0.005), box(0.03, 0.002, 0.18, mat(PALETTE.terracotta), -0.06, 0.676, 0.12));
+  const readingBook = group(
+    box(0.26, 0.05, 0.34, mat('#d8c3a5', { roughness: 0.6 }), -0.06, 0.645, 0),
+    box(0.24, 0.045, 0.32, mat('#fbf4e4'), -0.06, 0.65, 0.005),
+    box(0.03, 0.002, 0.18, mat(PALETTE.terracotta), -0.06, 0.676, 0.12),
+  );
   readingBook.rotation.y = 0.3;
   table.add(readingBook);
   ctx.addStatic(table);
@@ -145,7 +163,16 @@ export function buildLibrary(ctx: BuildContext): void {
   const lamp = new THREE.Group();
   const brass = mat(PALETTE.brass, { metalness: 0.8, roughness: 0.3 });
   lamp.add(cyl(0.22, 0.26, 0.05, brass, 0, 0.025, 0), cyl(0.025, 0.025, 1.6, brass, 0, 0.8, 0));
-  const shade = cyl(0.2, 0.34, 0.36, uniqueMat('#f6d88f', { emissive: '#ffcf70', emissiveIntensity: 0.8, roughness: 0.9, side: THREE.DoubleSide }), 0, 1.62, 0, 28);
+  const shade = cyl(
+    0.2,
+    0.34,
+    0.36,
+    uniqueMat('#f6d88f', { emissive: '#ffcf70', emissiveIntensity: 0.8, roughness: 0.9, side: THREE.DoubleSide }),
+    0,
+    1.62,
+    0,
+    28,
+  );
   const bulb = new THREE.PointLight('#ffcf8a', 7, 6, 1.8);
   bulb.position.set(0, 1.5, 0);
   lamp.add(shade, bulb);
@@ -300,7 +327,10 @@ function buildReadingNook(ctx: BuildContext) {
   const rod = cyl(0.03, 0.03, 5.3, mat(PALETTE.brass, { metalness: 0.8, roughness: 0.3 }), archX, 3.12, cz, 10);
   rod.rotation.x = Math.PI / 2;
   curtain.add(rod);
-  const lockSign = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.48), new THREE.MeshStandardMaterial({ map: signTexture('Reading Nook', { icon: '🔒', bg: '#fff6e6', fg: '#b8433a' }), roughness: 0.7 }));
+  const lockSign = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 0.48),
+    new THREE.MeshStandardMaterial({ map: signTexture('Reading Nook', { icon: '🔒', bg: '#fff6e6', fg: '#b8433a' }), roughness: 0.7 }),
+  );
   lockSign.rotation.y = Math.PI / 2;
   lockSign.position.set(archX + 0.08, 2.3, cz);
   curtain.add(lockSign);
@@ -319,13 +349,17 @@ function buildReadingNook(ctx: BuildContext) {
       const targetScale = open ? 0.18 : 1;
       if (animate && wasKnown && open) {
         ctx.particles.sparkle(new THREE.Vector3(archX + 0.5, 1.8, cz), { count: 80 });
-        await ctx.tweens.run(1.4, (k) => {
-          drapes.forEach((d, i) => {
-            const s = i === 0 ? -1 : 1;
-            d.scale.x = 1 - k * (1 - targetScale);
-            d.position.z = cz + s * (1.27 + k * 1.05);
-          });
-        }, { easing: ease.inOutCubic });
+        await ctx.tweens.run(
+          1.4,
+          (k) => {
+            drapes.forEach((d, i) => {
+              const s = i === 0 ? -1 : 1;
+              d.scale.x = 1 - k * (1 - targetScale);
+              d.position.z = cz + s * (1.27 + k * 1.05);
+            });
+          },
+          { easing: ease.inOutCubic },
+        );
       } else {
         drapes.forEach((d, i) => {
           const s = i === 0 ? -1 : 1;

@@ -23,7 +23,12 @@ function rockPath(seed: number): string {
 function MoonRock({ seed, counted, faded, onTap }: { seed: number; counted?: number; faded?: boolean; onTap?: () => void }) {
   const d = useMemo(() => rockPath(seed), [seed]);
   return (
-    <button type="button" className={`rock ${counted ? 'rock-counted' : ''} ${faded ? 'rock-faded' : ''}`} onClick={onTap} aria-label={counted ? `Rock number ${counted}` : 'Moon rock'}>
+    <button
+      type="button"
+      className={`rock ${counted ? 'rock-counted' : ''} ${faded ? 'rock-faded' : ''}`}
+      onClick={onTap}
+      aria-label={counted ? `Rock number ${counted}` : 'Moon rock'}
+    >
       <svg viewBox="-24 -24 48 48" width="44" height="44" aria-hidden="true">
         <path d={d} fill={counted ? '#d9d2c4' : '#b8b2a7'} stroke="#8d877c" strokeWidth="2" />
         <circle cx="-5" cy="-4" r="3.5" fill="#9f998e" />
@@ -155,13 +160,17 @@ export function LessonStage({ visual, seed, dropping }: { visual: LessonVisual; 
       );
     case 'object':
       return (
-        <div className="stage">
-          <TankStage objectId={visual.objectId} {...(visual.showResult !== undefined ? { showResult: visual.showResult } : {})} {...(dropping ? { floats: dropping.floats, dropping: true } : visual.floats !== undefined ? { floats: visual.floats } : {})} />
+        <div className="stage stage-lab">
+          <TankStage
+            objectId={visual.objectId}
+            {...(visual.showResult !== undefined ? { showResult: visual.showResult } : {})}
+            {...(dropping ? { floats: dropping.floats, dropping: true } : visual.floats !== undefined ? { floats: visual.floats } : {})}
+          />
         </div>
       );
     case 'objects':
       return (
-        <div className="stage stage-objects">
+        <div className="stage stage-lab stage-objects">
           {visual.objectIds.map((id) => (
             <div key={id} className="object-card">
               <span>{getTestObject(id)?.icon}</span>

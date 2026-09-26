@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LessonRun } from '../../../domain/lessons/engine';
 import type { LessonDefinition } from '../../../domain/lessons/types';
-import { TEACHERS, pickLine, teacherOpening } from '../../../domain/teachers/teachers';
+import { TEACHERS, personalize, pickLine, teacherOpening } from '../../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../../domain/types';
 import { hashString } from '../../../domain/util/random';
 import { Choices, DialogueShell, type Speech } from '../DialogueShell';
@@ -19,6 +19,7 @@ export interface LessonFlowProps {
   lesson: LessonDefinition;
   startTier: number;
   visitsToday: number;
+  childName: string;
   lastSummary?: string;
   speech: Speech;
   playSfx: (name: 'correct' | 'tryAgain' | 'click' | 'sparkle' | 'splash' | 'plop') => void;
@@ -34,8 +35,12 @@ export function LessonFlow(props: LessonFlowProps) {
   const runRef = useRef<LessonRun | null>(null);
   const [phase, setPhase] = useState<Phase>('intro');
   const [line, setLine] = useState(() => {
-    const open = teacherOpening(teacher, { visitsToday: props.visitsToday, booksCompleted: 0, ...(props.lastSummary ? { lastLessonSummary: props.lastSummary } : {}) }, seed.current);
-    return [...open, ...lesson.intro].join(' ');
+    const open = teacherOpening(
+      teacher,
+      { childName: props.childName, visitsToday: props.visitsToday, booksCompleted: 0, ...(props.lastSummary ? { lastLessonSummary: props.lastSummary } : {}) },
+      seed.current,
+    );
+    return [...open, ...lesson.intro.map((l) => personalize(l, props.childName))].join(' ');
   });
   const [mood, setMood] = useState<'happy' | 'thinking' | 'cheer'>('happy');
   const [choiceState, setChoiceState] = useState<Record<string, 'right' | 'soft' | 'disabled'>>({});
@@ -102,7 +107,12 @@ export function LessonFlow(props: LessonFlowProps) {
       }, 700);
       window.setTimeout(() => {
         const matched = (choiceId === 'float') === floats;
-        say(matched ? `It ${floats ? 'floated' : 'sank'} — just like you predicted!` : `Ooh, a surprise! It ${floats ? 'floated' : 'sank'}. Scientists love surprises!`, 'cheer');
+        say(
+          matched
+            ? `It ${floats ? 'floated' : 'sank'} — just like you predicted!`
+            : `Ooh, a surprise! It ${floats ? 'floated' : 'sank'}. Scientists love surprises!`,
+          'cheer',
+        );
         playSfx(matched ? 'correct' : 'sparkle');
       }, 2600);
       window.setTimeout(() => {

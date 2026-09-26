@@ -51,7 +51,8 @@ type TrialOutcome = 'independent' | 'supported' | 'notYet';
 
 /** Expands evidence into an ordered per-trial sequence (oldest first). */
 function trialSequence(evidence: Evidence[]): { outcome: TrialOutcome; day: string }[] {
-  const sorted = [...evidence].sort((a, b) => a.observedAt.localeCompare(b.observedAt));
+  // Exposure ("we talked about it") never contributes trials, whatever its counts say.
+  const sorted = evidence.filter((e) => e.kind !== 'exposure').sort((a, b) => a.observedAt.localeCompare(b.observedAt));
   const seq: { outcome: TrialOutcome; day: string }[] = [];
   for (const e of sorted) {
     const day = dayFromTimestamp(e.observedAt);
@@ -81,10 +82,7 @@ export function computeMastery(evidence: Evidence[]): MasteryComputation {
   const independentDays = new Set(seq.filter((t) => t.outcome === 'independent').map((t) => t.day)).size;
   const recent = seq.slice(-MASTERY_RULES.recentWindow);
   const recentScore = recent.length ? recent.reduce((sum, t) => sum + TRIAL_SCORE[t.outcome], 0) / recent.length : 0;
-  const lastObservedAt = evidence.reduce<Timestamp | undefined>(
-    (latest, e) => (!latest || e.observedAt > latest ? e.observedAt : latest),
-    undefined,
-  );
+  const lastObservedAt = evidence.reduce<Timestamp | undefined>((latest, e) => (!latest || e.observedAt > latest ? e.observedAt : latest), undefined);
 
   const stats: MasteryStats = {
     independent,
@@ -135,10 +133,7 @@ export function updateMasteryRecord(
   const history = [...(previous?.history ?? [])];
   if (!previous || previous.computedLevel !== level) history.push({ at: now, level });
   const peak = history.reduce<MasteryLevel>((p, h) => maxLevel(p, h.level), 'not_started');
-  const needsReview =
-    masteryRank(peak) >= masteryRank('proficient') &&
-    masteryRank(level) < masteryRank(peak) &&
-    stats.recentScore < MASTERY_RULES.reviewScore;
+  const needsReview = masteryRank(peak) >= masteryRank('proficient') && masteryRank(level) < masteryRank(peak) && stats.recentScore < MASTERY_RULES.reviewScore;
   return {
     id: masteryId(childId, skillId),
     childId,

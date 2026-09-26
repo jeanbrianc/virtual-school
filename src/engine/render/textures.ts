@@ -5,8 +5,9 @@
  * textures later via the AssetRegistry.
  */
 import * as THREE from 'three';
-import { createRng, randInt, type Rng } from '../../domain/util/random';
+import { createRng, type Rng } from '../../domain/util/random';
 import { ROUNDED, SERIF } from '../../shared/coverPainter';
+import { KID_ART_SIZE, paintKidArt } from '../../shared/kidArtPainter';
 import { PALETTE } from '../palette';
 
 type Paint = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
@@ -360,10 +361,39 @@ export function posterTexture(kind: 'numberline' | 'shapes' | 'solar' | 'plants'
         ctx.fillStyle = PALETTE.navy;
         ctx.fillText('Shapes', w / 2, 60);
         const cells: [string, (x: number, y: number) => void][] = [
-          ['circle', (x, y) => { ctx.beginPath(); ctx.arc(x, y, 60, 0, Math.PI * 2); ctx.fill(); }],
+          [
+            'circle',
+            (x, y) => {
+              ctx.beginPath();
+              ctx.arc(x, y, 60, 0, Math.PI * 2);
+              ctx.fill();
+            },
+          ],
           ['square', (x, y) => ctx.fillRect(x - 55, y - 55, 110, 110)],
-          ['triangle', (x, y) => { ctx.beginPath(); ctx.moveTo(x, y - 62); ctx.lineTo(x + 64, y + 50); ctx.lineTo(x - 64, y + 50); ctx.fill(); }],
-          ['hexagon', (x, y) => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; const px = x + Math.cos(a) * 62; const py = y + Math.sin(a) * 62; if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py); } ctx.fill(); }],
+          [
+            'triangle',
+            (x, y) => {
+              ctx.beginPath();
+              ctx.moveTo(x, y - 62);
+              ctx.lineTo(x + 64, y + 50);
+              ctx.lineTo(x - 64, y + 50);
+              ctx.fill();
+            },
+          ],
+          [
+            'hexagon',
+            (x, y) => {
+              ctx.beginPath();
+              for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2;
+                const px = x + Math.cos(a) * 62;
+                const py = y + Math.sin(a) * 62;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+              }
+              ctx.fill();
+            },
+          ],
         ];
         cells.forEach(([label, draw], i) => {
           const x = i % 2 ? w * 0.73 : w * 0.27;
@@ -388,7 +418,16 @@ export function posterTexture(kind: 'numberline' | 'shapes' | 'solar' | 'plants'
         ctx.beginPath();
         ctx.arc(-40, h / 2, 150, 0, Math.PI * 2);
         ctx.fill();
-        const planets: [number, string][] = [[10, '#b9a38c'], [16, '#e9c07b'], [17, '#5aa0d6'], [13, '#d9774b'], [34, '#d9b38c'], [30, '#e8d29a'], [22, '#9fd6e0'], [21, '#4f7bd6']];
+        const planets: [number, string][] = [
+          [10, '#b9a38c'],
+          [16, '#e9c07b'],
+          [17, '#5aa0d6'],
+          [13, '#d9774b'],
+          [34, '#d9b38c'],
+          [30, '#e8d29a'],
+          [22, '#9fd6e0'],
+          [21, '#4f7bd6'],
+        ];
         let x = 150;
         planets.forEach(([r, c]) => {
           ctx.fillStyle = c;
@@ -472,7 +511,14 @@ export function posterTexture(kind: 'numberline' | 'shapes' | 'solar' | 'plants'
         ctx.fillRect(0, 0, w, h);
         const rng = createRng(5);
         const land = [PALETTE.wainscot, '#c9d68f', '#e8c98b', '#b5d39a', '#d9b38c'];
-        const blobs: [number, number, number, number][] = [[170, 170, 110, 80], [220, 330, 60, 110], [410, 160, 80, 60], [430, 300, 70, 110], [590, 190, 130, 90], [640, 380, 60, 40]];
+        const blobs: [number, number, number, number][] = [
+          [170, 170, 110, 80],
+          [220, 330, 60, 110],
+          [410, 160, 80, 60],
+          [430, 300, 70, 110],
+          [590, 190, 130, 90],
+          [640, 380, 60, 40],
+        ];
         blobs.forEach(([x, y, rx, ry], i) => {
           ctx.fillStyle = land[i % land.length] ?? PALETTE.wainscot;
           ctx.beginPath();
@@ -559,114 +605,8 @@ export function landscapeTexture(): THREE.CanvasTexture {
 }
 
 /** A child's artwork, generated deterministically from a seed. */
-export function kidArtTexture(seed: number): THREE.CanvasTexture {
-  return canvasTexture(384, 288, (ctx, w, h) => {
-    const rng = createRng(seed);
-    ctx.fillStyle = '#fffaf0';
-    ctx.fillRect(0, 0, w, h);
-    const crayon = (color: string, width = 8) => {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-    };
-    const kind = seed % 4;
-    ctx.fillStyle = '#9fd0e8';
-    ctx.fillRect(0, 0, w, h * 0.12);
-    crayon('#f2c14e', 6);
-    ctx.beginPath();
-    ctx.arc(w - 50, 50, 26, 0, Math.PI * 2);
-    ctx.stroke();
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(w - 50 + Math.cos(a) * 34, 50 + Math.sin(a) * 34);
-      ctx.lineTo(w - 50 + Math.cos(a) * 48, 50 + Math.sin(a) * 48);
-      ctx.stroke();
-    }
-    crayon('#5aa64b', 10);
-    ctx.beginPath();
-    ctx.moveTo(0, h - 30);
-    for (let x = 0; x <= w; x += 24) ctx.lineTo(x, h - 30 + Math.sin(x * 0.08) * 6);
-    ctx.stroke();
-    if (kind === 0) {
-      // Sunflowers.
-      for (let i = 0; i < 3; i++) {
-        const x = 70 + i * 100 + rng() * 20;
-        const top = 90 + rng() * 50;
-        crayon('#4f8a45', 7);
-        ctx.beginPath();
-        ctx.moveTo(x, h - 30);
-        ctx.lineTo(x, top);
-        ctx.stroke();
-        ctx.fillStyle = '#f2c14e';
-        for (let p = 0; p < 10; p++) {
-          const a = (p / 10) * Math.PI * 2;
-          ctx.beginPath();
-          ctx.ellipse(x + Math.cos(a) * 24, top + Math.sin(a) * 24, 14, 7, a, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.fillStyle = '#8a5a33';
-        ctx.beginPath();
-        ctx.arc(x, top, 15, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } else if (kind === 1) {
-      // House with family.
-      ctx.fillStyle = '#e07a5f';
-      ctx.fillRect(60, 130, 130, 110);
-      ctx.fillStyle = '#7a5236';
-      ctx.beginPath();
-      ctx.moveTo(45, 132);
-      ctx.lineTo(125, 70);
-      ctx.lineTo(205, 132);
-      ctx.fill();
-      ctx.fillStyle = '#f2cc8f';
-      ctx.fillRect(110, 180, 30, 60);
-      for (let i = 0; i < 3; i++) {
-        const x = 240 + i * 38;
-        const s = i === 2 ? 0.7 : 1;
-        crayon(['#3d85c6', '#f15bb5', '#9b5de5'][i] ?? '#333', 5);
-        ctx.beginPath();
-        ctx.arc(x, 170 + (1 - s) * 30, 13 * s, 0, Math.PI * 2);
-        ctx.moveTo(x, 183 + (1 - s) * 30);
-        ctx.lineTo(x, 225);
-        ctx.moveTo(x - 15 * s, 200);
-        ctx.lineTo(x + 15 * s, 200);
-        ctx.moveTo(x, 225);
-        ctx.lineTo(x - 10, 250);
-        ctx.moveTo(x, 225);
-        ctx.lineTo(x + 10, 250);
-        ctx.stroke();
-      }
-    } else if (kind === 2) {
-      // Rainbow.
-      ['#e63946', '#f4a261', '#f2c14e', '#5aa64b', '#3d85c6', '#9b5de5'].forEach((c, i) => {
-        crayon(c, 14);
-        ctx.beginPath();
-        ctx.arc(w / 2, h - 30, 150 - i * 16, Math.PI, 0);
-        ctx.stroke();
-      });
-    } else {
-      // Map scribble.
-      crayon('#7a5236', 6);
-      ctx.strokeRect(50, 60, 280, 170);
-      ctx.beginPath();
-      ctx.moveTo(190, 60);
-      ctx.lineTo(190, 230);
-      ctx.moveTo(50, 150);
-      ctx.lineTo(190, 150);
-      ctx.stroke();
-      ctx.fillStyle = '#e07a5f';
-      ctx.font = `600 22px ${ROUNDED}`;
-      ctx.fillText('kichen', 70, 110);
-      ctx.fillText('my rum', 210, 110);
-    }
-    // Signature.
-    ctx.fillStyle = '#3d85c6';
-    ctx.font = `600 26px ${ROUNDED}`;
-    ctx.fillText('IZZY', 20 + randInt(rng, 0, 10), h - 8);
-  });
+export function kidArtTexture(seed: number, signature?: string): THREE.CanvasTexture {
+  return canvasTexture(KID_ART_SIZE.w, KID_ART_SIZE.h, (ctx, w, h) => paintKidArt(ctx, w, h, seed, signature));
 }
 
 export function radialTexture(inner: string, outer: string, size = 128): THREE.CanvasTexture {

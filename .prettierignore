@@ -1,0 +1,9 @@
+dist
+dist-e2e
+.dev
+node_modules
+test-results
+playwright-report
+src/assets
+*.woff
+*.md

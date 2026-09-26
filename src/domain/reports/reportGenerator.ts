@@ -59,6 +59,16 @@ export function periodLabel(start: DayString, end: DayString): string {
   return `${formatDay(start)} – ${formatDay(end)}, ${e.getFullYear()}`;
 }
 
+/** Lowercases only a leading common word ("Answered…" → "answered…"), keeping names (the child, teachers, "Moon Rock Rescue"). */
+export function lowerFirst(text: string, names: string[] = []): string {
+  const first = text.split(/\s+/)[0] ?? '';
+  const second = text.split(/\s+/)[1] ?? '';
+  const properNoun = /^[A-Z][a-z]+$/.test(first) && /^[A-Z]/.test(second);
+  if (!first || properNoun || ['I', 'Professor', 'Digit', 'Nova', 'Hoot', ...names].includes(first.replace(/[’']s$/, '')) || first === first.toUpperCase())
+    return text;
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
 function stars(n?: number): string {
   return n ? '★'.repeat(n) + '☆'.repeat(Math.max(0, 5 - n)) : '';
 }
@@ -86,10 +96,7 @@ export function generateReport(input: ReportInputs, req: ReportRequest): ReportC
   // Time on learning (recorded durations only — never estimated).
   const activityMinutes = activities.reduce((sum, a) => sum + (a.durationMinutes ?? 0), 0);
   const readingMinutes = sessions.reduce((sum, s) => sum + (s.minutes ?? 0), 0);
-  const lessonMinutes = lessons.reduce(
-    (sum, l) => sum + Math.max(1, Math.round((Date.parse(l.completedAt) - Date.parse(l.startedAt)) / 60000)),
-    0,
-  );
+  const lessonMinutes = lessons.reduce((sum, l) => sum + Math.max(1, Math.round((Date.parse(l.completedAt) - Date.parse(l.startedAt)) / 60000)), 0);
   const totalMinutes = activityMinutes + readingMinutes + lessonMinutes;
 
   // Skills that moved up during the period.
@@ -188,7 +195,10 @@ export function generateReport(input: ReportInputs, req: ReportRequest): ReportC
         ? `${child.name} read ${plural(booksDone.length, 'book')} during ${label}${favorite?.childRating ? ` — her favorite was ${favorite.title} (${stars(favorite.childRating)})` : ''}. Each one now sits on the bookshelf in her virtual school.`
         : `${child.name} kept reading and exploring during ${label}.`,
     );
-    const disc = highlights.slice(0, 3).map((h) => h.statement.replace(/^[^:]+:\s*/, '').replace(/\.$/, '').toLowerCase());
+    const disc = highlights
+      .slice(0, 3)
+      .map((h) => h.statement.replace(/^[^:]+:\s*/, '').replace(/\.$/, ''))
+      .map((t) => lowerFirst(t, [child.name]));
     if (disc.length) narrative.push(`Some things she did: ${disc.join('; ')}.`);
     if (milestones.length) narrative.push(`Her school grew too — she unlocked ${milestones.map((m) => `${m.icon} ${m.title}`).join(', ')}.`);
     const q = activities.flatMap((a) => (a.childReflection ? [a.childReflection] : [])).slice(0, 2);
@@ -243,9 +253,7 @@ export function generateReport(input: ReportInputs, req: ReportRequest): ReportC
     periodStart: req.start,
     periodEnd: req.end,
     generatedAt: req.now,
-    headline: family
-      ? `${child.name}’s learning adventures — ${label}`
-      : `${child.name} — Learning summary, ${label}`,
+    headline: family ? `${child.name}’s learning adventures — ${label}` : `${child.name} — Learning summary, ${label}`,
     stats,
     narrative,
     reading: {
@@ -260,7 +268,11 @@ export function generateReport(input: ReportInputs, req: ReportRequest): ReportC
       })),
       inProgress: booksReading.map((b) => ({
         title: b.title,
-        progress: b.totalChapters ? `Chapter ${b.chaptersRead ?? 0} of ${b.totalChapters}` : b.totalPages ? `Page ${b.pagesRead ?? 0} of ${b.totalPages}` : 'In progress',
+        progress: b.totalChapters
+          ? `Chapter ${b.chaptersRead ?? 0} of ${b.totalChapters}`
+          : b.totalPages
+            ? `Page ${b.pagesRead ?? 0} of ${b.totalPages}`
+            : 'In progress',
       })),
       comprehension,
     },

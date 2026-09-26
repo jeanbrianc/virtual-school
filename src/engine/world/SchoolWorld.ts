@@ -30,7 +30,7 @@ export class SchoolWorld {
   private state: WorldState | null = null;
   private time = 0;
 
-  constructor(tweens: Tweens, particles: Particles, today: Date) {
+  constructor(tweens: Tweens, particles: Particles, today: Date, childName: string) {
     this.structure = new Structure();
     this.root.add(this.structure.root);
     const staticRoot = new THREE.Group();
@@ -46,6 +46,7 @@ export class SchoolWorld {
       features: this.features,
       anchors: this.anchors,
       lights: [],
+      childName,
       add: (obj) => this.root.add(obj),
       addStatic: (obj) => staticRoot.add(obj),
       mount: (side, obj) => this.structure.mountOnWall(side, obj),
@@ -57,7 +58,7 @@ export class SchoolWorld {
       },
     };
 
-    this.bookshelf = new Bookshelf(tweens);
+    this.bookshelf = new Bookshelf(tweens, childName);
     this.root.add(this.bookshelf.root);
     this.structure.collisions.addBox(-9.4, LAYOUT.shelfZ + 0.22, 8.5, 0.8);
     ctx.interact({

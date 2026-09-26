@@ -87,10 +87,14 @@ export class MemoryDatabase implements Database {
 
   async commit(ops: WriteOp[]): Promise<void> {
     // Validate first so the batch is all-or-nothing.
-    const staged = ops.map((op) => ({ op, key: op.type === 'put' ? this.keyOf(op.table, op.value) : op.key }));
-    for (const { op, key } of staged) {
-      const store = this.store(op.table);
-      if (op.type === 'put') store.set(key as Key, clone(op.value));
+    const staged = ops.map((op) => ({
+      op,
+      store: this.store(op.table),
+      key: op.type === 'put' ? this.keyOf(op.table, op.value) : op.key,
+      value: op.type === 'put' ? clone(op.value) : undefined,
+    }));
+    for (const { op, store, key, value } of staged) {
+      if (op.type === 'put') store.set(key as Key, value);
       else if (key) store.delete(key);
     }
     this.notify([...new Set(ops.map((o) => o.table))]);

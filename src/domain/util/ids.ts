@@ -5,9 +5,7 @@ export type IdFactory = (prefix: string) => ID;
 /** Production ids: random UUIDs, prefixed by entity type for readability. */
 export const randomIds: IdFactory = (prefix) => {
   const uuid =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   return `${prefix}_${uuid}`;
 };
 

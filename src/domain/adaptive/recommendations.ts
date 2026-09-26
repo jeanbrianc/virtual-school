@@ -36,10 +36,7 @@ export function prerequisitesMet(skill: Skill, levels: Map<string, MasteryLevel>
   return skill.prerequisites.every((p) => isProficientOrAbove(levels.get(p) ?? 'not_started'));
 }
 
-export function recommendNext(
-  records: MasteryRecord[],
-  options: { limit?: number; domainId?: string; perDomain?: number } = {},
-): Recommendation[] {
+export function recommendNext(records: MasteryRecord[], options: { limit?: number; domainId?: string; perDomain?: number } = {}): Recommendation[] {
   const recordMap = new Map(records.map((r) => [r.skillId, r]));
   const levels = new Map(SKILLS.map((s) => [s.id, effectiveLevel(recordMap.get(s.id))]));
 

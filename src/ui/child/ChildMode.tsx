@@ -178,6 +178,9 @@ export function ChildMode({ childId }: { childId: string }) {
     [audio, childId, ctx],
   );
 
+  // A milestone preview lasts only while the school is open.
+  useEffect(() => () => appStore.set({ preview: null }), []);
+
   // ── Game lifecycle ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!data || !host.current || gameRef.current) return;
@@ -188,6 +191,7 @@ export function ChildMode({ childId }: { childId: string }) {
       quality: data.household.settings.graphicsQuality,
       audio,
       today: new Date(),
+      childName: data.child.name,
       callbacks: {
         onFocus: (f) => setFocus(f),
         onInteract: (id) => void handleInteract(id),
@@ -215,14 +219,20 @@ export function ChildMode({ childId }: { childId: string }) {
         game.setShelfBooks(pv.books);
         game.syncPets(pv.world.pets as PetId[], 'pet.dragon');
         if (pv.celebrate.some((id) => getReward(id)?.celebration === 'grand')) game.confetti();
-        const items = pv.celebrate.map(getReward).filter((r) => !!r).map((r) => rewardToCelebration(r!));
+        const items = pv.celebrate
+          .map(getReward)
+          .filter((r) => !!r)
+          .map((r) => rewardToCelebration(r!));
         if (items.length) setOverlay({ kind: 'celebrate', items, rewardIds: [] });
         else game.setInputEnabled(true);
       } else {
         setToast(`Welcome back, ${data.child.name}!`);
         window.setTimeout(() => setToast(null), 3500);
         // Celebrate anything unlocked from parent-logged activities since last visit.
-        const pending = data.records.unlocks.filter((u) => !u.celebrated).map((u) => getReward(u.rewardId)).filter((r) => !!r);
+        const pending = data.records.unlocks
+          .filter((u) => !u.celebrated)
+          .map((u) => getReward(u.rewardId))
+          .filter((r) => !!r);
         if (pending.length) {
           window.setTimeout(() => {
             if (!overlayRef.current) {
@@ -335,7 +345,15 @@ export function ChildMode({ childId }: { childId: string }) {
         ...(book?.totalChapters ? { chaptersRead: chapters } : { pagesRead: chapters }),
         source: 'child',
       });
-      await recordConversation(ctx, childId, 'hoot', 'read-more', startedAt, transcript, `Logged ${chapters} ${book?.totalChapters ? 'chapters' : 'pages'} of ${book?.title ?? 'a book'}`);
+      await recordConversation(
+        ctx,
+        childId,
+        'hoot',
+        'read-more',
+        startedAt,
+        transcript,
+        `Logged ${chapters} ${book?.totalChapters ? 'chapters' : 'pages'} of ${book?.title ?? 'a book'}`,
+      );
       void reload();
       const b = res.book;
       if (b.totalChapters) {
@@ -437,7 +455,9 @@ export function ChildMode({ childId }: { childId: string }) {
   const lastSummary = (lessonId: string) => {
     const last = [...(data?.records.lessons ?? [])].filter((l) => l.lessonId === lessonId).sort((a, b) => b.completedAt.localeCompare(a.completedAt))[0];
     if (!last) return undefined;
-    return lessonId === 'moon-rocks' ? 'Thanks for helping with my moon rocks last time — the rocket is growing!' : 'Remember our floating experiments? I have new mysteries!';
+    return lessonId === 'moon-rocks'
+      ? 'Thanks for helping with my moon rocks last time — the rocket is growing!'
+      : 'Remember our floating experiments? I have new mysteries!';
   };
   const booksCount = data?.shelfBooks.length ?? 0;
 
@@ -543,6 +563,9 @@ export function ChildMode({ childId }: { childId: string }) {
               onFinishBook={(input) => void finishBook(input)}
               onReadMore={readMore}
               onClose={(t, s) => void endConversation('hoot', 'chat', t, s, 'Visited Professor Hoot')}
+              {...(data.household.settings.speechInput && services.speechIn.available
+                ? { listen: () => services.speechIn.listenOnce({ timeoutMs: 8000 }).then((r) => r?.transcript ?? null) }
+                : {})}
             />
           )}
           {overlay?.kind === 'lesson' && (
@@ -551,7 +574,10 @@ export function ChildMode({ childId }: { childId: string }) {
               lesson={getLesson(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')!}
               startTier={overlay.startTier}
               visitsToday={visitsToday(overlay.teacher)}
-              {...(lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float') ? { lastSummary: lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')! } : {})}
+              childName={data.child.name}
+              {...(lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')
+                ? { lastSummary: lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')! }
+                : {})}
               speech={speech}
               playSfx={(n) => audio.play(n)}
               onComplete={(run, t, s) => void finishLesson(overlay.teacher, run, t, s)}

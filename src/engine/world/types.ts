@@ -38,6 +38,8 @@ export interface BuildContext {
   features: Feature[];
   anchors: Map<string, THREE.Vector3>;
   lights: THREE.Light[];
+  /** The learner this school belongs to (chalkboard, art signatures, shelf plaque). */
+  childName: string;
   add(obj: THREE.Object3D): void;
   /** Adds a prop that never moves; it is merged into batched meshes after building. */
   addStatic(obj: THREE.Object3D): void;

@@ -73,7 +73,14 @@ export class AvatarModel {
     const outfit = mat(c.outfitColor, { roughness: 0.8 });
     const accent = mat(c.accentColor, { roughness: 0.8 });
     const shoe = mat(c.shoeColor, { roughness: 0.5 });
-    const pants = c.outfit === 'overalls' ? outfit : c.outfit === 'tee' ? accent : c.outfit === 'sweater' || c.outfit === 'labcoat' ? mat(shade(c.accentColor, -0.35)) : skin;
+    const pants =
+      c.outfit === 'overalls'
+        ? outfit
+        : c.outfit === 'tee'
+          ? accent
+          : c.outfit === 'sweater' || c.outfit === 'labcoat'
+            ? mat(shade(c.accentColor, -0.35))
+            : skin;
 
     // ── Legs (pivot at hip) ──────────────────────────────────────────────
     for (const [leg, side] of [
@@ -329,7 +336,10 @@ export class AvatarModel {
       }
       case 'starClips': {
         for (const s of [-1, 1]) {
-          const star = new THREE.Mesh(new THREE.ExtrudeGeometry(starShape(0.05, 0.022), { depth: 0.015, bevelEnabled: false }), mat('#ffd166', { emissive: '#ffb703', emissiveIntensity: 0.15 }));
+          const star = new THREE.Mesh(
+            new THREE.ExtrudeGeometry(starShape(0.05, 0.022), { depth: 0.015, bevelEnabled: false }),
+            mat('#ffd166', { emissive: '#ffb703', emissiveIntensity: 0.15 }),
+          );
           star.position.set(s * 0.22, 0.17, 0.12);
           star.rotation.y = s * 0.7;
           this.head.add(star);

@@ -64,7 +64,10 @@ export class Bookshelf {
   private plaqueCount = -1;
   private readonly z = LAYOUT.shelfZ;
 
-  constructor(private readonly tweens: Tweens) {
+  constructor(
+    private readonly tweens: Tweens,
+    private readonly childName: string,
+  ) {
     UNIT_SPECS.forEach((spec, i) => {
       const unit = this.buildUnit(spec, i);
       unit.visible = i === 0;
@@ -140,8 +143,14 @@ export class Bookshelf {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = PALETTE.walnut;
-      ctx.font = `600 70px ${ROUNDED}`;
-      ctx.fillText('Izzy’s Books', w / 2 - 70, h / 2 + 4);
+      const label = `${this.childName}’s Books`;
+      let size = 70;
+      ctx.font = `600 ${size}px ${ROUNDED}`;
+      while (ctx.measureText(label).width > w - 300 && size > 36) {
+        size -= 4;
+        ctx.font = `600 ${size}px ${ROUNDED}`;
+      }
+      ctx.fillText(label, w / 2 - 70, h / 2 + 4);
       ctx.fillStyle = PALETTE.terracotta;
       ctx.beginPath();
       ctx.arc(w - 120, h / 2, 70, 0, Math.PI * 2);
@@ -206,7 +215,9 @@ export class Bookshelf {
 
   private makeBookMesh(book: ShelfBook): THREE.Mesh {
     const dims = bookDims(book.id);
-    const spineTex = canvasTexture(96, 256, (ctx, w, h) => paintSpine(ctx, w, h, { title: book.title, author: book.author, cover: book.cover }), { anisotropy: 4 });
+    const spineTex = canvasTexture(96, 256, (ctx, w, h) => paintSpine(ctx, w, h, { title: book.title, author: book.author, cover: book.cover }), {
+      anisotropy: 4,
+    });
     const coverMat = mat(book.cover.background, { roughness: 0.6 });
     const spineMat = new THREE.MeshStandardMaterial({ map: spineTex, roughness: 0.55 });
     const geo = new THREE.BoxGeometry(dims.t, dims.h, 0.3);
@@ -286,7 +297,10 @@ export class Bookshelf {
     const start = from.clone();
     const end = target.position.clone();
     const front = end.clone().add(new THREE.Vector3(0, 0.05, 0.9));
-    const ctrl = start.clone().lerp(front, 0.5).add(new THREE.Vector3(0, 2.4, 0));
+    const ctrl = start
+      .clone()
+      .lerp(front, 0.5)
+      .add(new THREE.Vector3(0, 2.4, 0));
     const curve = new THREE.QuadraticBezierCurve3(start, ctrl, front);
 
     mesh.position.copy(start);
@@ -299,10 +313,14 @@ export class Bookshelf {
       mesh.scale.setScalar(1.6 - k * 0.6);
     });
     // Settle into the slot.
-    await this.tweens.run(0.5, (k) => {
-      mesh.position.lerpVectors(front, end, k);
-      mesh.rotation.set(0, 0, 0);
-    }, { easing: ease.outCubic });
+    await this.tweens.run(
+      0.5,
+      (k) => {
+        mesh.position.lerpVectors(front, end, k);
+        mesh.rotation.set(0, 0, 0);
+      },
+      { easing: ease.outCubic },
+    );
     mesh.position.copy(end);
     onLand(end.clone().add(new THREE.Vector3(0, 0.1, 0.2)));
     await this.tweens.run(0.35, (k) => {

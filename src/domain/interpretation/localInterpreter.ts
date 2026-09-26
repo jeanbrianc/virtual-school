@@ -18,6 +18,7 @@ import {
   NATURE_ITEMS,
   RULES,
   TRIP_TOPICS,
+  refineAddSubSkill,
   refineCountSkill,
   type Rule,
   type SentenceContext,
@@ -46,11 +47,14 @@ const CONTEXT_CUES: [SentenceContext, RegExp][] = [
   ['reading', /\b(read|reading|reread|chapters?|book|story|stories|pages?)\b/i],
 ];
 
-const INDEPENDENT_CUES = /\b(by herself|by himself|on her own|on his own|independently|without (?:any )?help|all by herself|herself|himself|without prompting|without hints?|unprompted)\b/i;
-const SUPPORTED_CUES = /\b(with (?:a little |some |a bit of )?help|with (?:some )?prompting|with (?:a )?hints?|with support|i helped (?:her|him)|we helped|helped her (?:sound|count|read|measure)|together|with me)\b/i;
+const INDEPENDENT_CUES =
+  /\b(by herself|by himself|on her own|on his own|independently|without (?:any )?help|all by herself|herself|himself|without prompting|without hints?|unprompted)\b/i;
+const SUPPORTED_CUES =
+  /\b(with (?:a little |some |a bit of )?help|with (?:some )?prompting|with (?:a )?hints?|with support|i helped (?:her|him)|we helped|helped her (?:sound|count|read|measure)|together|with me)\b/i;
 const ASSISTED_CUES = /\b(i read (?:it |them )?(?:aloud )?to (?:her|him)|hand over hand|i did most|she watched me|he watched me)\b/i;
 const EXPOSURE_CUES = /\b(talked about|learned about|watched (?:a )?(?:video|show|documentary)|listened to|we discussed|showed her|showed him)\b/i;
-const STRUGGLE_CUES = /\b(struggled|had trouble|found it hard|wasn'?t able|couldn'?t yet|not yet able|got frustrated with|needed lots of help)\b/i;
+const STRUGGLE_CUES =
+  /\b(struggled|had trouble|found it hard|wasn'?t able|couldn'?t(?: yet)?|could not|not yet able|got frustrated|got stuck|was stuck|stuck on|gave up|didn'?t get it|mixed up|was confused|needed lots of help)\b/i;
 const HEDGE_CUES = /\b(tried to|sort of|kind of|almost|a little bit|partly|mostly)\b/i;
 const AFFIRM_CUES = /\b(correctly|accurately|perfectly|exactly right|got it right|right away)\b/i;
 
@@ -162,7 +166,13 @@ function extractQuestions(text: string): string[] {
 function extractBooks(sentences: SentenceInfo[], context: InterpretationContext): BookMention[] {
   const mentions = new Map<string, BookMention>();
   const known = context.knownBooks;
-  const norm = (s: string) => s.toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[’']/g, '')
+      .replace(/[^a-z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
   for (const s of sentences) {
     const lowerNorm = norm(s.text);
@@ -191,7 +201,9 @@ function extractBooks(sentences: SentenceInfo[], context: InterpretationContext)
         catalogId = cat.id;
       } else {
         const quoted = s.text.match(/\bread(?:ing)?\s+(?:the book\s+|a book called\s+)?["“]([^"”]{3,80})["”]/i);
-        const titled = s.text.match(/\bread(?:ing)?\s+(?:the book\s+|a book called\s+)?((?:[A-Z][\w’'!?-]*)(?:\s+(?:[A-Z][\w’'!?-]*|of|the|and|a|an|to|in|on|at))*\s+[A-Z][\w’'!?-]*)/);
+        const titled = s.text.match(
+          /\bread(?:ing)?\s+(?:the book\s+|a book called\s+)?((?:[A-Z][\w’'!?-]*)(?:\s+(?:[A-Z][\w’'!?-]*|of|the|and|a|an|to|in|on|at))*\s+[A-Z][\w’'!?-]*)/,
+        );
         title = quoted?.[1] ?? titled?.[1];
       }
     }
@@ -241,16 +253,25 @@ function clauseIndependence(sentence: string, index: number): Independence | nul
   return null;
 }
 
+/**
+ * "Read a book about how seeds sprout" is reading *to learn about* a topic, so
+ * topic rules (plants, space, dinosaurs…) may fire even in a reading context.
+ * Plain story sentences ("Wilbur was scared") still don't trigger them.
+ */
+const LEARNING_ABOUT = /\b(?:books?|stor(?:y|ies)|read|reading|video|documentary|learned|learning)\s+(?:all\s+|a lot\s+)?about\b|\bnon-?fiction\b/i;
+
 function ruleApplies(rule: Rule, s: SentenceInfo): RegExpMatchArray | null {
   if (rule.onlyIn && !rule.onlyIn.includes(s.context)) return null;
-  if (rule.notIn && rule.notIn.includes(s.context)) return null;
+  const aboutTopic = s.context === 'reading' && !!rule.topics?.length && LEARNING_ABOUT.test(s.text);
+  if (rule.notIn && rule.notIn.includes(s.context) && !aboutTopic) return null;
   if (rule.exclude && rule.exclude.test(s.text)) return null;
   return s.text.match(rule.pattern);
 }
 
-function outcomeFor(kind: SkillSuggestion['kind'], independence: Independence, struggled: boolean): SuggestionOutcome {
+function outcomeFor(kind: SkillSuggestion['kind'], independence: Independence, struggled: boolean, helpedAfter = false): SuggestionOutcome {
   if (kind === 'exposure') return 'exposure';
-  if (struggled) return 'not_yet';
+  // "Got stuck, so we used blocks together" → succeeded with support, not mastery.
+  if (struggled) return helpedAfter ? 'with_support' : 'not_yet';
   if (independence === 'independent') return 'demonstrated';
   if (independence === 'assisted') return 'exposure';
   return 'with_support';
@@ -321,7 +342,7 @@ export function interpretLocally(narrative: string, context: InterpretationConte
 
       for (const rs of rule.skills) {
         if (rs.when && !rs.when.test(s.text)) continue;
-        const skillId = rule.id === 'math.count' ? refineCountSkill(m) : rs.skillId;
+        const skillId = rule.id === 'math.count' ? refineCountSkill(m) : rule.id === 'math.addSub' ? refineAddSubSkill(s.text) : rs.skillId;
         const skill = getSkill(skillId);
         if (!skill) continue;
         const kind = s.exposureOnly ? 'exposure' : (rs.kind ?? 'performance');
@@ -330,20 +351,26 @@ export function interpretLocally(narrative: string, context: InterpretationConte
         // leaking onto "and we baked").
         const clauseCue = clauseIndependence(s.text, m.index ?? 0);
         const cue = clauseCue ?? (s.text.includes(',') || / and (she|he|we|i) /i.test(s.text) ? null : s.independence);
-        const independence: Independence = cue ?? rule.assume ?? (kind === 'exposure' ? 'assisted' : 'independent');
+        const independence: Independence =
+          cue ?? rule.assume ?? (s.struggled ? (SUPPORTED_CUES.test(s.lower) ? 'supported' : 'assisted') : kind === 'exposure' ? 'assisted' : 'independent');
         let confidence = rs.confidence;
         if (cue) confidence += 0.05;
         if (s.affirmed) confidence += 0.05;
         if (s.hedged) confidence -= 0.15;
         confidence = Math.max(0.05, Math.min(0.97, confidence));
 
+        const outcome = outcomeFor(kind, independence, s.struggled, SUPPORTED_CUES.test(s.lower));
+        let statement = rs.statement({ ...s, independence: cue ?? rule.assume ?? null }, m);
+        // Keep the statement consistent with the outcome — never claim independence that wasn't there.
+        if (outcome === 'not_yet') statement = `Working on ${skill.name.toLowerCase()} — not yet: “${s.text.replace(/[.!]+$/, '')}.”`;
+        else if (outcome === 'with_support') statement = statement.replace(/ independently\b/, ' with support');
         const suggestion: SkillSuggestion = {
           skillId,
           confidence: Math.round(confidence * 100) / 100,
           kind,
           independence,
-          outcome: outcomeFor(kind, independence, s.struggled),
-          statement: rs.statement({ ...s, independence: cue ?? rule.assume ?? null }, m),
+          outcome,
+          statement,
           excerpt: s.text,
           topics: [...new Set([...(rule.topics ?? []), ...skill.topics])],
           accepted: confidence >= ACCEPT_THRESHOLD,

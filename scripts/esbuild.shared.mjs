@@ -55,9 +55,7 @@ export function writeIndexHtml(outdir, metafile, { liveReload = false } = {}) {
   const tags = [
     cssFile ? `<link rel="stylesheet" href="./assets/${cssFile}" />` : '',
     `<script type="module" src="./assets/${jsFile}"></script>`,
-    liveReload
-      ? `<script>new EventSource('/esbuild').addEventListener('change', () => location.reload());</script>`
-      : '',
+    liveReload ? `<script>new EventSource('/esbuild').addEventListener('change', () => location.reload());</script>` : '',
   ]
     .filter(Boolean)
     .join('\n    ');

@@ -97,7 +97,10 @@ export class CameraRig {
 
   update(dt: number, focus: THREE.Vector3): void {
     // Look slightly ahead of Izzy so she sits in the lower third with the room ahead in view.
-    const desired = focus.clone().add(new THREE.Vector3(0, CAMERA.lookHeight, 0)).addScaledVector(this.forward, CAMERA.lookAhead);
+    const desired = focus
+      .clone()
+      .add(new THREE.Vector3(0, CAMERA.lookHeight, 0))
+      .addScaledVector(this.forward, CAMERA.lookAhead);
     if (!this.initialized) {
       this.target.copy(desired);
       this.initialized = true;

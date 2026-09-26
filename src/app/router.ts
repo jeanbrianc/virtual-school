@@ -41,7 +41,11 @@ function subscribe(cb: () => void) {
 }
 
 export function useRoute(): Route {
-  const hash = useSyncExternalStore(subscribe, () => window.location.hash, () => '');
+  const hash = useSyncExternalStore(
+    subscribe,
+    () => window.location.hash,
+    () => '',
+  );
   return parseHash(hash);
 }
 

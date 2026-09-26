@@ -70,7 +70,16 @@ function labBench(ctx: BuildContext) {
   liquid.forEach((c, i) => {
     const b = group(
       cyl(0.07, 0.07, 0.18, glassMat('#e8fbff', 0.35), 0, 0.09, 0, 18),
-      cyl(0.062, 0.062, 0.09 + (i % 2) * 0.04, uniqueMat(c, { emissive: c, emissiveIntensity: 0.25, transparent: true, opacity: 0.85, roughness: 0.2 }), 0, 0.05, 0, 18),
+      cyl(
+        0.062,
+        0.062,
+        0.09 + (i % 2) * 0.04,
+        uniqueMat(c, { emissive: c, emissiveIntensity: 0.25, transparent: true, opacity: 0.85, roughness: 0.2 }),
+        0,
+        0.05,
+        0,
+        18,
+      ),
     );
     b.position.set(-0.8 + i * 0.22, 0.92, 0.12 - (i % 2) * 0.1);
     bench.add(b);
@@ -86,7 +95,15 @@ function labBench(ctx: BuildContext) {
   const crystals = new THREE.Group();
   const cc = ['#b99cf2', '#7fe0e6', '#f7a8d1'];
   for (let i = 0; i < 7; i++) {
-    const c = cone(0.035 + (i % 3) * 0.01, 0.16 + (i % 2) * 0.08, uniqueMat(cc[i % 3] ?? '#b99cf2', { emissive: cc[i % 3] ?? '#b99cf2', emissiveIntensity: 0.6, roughness: 0.15 }), (i - 3) * 0.05, 0.08, (i % 2) * 0.05, 6);
+    const c = cone(
+      0.035 + (i % 3) * 0.01,
+      0.16 + (i % 2) * 0.08,
+      uniqueMat(cc[i % 3] ?? '#b99cf2', { emissive: cc[i % 3] ?? '#b99cf2', emissiveIntensity: 0.6, roughness: 0.15 }),
+      (i - 3) * 0.05,
+      0.08,
+      (i % 2) * 0.05,
+      6,
+    );
     c.rotation.z = (i - 3) * 0.12;
     crystals.add(c);
   }
@@ -139,12 +156,25 @@ export function buildScience(ctx: BuildContext): void {
     [0.55, -0.32],
     [-0.55, 0.32],
     [0.55, 0.32],
-  ] as const) tankTable.add(cyl(0.035, 0.035, 0.7, mat(PALETTE.oak), x, 0.35, z, 8));
+  ] as const)
+    tankTable.add(cyl(0.035, 0.035, 0.7, mat(PALETTE.oak), x, 0.35, z, 8));
   const tank = group(
     box(1.1, 0.5, 0.6, glassMat('#e3fbff', 0.25), 0, 1.0, 0),
-    box(1.06, 0.36, 0.56, uniqueMat('#6cc6dc', { transparent: true, opacity: 0.55, roughness: 0.05, emissive: '#1d6f86', emissiveIntensity: 0.15 }), 0, 0.93, 0),
+    box(
+      1.06,
+      0.36,
+      0.56,
+      uniqueMat('#6cc6dc', { transparent: true, opacity: 0.55, roughness: 0.05, emissive: '#1d6f86', emissiveIntensity: 0.15 }),
+      0,
+      0.93,
+      0,
+    ),
   );
-  const duck = group(sphere(0.07, mat('#f5c542'), 0, 0, 0, 14), sphere(0.045, mat('#f5c542'), 0.05, 0.06, 0, 12), cone(0.02, 0.04, mat('#e9833b'), 0.1, 0.055, 0, 6));
+  const duck = group(
+    sphere(0.07, mat('#f5c542'), 0, 0, 0, 14),
+    sphere(0.045, mat('#f5c542'), 0.05, 0.06, 0, 12),
+    cone(0.02, 0.04, mat('#e9833b'), 0.1, 0.055, 0, 6),
+  );
   (duck.children[2] as THREE.Object3D).rotation.z = -Math.PI / 2;
   duck.position.set(-0.25, 1.13, 0.05);
   const cork = cyl(0.04, 0.035, 0.06, mat('#b98a5a'), 0.2, 1.12, -0.1, 12);
@@ -170,7 +200,9 @@ export function buildScience(ctx: BuildContext): void {
   const aq = new THREE.Group();
   aq.add(rbox(0.6, 0.8, 1.6, 0.02, mat(PALETTE.walnut, { roughness: 0.6 }), 0, 0.4, 0));
   aq.add(box(0.55, 0.62, 1.5, glassMat('#dff7ff', 0.22), 0, 1.12, 0));
-  aq.add(box(0.5, 0.5, 1.45, uniqueMat('#5fb8d6', { transparent: true, opacity: 0.45, emissive: '#1d6f86', emissiveIntensity: 0.25, roughness: 0.05 }), 0, 1.07, 0));
+  aq.add(
+    box(0.5, 0.5, 1.45, uniqueMat('#5fb8d6', { transparent: true, opacity: 0.45, emissive: '#1d6f86', emissiveIntensity: 0.25, roughness: 0.05 }), 0, 1.07, 0),
+  );
   aq.add(box(0.5, 0.06, 1.45, mat('#e8d4a8', { roughness: 1 }), 0, 0.84, 0));
   for (let i = 0; i < 5; i++) {
     const weed = cyl(0.015, 0.02, 0.25 + (i % 3) * 0.1, mat('#4f9a5a'), 0, 0.98 + (i % 3) * 0.05, -0.6 + i * 0.3, 6);
@@ -236,7 +268,14 @@ export function buildScience(ctx: BuildContext): void {
   scope.add(tube);
   scope.position.set(6.6, 0, -8.3);
   ctx.add(scope);
-  ctx.features.push(toggleFeature(scope, (s) => s.telescope, ctx, () => ctx.collide(6.6, -8.3, 0.6, 0.6, 'telescope')));
+  ctx.features.push(
+    toggleFeature(
+      scope,
+      (s) => s.telescope,
+      ctx,
+      () => ctx.collide(6.6, -8.3, 0.6, 0.6, 'telescope'),
+    ),
+  );
 
   // Nova's station collider.
   ctx.collide(LAYOUT.nova.x, LAYOUT.nova.z, 0.6, 0.6);
@@ -265,15 +304,18 @@ export function buildMath(ctx: BuildContext): void {
     [0.65, -0.4],
     [-0.65, 0.4],
     [0.65, 0.4],
-  ] as const) table.add(cyl(0.035, 0.035, 0.5, mat('#7fc8c0'), x, 0.25, z, 8));
+  ] as const)
+    table.add(cyl(0.035, 0.035, 0.5, mat('#7fc8c0'), x, 0.25, z, 8));
   const colors = [PALETTE.terracotta, PALETTE.mustard, '#7fc8c0', PALETTE.blush, '#9b8ec9', PALETTE.wainscot, '#4a6fa5'];
   [3, 5, 2, 4, 6, 1].forEach((hgt, i) => {
-    for (let j = 0; j < hgt; j++) table.add(rbox(0.09, 0.09, 0.09, 0.012, mat(colors[(i + j) % colors.length] ?? '#e07a5f', { roughness: 0.5 }), -0.55 + i * 0.2, 0.6 + j * 0.092, -0.2));
+    for (let j = 0; j < hgt; j++)
+      table.add(rbox(0.09, 0.09, 0.09, 0.012, mat(colors[(i + j) % colors.length] ?? '#e07a5f', { roughness: 0.5 }), -0.55 + i * 0.2, 0.6 + j * 0.092, -0.2));
   });
   for (const x of [-0.35, 0.35]) {
     const bin = group(cyl(0.2, 0.17, 0.16, mat('#4a6fa5', { roughness: 0.6 }), 0, 0.63, 0, 20));
     const rng = createRng(x > 0 ? 3 : 8);
-    for (let i = 0; i < 9; i++) bin.add(sphere(0.045, mat('#b8b2a7', { flatShading: true, roughness: 1 }), (rng() - 0.5) * 0.24, 0.72 + rng() * 0.04, (rng() - 0.5) * 0.24, 6));
+    for (let i = 0; i < 9; i++)
+      bin.add(sphere(0.045, mat('#b8b2a7', { flatShading: true, roughness: 1 }), (rng() - 0.5) * 0.24, 0.72 + rng() * 0.04, (rng() - 0.5) * 0.24, 6));
     bin.position.set(x, 0, 0.2);
     table.add(bin);
   }
@@ -285,7 +327,12 @@ export function buildMath(ctx: BuildContext): void {
   // Abacus stand.
   const abacus = new THREE.Group();
   const frame = mat(PALETTE.walnut, { roughness: 0.5 });
-  abacus.add(box(0.05, 1.3, 0.05, frame, -0.55, 0.65, 0), box(0.05, 1.3, 0.05, frame, 0.55, 0.65, 0), box(1.15, 0.05, 0.08, frame, 0, 1.28, 0), box(1.15, 0.05, 0.08, frame, 0, 0.55, 0));
+  abacus.add(
+    box(0.05, 1.3, 0.05, frame, -0.55, 0.65, 0),
+    box(0.05, 1.3, 0.05, frame, 0.55, 0.65, 0),
+    box(1.15, 0.05, 0.08, frame, 0, 1.28, 0),
+    box(1.15, 0.05, 0.08, frame, 0, 0.55, 0),
+  );
   for (let r = 0; r < 5; r++) {
     const y = 0.66 + r * 0.12;
     const rod = cyl(0.008, 0.008, 1.1, mat('#c9c2b4', { metalness: 0.6 }), 0, y, 0, 6);

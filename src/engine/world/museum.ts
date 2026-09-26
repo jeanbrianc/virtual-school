@@ -111,7 +111,11 @@ function natureItem(kind: string, seed: number): THREE.Object3D {
   const rng = createRng(seed);
   switch (kind) {
     case 'acorn':
-      return group(sphere(0.045, mat('#a6773f', { roughness: 0.5 }), 0, 0.045, 0, 12), cyl(0.05, 0.045, 0.035, mat('#6b4a2b', { roughness: 1 }), 0, 0.085, 0, 12), cyl(0.006, 0.006, 0.03, mat('#6b4a2b'), 0, 0.11, 0, 5));
+      return group(
+        sphere(0.045, mat('#a6773f', { roughness: 0.5 }), 0, 0.045, 0, 12),
+        cyl(0.05, 0.045, 0.035, mat('#6b4a2b', { roughness: 1 }), 0, 0.085, 0, 12),
+        cyl(0.006, 0.006, 0.03, mat('#6b4a2b'), 0, 0.11, 0, 5),
+      );
     case 'pinecone': {
       const g = new THREE.Group();
       for (let i = 0; i < 5; i++) g.add(cone(0.06 - i * 0.008, 0.05, mat('#7a5236', { flatShading: true }), 0, 0.03 + i * 0.03, 0, 7));
@@ -223,7 +227,14 @@ export function buildMuseum(ctx: BuildContext): void {
   // Trophy shelf.
   const shelf = new THREE.Group();
   const wood = mat(PALETTE.walnut, { roughness: 0.6 });
-  shelf.add(box(1.6, 0.05, 0.4, wood, 0, 0.9, 0), box(1.6, 0.05, 0.4, wood, 0, 1.5, 0), box(0.05, 1.6, 0.4, wood, -0.8, 0.8, 0), box(0.05, 1.6, 0.4, wood, 0.8, 0.8, 0), box(1.6, 0.05, 0.4, wood, 0, 0.3, 0), box(1.65, 0.05, 0.42, wood, 0, 1.6, 0));
+  shelf.add(
+    box(1.6, 0.05, 0.4, wood, 0, 0.9, 0),
+    box(1.6, 0.05, 0.4, wood, 0, 1.5, 0),
+    box(0.05, 1.6, 0.4, wood, -0.8, 0.8, 0),
+    box(0.05, 1.6, 0.4, wood, 0.8, 0.8, 0),
+    box(1.6, 0.05, 0.4, wood, 0, 0.3, 0),
+    box(1.65, 0.05, 0.42, wood, 0, 1.6, 0),
+  );
   const trophySlots = new THREE.Group();
   trophySlots.userData.dynamic = true;
   shelf.add(trophySlots);
@@ -268,15 +279,23 @@ export function buildMuseum(ctx: BuildContext): void {
   am.rotation.y = 0.4;
   const dome = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), glassMat('#eefcff', 0.2));
   dome.position.y = 0.96;
-  const label = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.16), new THREE.MeshStandardMaterial({ map: signTexture('Ammonite', { icon: '🐚', w: 384, h: 120 }) }));
+  const label = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.5, 0.16),
+    new THREE.MeshStandardMaterial({ map: signTexture('Ammonite', { icon: '🐚', w: 384, h: 120 }) }),
+  );
   label.position.set(0, 0.7, 0.36);
   fossil.add(am, dome, label);
   fossil.position.set(-11.5, 0, 4.3);
   ctx.add(fossil);
   ctx.features.push(
-    toggleFeature(fossil, (s) => s.fossilDisplay, ctx, () => {
-      if (!ctx.collisions.has('fossil')) ctx.collide(-11.5, 4.3, 0.8, 0.8, 'fossil');
-    }),
+    toggleFeature(
+      fossil,
+      (s) => s.fossilDisplay,
+      ctx,
+      () => {
+        if (!ctx.collisions.has('fossil')) ctx.collide(-11.5, 4.3, 0.8, 0.8, 'fossil');
+      },
+    ),
   );
   ctx.features.push({ apply: () => undefined, update: (_dt, t) => (am.rotation.y = 0.4 + t * 0.3) });
 
@@ -286,9 +305,14 @@ export function buildMuseum(ctx: BuildContext): void {
   skeleton.rotation.y = 0.35;
   ctx.add(skeleton);
   ctx.features.push(
-    toggleFeature(skeleton, (s) => s.dinoSkeleton, ctx, () => {
-      if (!ctx.collisions.has('skeleton')) ctx.collide(-8.3, 7.3, 3.4, 1.4, 'skeleton');
-    }),
+    toggleFeature(
+      skeleton,
+      (s) => s.dinoSkeleton,
+      ctx,
+      () => {
+        if (!ctx.collisions.has('skeleton')) ctx.collide(-8.3, 7.3, 3.4, 1.4, 'skeleton');
+      },
+    ),
   );
 
   // Nature exhibit table.
@@ -299,12 +323,16 @@ export function buildMuseum(ctx: BuildContext): void {
     [0.7, -0.32],
     [-0.7, 0.32],
     [0.7, 0.32],
-  ] as const) nature.add(cyl(0.03, 0.03, 0.68, mat(PALETTE.walnut), x, 0.34, z, 8));
+  ] as const)
+    nature.add(cyl(0.03, 0.03, 0.68, mat(PALETTE.walnut), x, 0.34, z, 8));
   const tray = rbox(1.4, 0.03, 0.62, 0.01, mat('#e9dcc4', { roughness: 1 }), 0, 0.745, 0);
   nature.add(tray);
   const items = new THREE.Group();
   nature.add(items);
-  const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.18), new THREE.MeshStandardMaterial({ map: signTexture('Nature Finds', { icon: '🍂', w: 384, h: 110 }) }));
+  const tag = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.6, 0.18),
+    new THREE.MeshStandardMaterial({ map: signTexture('Nature Finds', { icon: '🍂', w: 384, h: 110 }) }),
+  );
   tag.position.set(0, 0.62, 0.41);
   nature.add(tag);
   nature.position.set(-11.2, 0, 2.2);
@@ -448,7 +476,8 @@ function buildGreenhouse(ctx: BuildContext) {
     [0.7, -0.25],
     [-0.7, 0.25],
     [0.7, 0.25],
-  ] as const) benchG.add(box(0.05, 0.85, 0.05, mat(PALETTE.walnut), x, 0.42, z));
+  ] as const)
+    benchG.add(box(0.05, 0.85, 0.05, mat(PALETTE.walnut), x, 0.42, z));
   const can = group(cyl(0.12, 0.14, 0.22, mat('#6d8f86', { metalness: 0.4, roughness: 0.4 }), 0, 0.11, 0, 16), torus(0.08, 0.015, mat('#6d8f86')));
   (can.children[1] as THREE.Object3D).position.y = 0.26;
   const spout = cyl(0.015, 0.025, 0.3, mat('#6d8f86'), 0.18, 0.18, 0, 8);
@@ -472,7 +501,11 @@ function buildGreenhouse(ctx: BuildContext) {
   ctx.add(bedPlants);
   const butterflies = new THREE.Group();
   ctx.add(butterflies);
-  const wingMat = [uniqueMat('#ffb3c7', { side: THREE.DoubleSide }), uniqueMat('#ffd166', { side: THREE.DoubleSide }), uniqueMat('#9ad1ff', { side: THREE.DoubleSide })];
+  const wingMat = [
+    uniqueMat('#ffb3c7', { side: THREE.DoubleSide }),
+    uniqueMat('#ffd166', { side: THREE.DoubleSide }),
+    uniqueMat('#9ad1ff', { side: THREE.DoubleSide }),
+  ];
   for (let i = 0; i < 5; i++) {
     const bfly = new THREE.Group();
     for (const s of [-1, 1]) {
@@ -530,11 +563,17 @@ function buildGreenhouse(ctx: BuildContext) {
     doors.push(leaf);
     ctx.add(leaf);
   }
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.5), new THREE.MeshStandardMaterial({ map: signTexture('Greenhouse', { icon: '🌱', bg: '#eef7e8', fg: '#4c7a3d' }), roughness: 0.7 }));
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.8, 0.5),
+    new THREE.MeshStandardMaterial({ map: signTexture('Greenhouse', { icon: '🌱', bg: '#eef7e8', fg: '#4c7a3d' }), roughness: 0.7 }),
+  );
   sign.rotation.y = -Math.PI / 2;
   sign.position.set(LAYOUT.hall.maxX - 0.02, 3.35, doorZ);
   ctx.mount('east', sign);
-  const lock = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42), new THREE.MeshStandardMaterial({ map: signTexture('🔒', { w: 160, h: 160, bg: '#fff6e6' }), transparent: true }));
+  const lock = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.42, 0.42),
+    new THREE.MeshStandardMaterial({ map: signTexture('🔒', { w: 160, h: 160, bg: '#fff6e6' }), transparent: true }),
+  );
   lock.rotation.y = -Math.PI / 2;
   lock.position.set(LAYOUT.hall.maxX - 0.05, 1.5, doorZ);
   ctx.add(lock);
@@ -610,13 +649,20 @@ function buildArtStudio(ctx: BuildContext) {
   // Paint splatters.
   const rng = createRng(4);
   for (let i = 0; i < 14; i++) {
-    const s = new THREE.Mesh(new THREE.CircleGeometry(0.05 + rng() * 0.12, 12), mat(['#e07a5f', '#3d85c6', '#f2cc8f', '#81b29a', '#f15bb5'][i % 5] ?? '#e07a5f'));
+    const s = new THREE.Mesh(
+      new THREE.CircleGeometry(0.05 + rng() * 0.12, 12),
+      mat(['#e07a5f', '#3d85c6', '#f2cc8f', '#81b29a', '#f15bb5'][i % 5] ?? '#e07a5f'),
+    );
     s.rotation.x = -Math.PI / 2;
     s.position.set(minX + 0.5 + rng() * (maxX - minX - 1), 0.008, minZ + 0.5 + rng() * (maxZ - minZ - 1));
     studio.add(s);
   }
   const wallM = mat('#e8f0f2', { roughness: 0.95 });
-  studio.add(box(maxX - minX + 0.3, 3.2, 0.25, wallM, cx, 1.6, minZ - 0.12), box(maxX - minX + 0.3, 3.2, 0.25, wallM, cx, 1.6, maxZ + 0.12), box(0.25, 3.2, maxZ - minZ + 0.5, wallM, maxX + 0.12, 1.6, cz));
+  studio.add(
+    box(maxX - minX + 0.3, 3.2, 0.25, wallM, cx, 1.6, minZ - 0.12),
+    box(maxX - minX + 0.3, 3.2, 0.25, wallM, cx, 1.6, maxZ + 0.12),
+    box(0.25, 3.2, maxZ - minZ + 0.5, wallM, maxX + 0.12, 1.6, cz),
+  );
   ctx.collide(cx, minZ - 0.12, maxX - minX + 0.3, 0.3);
   ctx.collide(cx, maxZ + 0.12, maxX - minX + 0.3, 0.3);
   ctx.collide(maxX + 0.12, cz, 0.3, maxZ - minZ + 0.5);
@@ -628,7 +674,10 @@ function buildArtStudio(ctx: BuildContext) {
       leg.rotation.z = -s * 0.06;
       e.add(leg);
     }
-    const canvasMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.55), new THREE.MeshStandardMaterial({ map: kidArtTexture(100 + i), roughness: 0.9 }));
+    const canvasMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.7, 0.55),
+      new THREE.MeshStandardMaterial({ map: kidArtTexture(100 + i, ctx.childName), roughness: 0.9 }),
+    );
     canvasMesh.position.set(0, 1.2, 0.03);
     e.add(canvasMesh, box(0.75, 0.04, 0.1, mat(PALETTE.oak), 0, 0.9, 0.04));
     e.position.set(minX + 1.2 + i * 1.3, 0, maxZ - 1.2);
@@ -650,7 +699,10 @@ function buildArtStudio(ctx: BuildContext) {
   const door = new THREE.Group();
   const panel = group(rbox(1.8, 2.65, 0.08, 0.03, mat('#e07a5f', { roughness: 0.6 }), 0.9, 1.33, 0));
   for (let i = 0; i < 6; i++) {
-    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.08 + (i % 3) * 0.03, 12), mat(['#f2cc8f', '#3d85c6', '#81b29a', '#f15bb5', '#9b5de5', '#fff'][i] ?? '#fff'));
+    const dot = new THREE.Mesh(
+      new THREE.CircleGeometry(0.08 + (i % 3) * 0.03, 12),
+      mat(['#f2cc8f', '#3d85c6', '#81b29a', '#f15bb5', '#9b5de5', '#fff'][i] ?? '#fff'),
+    );
     dot.position.set(0.3 + (i % 3) * 0.55, 0.8 + Math.floor(i / 3) * 1.1, 0.045);
     panel.add(dot);
   }
@@ -659,7 +711,10 @@ function buildArtStudio(ctx: BuildContext) {
   door.position.set(doorX, 0, doorZ + 0.9);
   door.rotation.y = Math.PI / 2;
   ctx.add(door);
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.48), new THREE.MeshStandardMaterial({ map: signTexture('Art Studio', { icon: '🎨', bg: '#fff0ea', fg: '#c8553d' }), roughness: 0.7 }));
+  const sign = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.7, 0.48),
+    new THREE.MeshStandardMaterial({ map: signTexture('Art Studio', { icon: '🎨', bg: '#fff0ea', fg: '#c8553d' }), roughness: 0.7 }),
+  );
   sign.rotation.y = -Math.PI / 2;
   sign.position.set(LAYOUT.hall.maxX - 0.02, 3.05, doorZ);
   ctx.mount('east', sign);

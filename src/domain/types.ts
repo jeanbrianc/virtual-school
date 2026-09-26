@@ -267,15 +267,7 @@ export interface Activity {
   isDemo?: boolean;
 }
 
-export type PortfolioKind =
-  | 'photo'
-  | 'artwork'
-  | 'project'
-  | 'work_sample'
-  | 'book'
-  | 'assessment'
-  | 'observation'
-  | 'nature';
+export type PortfolioKind = 'photo' | 'artwork' | 'project' | 'work_sample' | 'book' | 'assessment' | 'observation' | 'nature';
 
 export interface PortfolioItem {
   id: ID;

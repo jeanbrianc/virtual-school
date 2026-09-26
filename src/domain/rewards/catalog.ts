@@ -144,8 +144,7 @@ export const REWARDS: RewardDefinition[] = [
     kind: 'pet',
     name: 'Ember the Book Dragon (companion)',
     childTitle: 'Ember the Book Dragon!',
-    childMessage:
-      'ONE HUNDRED BOOKS! A little dragon hatched from the magic of every story you read. Ember is yours forever!',
+    childMessage: 'ONE HUNDRED BOOKS! A little dragon hatched from the magic of every story you read. Ember is yours forever!',
     hint: 'Read 100 books',
     rule: { type: 'books', count: 100 },
     icon: '🐉',

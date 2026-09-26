@@ -3,13 +3,7 @@
  */
 import { UnitOfWork } from '../data/repositories';
 import { getSkill } from '../domain/curriculum';
-import type {
-  ActivityInterpretation,
-  ActivityInterpretationService,
-  BookMention,
-  InterpretationContext,
-  SkillSuggestion,
-} from '../domain/interpretation';
+import type { ActivityInterpretation, ActivityInterpretationService, BookMention, InterpretationContext, SkillSuggestion } from '../domain/interpretation';
 import type { Activity, Book, Evidence, EvidenceTrials, PortfolioKind, ReadingSession } from '../domain/types';
 import { timestampAt, toDay } from '../domain/util/time';
 import { nowIso, type ServiceContext } from './context';
@@ -157,9 +151,7 @@ export async function saveActivity(ctx: ServiceContext, childId: string, reviewe
         status: 'reading',
         readingMode: mention.mode === 'read_aloud' ? 'read_aloud' : mention.mode === 'shared' ? 'shared' : 'independent',
       });
-    const chapters = mention.chaptersRead
-      ? Math.min(base.totalChapters ?? Infinity, (base.chaptersRead ?? 0) + mention.chaptersRead)
-      : base.chaptersRead;
+    const chapters = mention.chaptersRead ? Math.min(base.totalChapters ?? Infinity, (base.chaptersRead ?? 0) + mention.chaptersRead) : base.chaptersRead;
     const completing = mention.completed && base.status !== 'completed';
     const updated: Book = {
       ...base,

@@ -46,8 +46,7 @@ const QUESTION_SKILL: Record<QuestionType, string> = {
 };
 
 type Q = Omit<ComprehensionQuestion, 'id' | 'skillId'>;
-const qs = (bookId: string, list: Q[]): ComprehensionQuestion[] =>
-  list.map((q, i) => ({ ...q, id: `${bookId}.q${i + 1}`, skillId: QUESTION_SKILL[q.type] }));
+const qs = (bookId: string, list: Q[]): ComprehensionQuestion[] => list.map((q, i) => ({ ...q, id: `${bookId}.q${i + 1}`, skillId: QUESTION_SKILL[q.type] }));
 
 export const BOOK_CATALOG: CatalogBook[] = [
   {

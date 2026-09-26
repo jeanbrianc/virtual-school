@@ -288,7 +288,8 @@ function drawSimpleMotif(ctx: Ctx, motif: CoverMotif, cx: number, cy: number, u:
         [30, -30, 4],
         [38, 18, 3],
         [-36, -34, 2.5],
-      ] as const) circle(ctx, cx + sx * u, cy + sy * u, r * u, main);
+      ] as const)
+        circle(ctx, cx + sx * u, cy + sy * u, r * u, main);
       break;
     case 'fish':
       ellipse(ctx, cx - 6 * u, cy, 32 * u, 20 * u, main);

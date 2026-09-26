@@ -8,15 +8,7 @@ import { tallyBySkill } from '../domain/lessons/engine';
 import type { Problem } from '../domain/lessons/types';
 import { getCatalogBook } from '../domain/reading/bookCatalog';
 import { generatedCover } from '../domain/reading/bookMetadata';
-import type {
-  Book,
-  Evidence,
-  ProblemAttemptRecord,
-  ReadingMode,
-  ReadingSession,
-  TeacherInteraction,
-  TranscriptLine,
-} from '../domain/types';
+import type { Book, Evidence, ProblemAttemptRecord, ReadingMode, ReadingSession, TeacherInteraction, TranscriptLine } from '../domain/types';
 import { toDay } from '../domain/util/time';
 import { nowIso, type ServiceContext } from './context';
 import { finalizeLearning, makeEvidence, type LearningOutcome } from './learningCore';
@@ -164,7 +156,8 @@ const QUESTION_KIND_LABEL: Record<string, string> = {
 export async function completeBook(ctx: ServiceContext, childId: string, input: CompleteBookInput): Promise<CompleteBookResult> {
   const now = nowIso(ctx);
   const today = toDay(ctx.clock.now());
-  const all = await ctx.repos.forChild(ctx.repos.books, childId);
+  const [all, child] = await Promise.all([ctx.repos.forChild(ctx.repos.books, childId), ctx.repos.children.get(childId)]);
+  const name = child?.name ?? 'Their';
 
   let book: Book;
   if (input.bookId) {
@@ -278,9 +271,9 @@ export async function completeBook(ctx: ServiceContext, childId: string, input: 
     title: `Finished ${book.title}`,
     description: [
       book.author ? `by ${book.author}` : '',
-      input.rating ? `Izzy’s rating: ${'★'.repeat(input.rating)}` : '',
+      input.rating ? `${name}’s rating: ${'★'.repeat(input.rating)}` : '',
       input.favoritePart ? `Favorite part: ${input.favoritePart}` : '',
-      input.feeling ? `She said it felt ${input.feeling.toLowerCase()}.` : '',
+      input.feeling ? `${name} said it felt ${input.feeling.toLowerCase()}.` : '',
     ]
       .filter(Boolean)
       .join(' · '),

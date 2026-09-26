@@ -147,7 +147,8 @@ export class InteractionSystem {
       const isFocus = this.focused?.id === d.id || this.hovered?.id === d.id;
       const near = Math.hypot(d.position.x - player.x, d.position.z - player.z) < 9;
       // Teachers always show a gentle marker; objects only when nearby.
-      m.sprite.visible = d.enabled && (isFocus || (d.kind === 'teacher' ? near : near && Math.hypot(d.position.x - player.x, d.position.z - player.z) < d.radius + 2.5));
+      m.sprite.visible =
+        d.enabled && (isFocus || (d.kind === 'teacher' ? near : near && Math.hypot(d.position.x - player.x, d.position.z - player.z) < d.radius + 2.5));
       const bob = Math.sin(this.time * 2.6 + m.phase) * 0.1;
       m.sprite.position.set(m.base.x, m.base.y + bob + (isFocus ? 0.15 : 0), m.base.z);
       const target = (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : 1);
