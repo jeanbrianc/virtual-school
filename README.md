@@ -31,6 +31,12 @@ npm run dev          # http://127.0.0.1:5173 with live reload
 Open the app, tap **Izzy** to enter the school. The **Grown-ups** button asks for
 the parent PIN — the demo PIN is **1234** (change it in *Settings & privacy*).
 
+**Hosted copy.** The production build is also published as a private claude.ai
+artifact. It runs the same code with its own browser storage. That viewer blocks
+file downloads and the print dialog, so report download/print and JSON export
+only work when you run the app locally (`npm run build && npm run preview`, or
+serve `dist/` from any static host).
+
 ### All commands
 
 | Command | What it does |
