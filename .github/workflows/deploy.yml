@@ -1,0 +1,66 @@
+# Checks every push and pull request; deploys main to AWS once the stack exists.
+# One-time setup: run scripts/deploy/aws-deploy.sh on your computer, then add the
+# repository variable AWS_DEPLOY_ROLE_ARN it prints (Settings → Secrets and
+# variables → Actions → Variables). No AWS keys are stored in GitHub: the
+# workflow signs in with OpenID Connect to a role that can only publish the site.
+name: Check and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: deploy-aws
+      cancel-in-progress: false
+    env:
+      AWS_REGION: us-east-1
+      STACK_NAME: ${{ vars.AWS_STACK_NAME || 'virtual-school' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the site for AWS (AI helper at /api)
+        run: npm run build
+        env:
+          AI_HELPER_URL: /api
+      - name: Build the AI helper Lambda
+        run: node scripts/deploy/build-lambda.mjs
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+      - name: Publish
+        run: bash scripts/deploy/publish.sh

@@ -101,9 +101,9 @@ const PATTERN_RULES = [
   },
   {
     id: 'network-only-in-ai-adapter',
-    applies: (f) => !/interpretation\/remoteInterpreter\.ts$/.test(f.rel),
+    applies: (f) => !/(?:interpretation\/remoteInterpreter|teachers\/chatRemote)\.ts$/.test(f.rel),
     re: /\bfetch\s*\(|XMLHttpRequest|new WebSocket|navigator\.sendBeacon/g,
-    msg: 'network calls are only allowed in the consent-gated AI interpreter',
+    msg: 'network calls are only allowed in the consent-gated AI adapters',
   },
   { id: 'no-eval', applies: () => true, re: /\beval\s*\(|new Function\s*\(/g, msg: 'no eval / new Function' },
   { id: 'no-inner-html', applies: () => true, re: /dangerouslySetInnerHTML|\.innerHTML\s*=|\.outerHTML\s*=/g, msg: 'no raw HTML injection' },

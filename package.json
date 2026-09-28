@@ -14,11 +14,14 @@
     "preview": "node scripts/preview.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "node scripts/lint.mjs",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" playwright.config.ts",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" \"scripts/**/*.mjs\" playwright.config.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" \"scripts/**/*.{mjs,ts}\" playwright.config.ts",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" \"scripts/**/*.{mjs,ts}\" playwright.config.ts",
     "test": "node --import tsx --test --test-reporter=spec \"tests/unit/**/*.test.ts\"",
     "test:e2e": "node scripts/build.mjs --e2e && playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build",
+    "ai-helper": "node --import tsx scripts/ai-helper/main.ts",
+    "build:lambda": "node scripts/deploy/build-lambda.mjs",
+    "deploy:aws": "bash scripts/deploy/aws-deploy.sh"
   },
   "dependencies": {
     "react": "19.2.6",

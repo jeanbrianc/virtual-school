@@ -124,7 +124,8 @@ export class HttpInterpretationService implements ActivityInterpretationService 
     try {
       const res = await this.fetchImpl(this.endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // The custom header lets the family's local helper recognize this app (and forces a CORS preflight).
+        headers: { 'Content-Type': 'application/json', 'X-Izzy-Classroom': '1' },
         // Only the narrative, first name and date are sent (plus the public skill
         // catalog so the model can pick valid ids) — no ids, photos or history.
         body: JSON.stringify({

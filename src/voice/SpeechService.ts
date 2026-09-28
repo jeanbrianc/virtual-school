@@ -7,6 +7,8 @@
  * Future providers (cloud TTS voices, pronunciation analysis, narration
  * scoring) implement the same interfaces — see docs/ARCHITECTURE.md.
  */
+import type { OnDeviceAnswer } from '../domain/talk';
+
 export interface SpeakOptions {
   pitch?: number;
   rate?: number;
@@ -22,13 +24,74 @@ export interface SpeechOutput {
 export interface SpeechInputResult {
   transcript: string;
   confidence: number;
+  /** True when the words were recognized on this computer (audio never left it). */
+  onDevice: boolean;
+}
+
+/**
+ * Who may turn her voice into words.
+ *  • off     — no microphone anywhere in child mode.
+ *  • device  — only the browser's ON-DEVICE recognizer (audio never leaves the computer).
+ *  • browser — on-device when possible, otherwise the browser's own speech
+ *              service (Chrome: Google; Safari: Apple), which receives the audio.
+ */
+export type TalkMode = 'off' | 'device' | 'browser';
+
+/** What this browser said about on-device recognition (asked only from the Parent Studio — see domain/talk.ts). */
+export type { OnDeviceAnswer };
+
+export interface TalkAvailability {
+  state: 'ready' | 'needs-check' | 'needs-download' | 'downloading' | 'unsupported' | 'off';
+  /** Whether listening will happen on this computer. */
+  onDevice: boolean;
+}
+
+export type ListenError = 'no-speech' | 'not-allowed' | 'no-microphone' | 'network' | 'unavailable' | 'aborted';
+
+export interface ListenOptions {
+  lang?: string;
+  /** Longest she can talk before we stop and use what we heard. */
+  maxMs?: number;
+  /** Words to listen for (book titles, names) — improves on-device recognition when supported. */
+  phrases?: string[];
+  /** Live words while she talks. */
+  onInterim?: (text: string) => void;
+}
+
+export interface ListenOutcome {
+  result: SpeechInputResult | null;
+  error?: ListenError;
 }
 
 export interface SpeechInput {
+  /** Some recognizer exists in this browser (it may still need a parent's OK or a download). */
   readonly available: boolean;
-  /** Listens once; resolves with the best transcript or null (timeout / no speech / denied). */
-  listenOnce(opts?: { timeoutMs?: number; lang?: string }): Promise<SpeechInputResult | null>;
+  /** True when asking about on-device support means calling the browser (see `probe`). */
+  readonly canProbe: boolean;
+  /**
+   * Asks the browser whether it can recognize speech on-device. Call only from a
+   * parent's click, with a crash marker saved first: some builds crash the tab here.
+   */
+  probe(lang?: string): Promise<OnDeviceAnswer>;
+  /** What talking would do right now, given what the browser said earlier. Never calls the browser. */
+  check(mode: TalkMode, known: OnDeviceAnswer): TalkAvailability;
+  /** Downloads the on-device language pack (call from a parent's click). */
+  install(lang?: string): Promise<boolean>;
+  listen(mode: TalkMode, known: OnDeviceAnswer, opts?: ListenOptions): Promise<ListenOutcome>;
+  /** Finish listening now and use what was heard so far. */
   stop(): void;
+}
+
+/** Pure: the talk state for a mode, whether a recognizer exists, and the on-device answer. */
+export function talkAvailability(mode: TalkMode, hasRecognizer: boolean, known: OnDeviceAnswer): TalkAvailability {
+  if (mode === 'off') return { state: 'off', onDevice: false };
+  if (!hasRecognizer) return { state: 'unsupported', onDevice: false };
+  if (known === 'available') return { state: 'ready', onDevice: true };
+  if (mode === 'browser') return { state: 'ready', onDevice: false };
+  if (known === 'downloadable') return { state: 'needs-download', onDevice: true };
+  if (known === 'downloading') return { state: 'downloading', onDevice: true };
+  if (known === 'unknown') return { state: 'needs-check', onDevice: false };
+  return { state: 'unsupported', onDevice: false };
 }
 
 export const silentOutput: SpeechOutput = {
@@ -39,7 +102,11 @@ export const silentOutput: SpeechOutput = {
 
 export const noInput: SpeechInput = {
   available: false,
-  listenOnce: async () => null,
+  canProbe: false,
+  probe: async () => 'unavailable',
+  check: (mode) => talkAvailability(mode, false, 'unavailable'),
+  install: async () => false,
+  listen: async () => ({ result: null, error: 'unavailable' }),
   stop: () => undefined,
 };
 
@@ -56,7 +123,9 @@ export class BrowserSpeechOutput implements SpeechOutput {
       u.pitch = opts.pitch ?? 1;
       u.rate = (opts.rate ?? 1) * 0.95;
       u.volume = opts.volume ?? 1;
-      const voice = window.speechSynthesis.getVoices().find((v) => /en[-_]/i.test(v.lang) && /female|samantha|karen|moira|serena|google us/i.test(v.name));
+      // Only voices built into this computer: network voices would send the text away.
+      const local = window.speechSynthesis.getVoices().filter((v) => v.localService && /^en[-_]/i.test(v.lang));
+      const voice = local.find((v) => /female|samantha|karen|moira|serena|ava|allison|susan|victoria/i.test(v.name)) ?? local[0];
       if (voice) u.voice = voice;
       u.onend = () => resolve();
       u.onerror = () => resolve();
@@ -69,61 +138,183 @@ export class BrowserSpeechOutput implements SpeechOutput {
   }
 }
 
-type RecognitionCtor = new () => {
+interface RecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+interface RecognitionResultList {
+  length: number;
+  [index: number]: { isFinal: boolean; length: number; [index: number]: RecognitionAlternative };
+}
+interface Recognition {
   lang: string;
   interimResults: boolean;
+  continuous: boolean;
   maxAlternatives: number;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string; confidence: number }>> }) => void) | null;
-  onerror: (() => void) | null;
+  processLocally?: boolean;
+  phrases?: unknown[];
+  onresult: ((e: { resultIndex: number; results: RecognitionResultList }) => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
   onend: (() => void) | null;
   start(): void;
   stop(): void;
+  abort(): void;
+}
+type AvailabilityAnswer = 'available' | 'downloadable' | 'downloading' | 'unavailable';
+interface RecognitionCtor {
+  new (): Recognition;
+  available?: (opts: { langs: string[]; processLocally?: boolean }) => Promise<AvailabilityAnswer>;
+  install?: (opts: { langs: string[]; processLocally?: boolean }) => Promise<boolean>;
+}
+type PhraseCtor = new (phrase: string, boost?: number) => unknown;
+
+const ERRORS: Record<string, ListenError> = {
+  'no-speech': 'no-speech',
+  'not-allowed': 'not-allowed',
+  'service-not-allowed': 'not-allowed',
+  'audio-capture': 'no-microphone',
+  network: 'network',
+  aborted: 'aborted',
+  'language-not-supported': 'unavailable',
 };
 
+/**
+ * The browser's Web Speech recognizer, on-device first.
+ * Chrome can recognize speech entirely on the computer once its language pack
+ * is installed (SpeechRecognition.available/install + processLocally); without
+ * that, Chrome and Safari send audio to their own speech services — which we
+ * only allow in 'browser' mode, chosen by a parent.
+ */
 export class BrowserSpeechInput implements SpeechInput {
-  private active: InstanceType<RecognitionCtor> | null = null;
+  private active: Recognition | null = null;
+
+  constructor(private readonly win: Window | undefined = typeof window === 'undefined' ? undefined : window) {}
 
   private get ctor(): RecognitionCtor | undefined {
-    if (typeof window === 'undefined') return undefined;
-    const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
-    return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    const w = this.win as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor } | undefined;
+    return w?.SpeechRecognition ?? w?.webkitSpeechRecognition;
   }
 
   get available(): boolean {
     return !!this.ctor;
   }
 
-  listenOnce(opts: { timeoutMs?: number; lang?: string } = {}): Promise<SpeechInputResult | null> {
+  get canProbe(): boolean {
+    return typeof this.ctor?.available === 'function';
+  }
+
+  async probe(lang = 'en-US'): Promise<OnDeviceAnswer> {
     const Ctor = this.ctor;
-    if (!Ctor) return Promise.resolve(null);
+    if (!Ctor || typeof Ctor.available !== 'function') return 'unavailable';
+    let timer: number | undefined;
+    try {
+      const answer = await Promise.race([
+        Ctor.available({ langs: [lang], processLocally: true }),
+        new Promise<'unavailable'>((resolve) => {
+          timer = this.win?.setTimeout(() => resolve('unavailable'), 15_000);
+        }),
+      ]);
+      return answer === 'available' || answer === 'downloadable' || answer === 'downloading' ? answer : 'unavailable';
+    } catch {
+      return 'unavailable';
+    } finally {
+      if (timer !== undefined) this.win?.clearTimeout(timer);
+    }
+  }
+
+  check(mode: TalkMode, known: OnDeviceAnswer): TalkAvailability {
+    // Without the static method there is nothing to ask: no on-device recognizer.
+    return talkAvailability(mode, !!this.ctor, this.canProbe ? known : 'unavailable');
+  }
+
+  async install(lang = 'en-US'): Promise<boolean> {
+    const Ctor = this.ctor;
+    if (!Ctor || typeof Ctor.install !== 'function') return false;
+    try {
+      return await Ctor.install({ langs: [lang], processLocally: true });
+    } catch {
+      return false;
+    }
+  }
+
+  async listen(mode: TalkMode, known: OnDeviceAnswer, opts: ListenOptions = {}): Promise<ListenOutcome> {
+    const Ctor = this.ctor;
+    const lang = opts.lang ?? 'en-US';
+    const avail = this.check(mode, known);
+    if (!Ctor || avail.state !== 'ready') return { result: null, error: 'unavailable' };
+    this.stop();
+    const first = await this.run(Ctor, avail.onDevice, lang, opts, true);
+    // Some builds reject phrase lists; try once more without them.
+    if (first.error === 'aborted' && first.retryWithoutPhrases) return this.run(Ctor, avail.onDevice, lang, opts, false);
+    return first;
+  }
+
+  private run(
+    Ctor: RecognitionCtor,
+    onDevice: boolean,
+    lang: string,
+    opts: ListenOptions,
+    withPhrases: boolean,
+  ): Promise<ListenOutcome & { retryWithoutPhrases?: boolean }> {
     return new Promise((resolve) => {
       const rec = new Ctor();
       this.active = rec;
-      rec.lang = opts.lang ?? 'en-US';
-      rec.interimResults = false;
+      rec.lang = lang;
+      rec.continuous = false;
+      rec.interimResults = !!opts.onInterim;
       rec.maxAlternatives = 1;
+      if (onDevice) rec.processLocally = true;
+      const Phrase = (this.win as unknown as { SpeechRecognitionPhrase?: PhraseCtor } | undefined)?.SpeechRecognitionPhrase;
+      let usedPhrases = false;
+      if (withPhrases && onDevice && Phrase && opts.phrases?.length) {
+        try {
+          rec.phrases = opts.phrases.slice(0, 50).map((p) => new Phrase(p, 3));
+          usedPhrases = true;
+        } catch {
+          // Phrase biasing is a nice-to-have.
+        }
+      }
+      let finalText = '';
+      let interim = '';
+      let confidence = 0;
       let settled = false;
-      const finish = (r: SpeechInputResult | null) => {
+      const finish = (out: ListenOutcome & { retryWithoutPhrases?: boolean }) => {
         if (settled) return;
         settled = true;
-        this.active = null;
-        resolve(r);
+        this.win?.clearTimeout(timer);
+        if (this.active === rec) this.active = null;
+        resolve(out);
       };
-      const timer = window.setTimeout(() => {
-        rec.stop();
-        finish(null);
-      }, opts.timeoutMs ?? 8000);
+      const timer = this.win?.setTimeout(() => rec.stop(), opts.maxMs ?? 12_000) ?? 0;
       rec.onresult = (e) => {
-        window.clearTimeout(timer);
-        const alt = e.results[0]?.[0];
-        finish(alt ? { transcript: alt.transcript, confidence: alt.confidence } : null);
+        let live = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i]!;
+          const alt = r[0];
+          if (!alt) continue;
+          if (r.isFinal) {
+            finalText = `${finalText} ${alt.transcript}`.trim();
+            confidence = alt.confidence;
+          } else live += alt.transcript;
+        }
+        interim = live.trim();
+        opts.onInterim?.(`${finalText} ${interim}`.trim());
       };
-      rec.onerror = () => finish(null);
-      rec.onend = () => finish(null);
+      rec.onerror = (e) => {
+        const code = e.error ?? '';
+        if (code === 'phrases-not-supported' && usedPhrases) return finish({ result: null, error: 'aborted', retryWithoutPhrases: true });
+        const heard = `${finalText} ${interim}`.trim();
+        if (heard) return finish({ result: { transcript: heard, confidence, onDevice } });
+        finish({ result: null, error: ERRORS[code] ?? 'unavailable' });
+      };
+      rec.onend = () => {
+        const heard = (finalText || interim).trim();
+        finish(heard ? { result: { transcript: heard, confidence, onDevice } } : { result: null, error: 'no-speech' });
+      };
       try {
         rec.start();
       } catch {
-        finish(null);
+        finish({ result: null, error: 'unavailable' });
       }
     });
   }

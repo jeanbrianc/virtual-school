@@ -17,9 +17,11 @@ export function esbuildOptions({ mode, e2e = false, outdir }) {
     format: 'esm',
     splitting: true,
     outdir: join(outdir, 'assets'),
+    // Shared chunks are all named "chunk", so chunk (and asset) names always
+    // need a hash — even in dev — or esbuild refuses to write colliding files.
     entryNames: isProd ? '[name]-[hash]' : '[name]',
-    chunkNames: isProd ? 'chunk-[name]-[hash]' : 'chunk-[name]',
-    assetNames: isProd ? '[name]-[hash]' : '[name]',
+    chunkNames: 'chunk-[name]-[hash]',
+    assetNames: '[name]-[hash]',
     metafile: true,
     sourcemap: isProd ? 'linked' : 'inline',
     minify: isProd,
@@ -31,6 +33,9 @@ export function esbuildOptions({ mode, e2e = false, outdir }) {
       __BUILD_MODE__: JSON.stringify(mode),
       __E2E__: JSON.stringify(e2e),
       __APP_VERSION__: JSON.stringify(readPackageVersion()),
+      // Where the AI helper lives for this build: '' = the local helper
+      // (http://127.0.0.1:8787); the AWS build uses '/api' (same site).
+      __AI_HELPER_URL__: JSON.stringify(process.env.AI_HELPER_URL ?? ''),
     },
     logLevel: 'info',
   };

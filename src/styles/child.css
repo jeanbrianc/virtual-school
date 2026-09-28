@@ -448,8 +448,11 @@ kbd {
 /* ── Choices ──────────────────────────────────────────────────────────── */
 .choices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
   gap: 12px;
+}
+.dialogue-body {
+  min-width: 0;
 }
 .choice {
   position: relative;
@@ -1609,4 +1612,257 @@ button.treasure {
   50% {
     box-shadow: 0 0 0 10px rgba(47, 111, 115, 0.15);
   }
+}
+
+.mic-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.mic-btn.mic-round {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 3px solid var(--teal);
+  background: var(--teal);
+  color: #fff;
+  box-shadow: 0 6px 0 rgba(47, 111, 115, 0.35);
+}
+.mic-btn.preparing {
+  animation: mic-pulse 1.2s ease-in-out infinite;
+  opacity: 0.8;
+}
+.mic-btn.mic-round.on {
+  background: #d9534f;
+  border-color: #d9534f;
+  box-shadow: 0 6px 0 rgba(160, 50, 45, 0.35);
+}
+
+/* ── Talking to teachers ─────────────────────────────────────────────── */
+.talk-bar {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+.talk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.talk-input {
+  flex: 1;
+  width: 0;
+  min-width: 0;
+  font-family: var(--font-child);
+  font-size: 1.15rem;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 3px solid #ecd9b8;
+  background: #fff;
+  color: var(--ink);
+}
+.talk-input:focus {
+  outline: none;
+  border-color: var(--mustard);
+}
+.talk-send {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--mustard);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.talk-send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.talk-status {
+  min-height: 28px;
+  padding-left: 6px;
+  font-family: var(--font-child);
+  font-size: 1.1rem;
+}
+.talk-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 16px 16px 16px 4px;
+  background: #fff;
+  border: 2px solid var(--teal-soft);
+  color: var(--ink);
+}
+.talk-trouble {
+  color: #9a4a2a;
+  font-family: var(--font-child);
+  margin: 0;
+}
+.talk-thinking {
+  display: inline-flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: #fff;
+}
+.talk-thinking i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--teal);
+  animation: talk-dot 1s ease-in-out infinite;
+}
+.talk-thinking i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.talk-thinking i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes talk-dot {
+  50% {
+    transform: translateY(-5px);
+    opacity: 0.5;
+  }
+}
+.talk-topic {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: #fff8ea;
+  border: 2px solid #f0dfbd;
+  font-family: var(--font-child);
+}
+.talk-topic strong {
+  display: block;
+  font-size: 1.2rem;
+}
+.talk-topic .muted {
+  font-size: 0.95rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk-thinking i,
+  .mic-btn.on {
+    animation: none;
+  }
+}
+
+/* ── Discovery cards ("What's this?") ─────────────────────────────────── */
+.discover-backdrop {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 240, 210, 0.35), rgba(45, 30, 20, 0.42));
+  z-index: 38;
+  animation: fade-in 0.3s ease;
+}
+.discover-card {
+  position: relative;
+  width: min(480px, 100%);
+  padding: 58px 28px 22px;
+  border-radius: 28px;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 210, 74, 0.16), transparent 55%), var(--cream);
+  border: 3px dashed #e3c27a;
+  box-shadow: 0 26px 70px rgba(60, 40, 20, 0.32);
+  text-align: center;
+  animation: celebrate-in 0.55s var(--ease-spring);
+}
+.discover-stamp {
+  position: absolute;
+  top: -46px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 6px #ffe6a3,
+    0 12px 26px rgba(90, 60, 20, 0.25);
+  font-size: 3.1rem;
+}
+.discover-stamp span {
+  animation: bounce-in 0.9s var(--ease-spring);
+}
+.discover-kicker {
+  font-family: var(--font-child);
+  font-size: 1rem;
+  color: var(--terracotta-deep);
+  letter-spacing: 0.02em;
+}
+.discover-title {
+  margin: 4px 0 8px;
+  font-family: var(--font-child);
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--walnut);
+  text-wrap: balance;
+}
+.discover-text {
+  margin: 0 auto 16px;
+  max-width: 36ch;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.discover-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: -4px 0 16px;
+}
+.discover-progress span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #eadcc3;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.08);
+}
+.discover-progress span.on {
+  background: var(--sage-deep);
+}
+.discover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+.discover-count {
+  margin-top: 14px;
+  font-family: var(--font-child);
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.hud-chip.explore {
+  gap: 6px;
+}
+.hud-chip.explore small {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+.interact-prompt.fresh {
+  box-shadow:
+    0 0 0 4px rgba(255, 210, 74, 0.55),
+    var(--shadow-pop);
+}
+
+.shelf-empty {
+  margin: 4px 0 12px;
+  font-size: 1.15rem;
+  color: var(--ink-soft);
 }

@@ -48,6 +48,34 @@ Child taps "Finish a book" → HootFlow (LessonRun over storyChatLesson)
 Parent studio live-queries the same tables and re-renders.
 ```
 
+### Free talk ("I read Daddy the Goodnight Leelanau book")
+
+```
+Mic tap → Mic.listen (ChildMode: talkMode + the on-device answer a parent's
+          "Check this browser" saved in meta.speechProbe → SpeechInput.check;
+          on-device first, cancels teacher speech, phrases = her titles + catalog)
+  → words → useTeacherTalk.send → TeacherChatService.respond({teacher, name,
+            utterance, history (flow transcript, last 8), books, topic})
+       LocalTeacherChat: understand() → intent/title/readTo/finished
+                         → resolveBook() (her list → catalog → prefix → Title Case)
+       HttpTeacherChat:  safety cues → local (never sent) · else POST helper
+                         /v1/teacher → validateTeacherReply + sanitize → fallback
+  → nextTopic() keeps {book, finished, readTo, readBy} across turns
+  → HootFlow shows the reply + a big next-step button:
+       finished → finishFromTalk → the usual story chat → completeBook
+                  (sessionNote "Izzy read it aloud to Daddy", readingMode,
+                   parentNotes) · not yet → bookmark (logReading / addBook)
+  → transcript lines carry via: 'voice' | 'typed' | 'ai'; parentNotes land on the
+    TeacherInteraction and surface on Today until a parent marks them read.
+```
+
+The helper (`scripts/ai-helper/handler.ts`) is socket-free and unit-tested: it
+parses the browser's request with `parseTeacherAiInput`, builds the Anthropic
+Messages body with `buildTeacherRequest` (system prompt with persona + safety
+rules, alternating turns, forced `teacher_reply` tool), and returns only the
+tool input. `main.ts` wraps it in `node:http` on 127.0.0.1; `scripts/ai-helper.mjs`
+starts it from `dev`/`preview` when `.env.local` has a key.
+
 A parent-logged activity follows the identical `finalizeLearning` path, so a
 "we planted beans" entry can open the greenhouse; the unlock stays
 `celebrated=false` until the child next enters her school, where it is
@@ -77,6 +105,13 @@ celebrated with a camera shot of the new room.
   cooking / nature / art…) → clause-level independence cues → rule lexicon →
   merge per skill. `HttpInterpretationService`: consent-gated, validated,
   falls back to local.
+- **teachers/** — personas and openers (`teachers.ts`); free conversation
+  (`chat.ts`: `understand`, `resolveBook`, `localTeacherReply`, `nextTopic`,
+  `sanitizeTeacherReply`, `validateTeacherReply`); the consent-gated AI adapter
+  (`chatRemote.ts`, the only other file allowed to use the network); and the
+  prompt/request builders the local helper uses (`aiPrompt.ts`).
+- **settings.ts** — defaults (`talkMode: 'device'`, AI teachers off) and
+  `normalizeSettings` for households saved by older versions.
 - **rewards/** — declarative rules (`books`, `topic`, `lesson`, `artworks`,
   `masteredInDomain`); `evaluateNewRewards` / `upcomingRewards`.
 - **world/** — `deriveWorldState(snapshot, unlocked)` → everything the engine

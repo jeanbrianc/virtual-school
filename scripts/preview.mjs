@@ -2,6 +2,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
+import { startAiHelper } from './ai-helper.mjs';
 import { root } from './esbuild.shared.mjs';
 
 const dir = join(root, process.argv.includes('--e2e') ? 'dist-e2e' : 'dist');
@@ -36,9 +37,14 @@ createServer((req, res) => {
   if (!existsSync(file) || statSync(file).isDirectory()) file = join(dir, 'index.html');
   res.writeHead(200, {
     'Content-Type': types[extname(file)] ?? 'application/octet-stream',
-    // Local-first privacy posture: no third-party requests are ever needed.
+    // Local-first privacy posture: no third-party scripts, styles or images. The only
+    // connections allowed besides this server are the ones a parent turns on in
+    // Settings: the local AI helper (127.0.0.1) or their own https endpoint.
     'Content-Security-Policy':
-      "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self' data:",
+      "default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:* https:; font-src 'self' data:",
   });
   createReadStream(file).pipe(res);
-}).listen(port, '127.0.0.1', () => console.log(`Preview → http://127.0.0.1:${port}`));
+}).listen(port, '127.0.0.1', () => {
+  console.log(`Preview → http://127.0.0.1:${port}`);
+  if (!process.argv.includes('--e2e')) startAiHelper();
+});

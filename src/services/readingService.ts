@@ -129,6 +129,12 @@ export interface CompleteBookInput {
   favoritePart?: string;
   feeling?: string;
   narration?: string;
+  /** e.g. "Izzy read it aloud to Daddy" — goes on the reading log entry. */
+  sessionNote?: string;
+  /** How this reading happened, when she told a teacher (e.g. read_aloud when Mommy read it to her). */
+  readingMode?: ReadingMode;
+  /** Things she said that a grown-up should know about. */
+  parentNotes?: string[];
   startedAt: string;
   transcript: TranscriptLine[];
   source: 'child' | 'parent';
@@ -165,7 +171,11 @@ export async function completeBook(ctx: ServiceContext, childId: string, input: 
     if (!found) throw new Error('Book not found for this child');
     book = found;
   } else if (input.newBook) {
-    book = buildBook(ctx, childId, { ...input.newBook, status: 'reading' });
+    book = buildBook(ctx, childId, {
+      ...input.newBook,
+      status: 'reading',
+      ...(input.readingMode && !input.newBook.readingMode ? { readingMode: input.readingMode } : {}),
+    });
   } else {
     throw new Error('completeBook needs bookId or newBook');
   }
@@ -196,8 +206,8 @@ export async function completeBook(ctx: ServiceContext, childId: string, input: 
     bookId: book.id,
     date: today,
     ...(remainingChapters && remainingChapters > 0 ? { chaptersRead: remainingChapters } : {}),
-    mode: book.readingMode,
-    notes: 'Finished the book',
+    mode: input.readingMode ?? book.readingMode,
+    notes: input.sessionNote ? `Finished the book — ${input.sessionNote}` : 'Finished the book',
     source: input.source,
   } satisfies ReadingSession);
 
@@ -291,7 +301,8 @@ export async function completeBook(ctx: ServiceContext, childId: string, input: 
     endedAt: now,
     context: { bookId: book.id, flow: 'finish-book' },
     transcript: input.transcript,
-    outcome: `Finished ${book.title}; ${input.answers.length} story question${input.answers.length === 1 ? '' : 's'}; placed on shelf #${shelfIndex + 1}.`,
+    outcome: `Finished ${book.title}${input.sessionNote ? ` (${input.sessionNote})` : ''}; ${input.answers.length} story question${input.answers.length === 1 ? '' : 's'}; placed on shelf #${shelfIndex + 1}.`,
+    ...(input.parentNotes?.length ? { parentNotes: input.parentNotes } : {}),
   };
   uow.put('teacherInteractions', interaction);
 

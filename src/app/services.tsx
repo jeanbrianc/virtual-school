@@ -2,12 +2,14 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { AudioEngine } from '../audio/AudioEngine';
 import { Repositories } from '../data/repositories';
 import { DB_NAME, SCHEMA_VERSION, TABLES } from '../data/schema';
-import { resetToDemo, seedDemoData } from '../data/seed/demoSeed';
+import { loadSampleData, prepareDatabase, startFresh, type LaunchResult } from '../data/seed/launch';
 import { IndexedDbDatabase } from '../data/storage/indexedDb';
 import { MemoryDatabase } from '../data/storage/memory';
 import type { Database } from '../data/storage/types';
 import { createInterpretationService, type ActivityInterpretationService } from '../domain/interpretation';
 import { LocalBookCatalogService, type BookMetadataService } from '../domain/reading/bookMetadata';
+import type { TeacherChatService } from '../domain/teachers/chat';
+import { createTeacherChat } from '../domain/teachers/chatRemote';
 import type { Household } from '../domain/types';
 import { randomIds } from '../domain/util/ids';
 import { systemClock } from '../domain/util/time';
@@ -25,7 +27,14 @@ export interface AppServices {
   speechIn: SpeechInput;
   books: BookMetadataService;
   interpreter(household: Household | undefined): ActivityInterpretationService;
-  resetDemo(): Promise<void>;
+  /** Free conversation with a teacher: on-device, or an AI teacher when a parent enabled it. */
+  teacherChat(household: Household | undefined): TeacherChatService;
+  /** What happened to the database at startup (fresh household, upgrade, or existing data). */
+  launch: LaunchResult;
+  /** Replace everything with the labeled sample history. */
+  loadSampleData(): Promise<void>;
+  /** Erase learning records; keep names, avatars and settings. */
+  startFresh(): Promise<void>;
 }
 
 export async function createAppServices(): Promise<AppServices> {
@@ -42,7 +51,7 @@ export async function createAppServices(): Promise<AppServices> {
   const repos = new Repositories(db);
   const ctx: ServiceContext = { repos, clock: systemClock, ids: randomIds };
 
-  if (!(await getHousehold(ctx))) await seedDemoData(repos, systemClock);
+  const launch = await prepareDatabase(repos, systemClock);
 
   if (persistent && navigator.storage?.persist) {
     // Ask the browser not to evict the family's records under storage pressure.
@@ -62,9 +71,10 @@ export async function createAppServices(): Promise<AppServices> {
     speechIn: new BrowserSpeechInput(),
     books: new LocalBookCatalogService(),
     interpreter: (h) => createInterpretationService(h?.settings.interpretation ?? { provider: 'local', consentToSend: false }),
-    resetDemo: async () => {
-      await resetToDemo(repos, systemClock);
-    },
+    teacherChat: (h) => createTeacherChat(h?.settings.teacherAi),
+    launch,
+    loadSampleData: () => loadSampleData(repos, systemClock),
+    startFresh: () => startFresh(repos, systemClock),
   };
 }
 

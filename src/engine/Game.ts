@@ -429,7 +429,19 @@ export class Game {
   async applyWorld(state: WorldState, books: ShelfBook[], animate = false): Promise<void> {
     await this.world.apply(state, books, animate);
     this.world.setInteractableEnabled('nook', !state.readingNookOpen);
+    // The nature table only exists once it has been earned.
+    this.world.setInteractableEnabled('nature', state.natureTable);
     this.syncPets(state.pets as PetId[]);
+  }
+
+  /** Interactable ids that currently exist and can be used. */
+  availableInteractables(): string[] {
+    return this.world.interactables.filter((i) => i.enabled).map((i) => i.id);
+  }
+
+  /** Marks things the child hasn't discovered yet with a sparkle. */
+  setUndiscovered(ids: string[]): void {
+    this.interaction.setFresh(ids);
   }
 
   /** Shows only the given pets (active one leads). */

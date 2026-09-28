@@ -16,6 +16,7 @@ import type {
   ReportRecord,
 } from '../domain/types';
 import { masteryId } from '../domain/util/ids';
+import { normalizeSettings } from '../domain/settings';
 import { nowIso, type ServiceContext } from './context';
 import { loadChildRecords } from './learningCore';
 
@@ -23,7 +24,8 @@ export { DEFAULT_SETTINGS } from '../domain/settings';
 
 export async function getHousehold(ctx: ServiceContext): Promise<Household | undefined> {
   const all = await ctx.repos.households.all();
-  return all[0];
+  const h = all[0];
+  return h ? { ...h, settings: normalizeSettings(h.settings) } : undefined;
 }
 
 export async function updateSettings(ctx: ServiceContext, patch: Partial<HouseholdSettings>): Promise<Household> {
@@ -36,6 +38,7 @@ export async function updateSettings(ctx: ServiceContext, patch: Partial<Househo
       ...patch,
       audio: { ...h.settings.audio, ...(patch.audio ?? {}) },
       interpretation: { ...h.settings.interpretation, ...(patch.interpretation ?? {}) },
+      teacherAi: { ...h.settings.teacherAi, ...(patch.teacherAi ?? {}) },
     },
   };
   await ctx.repos.households.put(next);
@@ -135,6 +138,15 @@ export async function markRewardsCelebrated(ctx: ServiceContext, childId: string
   const unlocks = await ctx.repos.forChild(ctx.repos.rewardUnlocks, childId);
   const updates = unlocks.filter((u) => rewardIds.includes(u.rewardId) && !u.celebrated).map((u) => ({ ...u, celebrated: true }));
   if (updates.length) await ctx.repos.commit(updates.map((value) => ({ table: 'rewardUnlocks', type: 'put' as const, value })));
+}
+
+/** Remembers that the child has discovered something in her school (idempotent). */
+export async function markExplored(ctx: ServiceContext, childId: string, ids: string[]): Promise<string[]> {
+  const child = await ctx.repos.children.get(childId);
+  if (!child) return [];
+  const explored = [...new Set([...(child.explored ?? []), ...ids])];
+  if (explored.length !== (child.explored ?? []).length) await ctx.repos.children.put({ ...child, explored });
+  return explored;
 }
 
 export async function setActivePet(ctx: ServiceContext, childId: string, petId: string | null): Promise<void> {

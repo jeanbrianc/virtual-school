@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getReward, type RewardDefinition } from '../../domain/rewards/catalog';
 import { upcomingRewards } from '../../domain/rewards/engine';
+import type { Discovery } from '../../domain/discovery';
+import { DEFAULT_SETTINGS } from '../../domain/settings';
 import type { ProgressSnapshot } from '../../domain/progress/snapshot';
 import type { Book, RewardUnlock } from '../../domain/types';
 import { formatDay } from '../../domain/util/time';
@@ -121,6 +123,7 @@ export function BookshelfViewer({ books, onClose }: { books: Book[]; onClose: ()
               </>
             )}
             <h3 className="shelf-sub">Books I finished</h3>
+            {done.length === 0 && <p className="shelf-empty">No books yet! Finish a book, tell Professor Hoot about it, and it will fly right here. 🦉</p>}
             <div className="cover-grid">
               {done.map((b) => (
                 <button key={b.id} type="button" className="cover-tile" onClick={() => setSelected(b)}>
@@ -261,6 +264,79 @@ export function HintCard({
   );
 }
 
+// ─── Discovery card ─────────────────────────────────────────────────────────
+
+/** "What's this?" — the one-time explanation shown when a child first touches something. */
+export function DiscoveryCard({
+  discovery,
+  found,
+  total,
+  speak,
+  autoSpeak,
+  onClose,
+  onAction,
+}: {
+  discovery: Discovery;
+  found: number;
+  total: number;
+  speak?: (text: string) => void;
+  autoSpeak: boolean;
+  onClose: () => void;
+  onAction?: (target: string) => void;
+}) {
+  useEffect(() => {
+    if (autoSpeak && speak) speak(`${discovery.title}. ${discovery.text}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [discovery.id]);
+  const p = discovery.progress;
+  return (
+    <div className="discover-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="discover-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={discovery.title}
+        data-testid="discover-card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="discover-stamp" aria-hidden="true">
+          <span>{discovery.icon}</span>
+        </div>
+        {discovery.id !== '__welcome' && <div className="discover-kicker">✨ You discovered…</div>}
+        <h2 className="discover-title">{discovery.title}</h2>
+        <p className="discover-text">{discovery.text}</p>
+        {p && (
+          <div className="discover-progress" aria-label={`${p.current} of ${p.target}`}>
+            {Array.from({ length: Math.min(p.target, 10) }, (_, i) => (
+              <span key={i} className={i < Math.round((p.current / p.target) * Math.min(p.target, 10)) ? 'on' : ''} />
+            ))}
+          </div>
+        )}
+        <div className="discover-actions">
+          {speak && (
+            <button type="button" className="icon-btn big" onClick={() => speak(`${discovery.title}. ${discovery.text}`)} aria-label="Read it to me">
+              <Icon name="speaker" size={26} />
+            </button>
+          )}
+          {discovery.action && onAction && (
+            <button type="button" className="btn btn-big" onClick={() => onAction(discovery.action!.target)} data-testid="discover-action">
+              <span aria-hidden="true">{discovery.action.icon}</span> {discovery.action.label}
+            </button>
+          )}
+          <button type="button" className="btn btn-big btn-primary" onClick={onClose} data-testid="discover-ok">
+            Got it!
+          </button>
+        </div>
+        {total > 0 && (
+          <div className="discover-count">
+            🧭 {found} of {total} discovered
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Parent gate ────────────────────────────────────────────────────────────
 
 export function ParentGate({ pin, showHint, onPass, onClose }: { pin: string; showHint: boolean; onPass: () => void; onClose: () => void }) {
@@ -308,7 +384,7 @@ export function ParentGate({ pin, showHint, onPass, onClose }: { pin: string; sh
             ),
           )}
         </div>
-        {showHint && <p className="demo-hint">Demo PIN: {pin}</p>}
+        {showHint && pin === DEFAULT_SETTINGS.parentPin && <p className="demo-hint">Grown-ups: the starting PIN is {pin}. Change it in Settings.</p>}
       </div>
     </div>
   );

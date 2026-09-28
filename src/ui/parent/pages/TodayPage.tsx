@@ -1,14 +1,20 @@
 import { useMemo, useState } from 'react';
 import { navigate } from '../../../app/router';
+import { useLiveQuery, useServices } from '../../../app/services';
 import { recommendNext } from '../../../domain/adaptive/recommendations';
 import { LESSON_TITLES } from '../../../domain/lessons/registry';
 import { getReward } from '../../../domain/rewards/catalog';
 import { upcomingRewards } from '../../../domain/rewards/engine';
 import type { DayString } from '../../../domain/types';
 import { addDays, ageAt, ageLabel, dayFromTimestamp, formatDay, relativeDay, startOfMonth, toDay } from '../../../domain/util/time';
+import { markNotesSeen } from '../../../services/lessonService';
+import { getSpeechProbe } from '../../../services/talkService';
+import { browserFamily, knownOnDevice } from '../../../domain/talk';
 import { snapshotFromRecords } from '../../../services/learningCore';
+import { TEACHERS, type TeacherId } from '../../../domain/teachers/teachers';
 import { BookCover } from '../../shared/BookCover';
 import { Icon } from '../../shared/Icon';
+import { DEFAULT_SETTINGS } from '../../../domain/settings';
 import { Card, EmptyState, LevelBadge, PageHeader, StatTile } from '../components';
 import { logDraftStore, SAMPLE_NARRATIVES } from '../drafts';
 import type { ParentData } from '../ParentApp';
@@ -21,6 +27,111 @@ interface FeedItem {
   detail: string;
   evidence: string[];
   href?: string;
+}
+
+/** Things she told a teacher that a grown-up should know (hurt, scared, unsafe…). */
+function TeacherNotes({ data }: { data: ParentData }) {
+  const { ctx } = useServices();
+  const flagged = data.records.interactions.filter((i) => i.parentNotes?.length && !i.notesSeen).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  if (flagged.length === 0) return null;
+  return (
+    <Card title={`${data.child.name} told a teacher something you should know`} icon="info" className="flag-card">
+      <ul className="flag-list" data-testid="teacher-notes">
+        {flagged.map((i) => (
+          <li key={i.id}>
+            <div>
+              {i.parentNotes!.map((n, k) => (
+                <p key={k}>{n}</p>
+              ))}
+              <span className="muted small">
+                To {TEACHERS[i.teacherId as TeacherId]?.name ?? i.teacherId} · {relativeDay(dayFromTimestamp(i.startedAt), toDay(new Date()))} ·{' '}
+                <a href="#/parent/conversations">See the conversation</a>
+              </span>
+            </div>
+            <button type="button" className="btn btn-small" onClick={() => void markNotesSeen(ctx, i.id)}>
+              I’ve talked with her
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="muted small">The teacher told her kindly to find Mom or Dad right away. Nothing was shared with anyone else.</p>
+    </Card>
+  );
+}
+
+/** First-week checklist for a brand-new school; disappears once everything is done. */
+function GettingStarted({ data }: { data: ParentData }) {
+  const { child, records, avatar, household } = data;
+  const { ctx, speechIn } = useServices();
+  const probe = useLiveQuery(() => getSpeechProbe(ctx), [], ['meta']);
+  const micReady = speechIn.check(household.settings.talkMode, knownOnDevice(probe, browserFamily(navigator.userAgent))).state === 'ready';
+  const steps = [
+    {
+      done: !!avatar && avatar.updatedAt > child.createdAt,
+      title: `Make ${child.name}’s avatar together`,
+      detail: 'Hair, outfit and favorite colors — she’ll see herself walking around her school.',
+      href: '#/parent/avatar',
+    },
+    {
+      done: records.books.length > 0,
+      title: 'Add the books she’s reading',
+      detail: `Or let ${child.name} tell Professor Hoot herself. Only books you or she add ever appear.`,
+      href: '#/parent/books',
+    },
+    {
+      done: records.mastery.some((m) => m.override),
+      title: 'Tell us where she’s starting',
+      detail:
+        'Mark a few skills she already has (for example, reading comprehension) so teachers start at the right level. Open a skill in Curriculum and use “Parent assessment”.',
+      href: '#/parent/curriculum',
+    },
+    {
+      done: records.activities.length > 0,
+      title: 'Log your first learning moment',
+      detail: 'Describe something from today in the box below — you review everything before it’s saved.',
+      href: '#/parent/log',
+    },
+    {
+      done: micReady || household.settings.talkMode === 'off',
+      title: `Let ${child.name} talk to her teachers`,
+      detail: 'Set up the microphone so she can tell Professor Hoot about her books out loud instead of typing.',
+      href: '#/parent/settings',
+    },
+    {
+      done: household.settings.parentPin !== DEFAULT_SETTINGS.parentPin,
+      title: 'Choose your own parent PIN',
+      detail: 'The starting PIN is 1234.',
+      href: '#/parent/settings',
+    },
+  ];
+  const remaining = steps.filter((st) => !st.done).length;
+  if (remaining === 0) return null;
+  return (
+    <Card
+      title="Getting started"
+      icon="sparkle"
+      className="getting-started"
+      action={
+        <span className="muted small">
+          {steps.length - remaining} of {steps.length} done
+        </span>
+      }
+    >
+      <ol className="gs-list">
+        {steps.map((st) => (
+          <li key={st.title} className={st.done ? 'done' : ''}>
+            <span className="gs-check" aria-hidden="true">
+              {st.done ? <Icon name="check" size={16} /> : null}
+            </span>
+            <div>
+              <a href={st.href}>{st.title}</a>
+              <div className="muted small">{st.detail}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </Card>
+  );
 }
 
 export function TodayPage({ data }: { data: ParentData }) {
@@ -120,6 +231,10 @@ export function TodayPage({ data }: { data: ParentData }) {
           </>
         }
       />
+
+      <TeacherNotes data={data} />
+
+      <GettingStarted data={data} />
 
       <Card className="composer-card">
         <form

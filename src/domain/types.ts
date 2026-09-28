@@ -34,13 +34,28 @@ export interface InterpretationSettings {
   consentToSend: boolean;
 }
 
+export interface TeacherAiSettings {
+  enabled: boolean;
+  /** The family's helper, normally http://127.0.0.1:8787 (see scripts/ai-helper). */
+  endpoint: string;
+  /** Parent understands her words (not audio) are sent to the AI service. */
+  consentToSend: boolean;
+}
+
 export interface HouseholdSettings {
   parentPin: string;
   audio: AudioSettings;
   readAloud: boolean;
-  speechInput: boolean;
+  /**
+   * Talking to teachers by voice: 'off', 'device' (on-device recognition only —
+   * audio never leaves the computer) or 'browser' (the browser's speech service
+   * may be used when on-device isn't available).
+   */
+  talkMode: 'off' | 'device' | 'browser';
   graphicsQuality: GraphicsQuality;
   interpretation: InterpretationSettings;
+  /** Optional AI teachers through the family's local helper (off until a parent consents). */
+  teacherAi: TeacherAiSettings;
   /** Shows demo tooling (milestone previews, demo banners). */
   demoTools: boolean;
 }
@@ -72,6 +87,8 @@ export interface Child {
   createdAt: Timestamp;
   /** Currently following pet companion (reward id). */
   activePetId?: string;
+  /** Things in the school she has already discovered (interactable ids). */
+  explored?: string[];
   isDemo?: boolean;
 }
 
@@ -328,6 +345,8 @@ export interface TranscriptLine {
   speaker: 'teacher' | 'child' | 'system';
   text: string;
   at: Timestamp;
+  /** 'voice': she said it (speech-to-text); 'typed': typed in free talk; 'ai': an AI teacher wrote it. */
+  via?: 'voice' | 'typed' | 'ai';
 }
 
 export interface TeacherInteraction {
@@ -339,6 +358,10 @@ export interface TeacherInteraction {
   context: { lessonId?: string; bookId?: ID; flow: string };
   transcript: TranscriptLine[];
   outcome: string;
+  /** Things she said that a grown-up should know about (never shown to her). */
+  parentNotes?: string[];
+  /** Set when a parent has read the notes. */
+  notesSeen?: boolean;
   isDemo?: boolean;
 }
 

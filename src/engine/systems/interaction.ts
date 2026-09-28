@@ -9,7 +9,24 @@ import type { InteractableDef } from '../world/types';
 
 const PROXY_LAYER = 1;
 
-function iconTexture(icon: string, highlight: boolean): THREE.CanvasTexture {
+/** Four-point sparkle used on markers for things the child hasn't discovered yet. */
+function drawSparkle(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : r * 0.38;
+    ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+  }
+  ctx.closePath();
+  ctx.fillStyle = '#ffd24a';
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 6;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.fill();
+}
+
+function iconTexture(icon: string, highlight: boolean, fresh = false): THREE.CanvasTexture {
   return canvasTexture(192, 192, (ctx, w, h) => {
     ctx.shadowColor = 'rgba(60,30,10,0.35)';
     ctx.shadowBlur = 14;
@@ -19,9 +36,14 @@ function iconTexture(icon: string, highlight: boolean): THREE.CanvasTexture {
     ctx.arc(w / 2, h / 2 - 8, 70, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowColor = 'transparent';
-    ctx.lineWidth = 8;
-    ctx.strokeStyle = highlight ? '#e3b448' : 'rgba(227,180,72,0.6)';
+    ctx.lineWidth = fresh ? 12 : 8;
+    ctx.strokeStyle = fresh ? '#ffc93c' : highlight ? '#e3b448' : 'rgba(227,180,72,0.6)';
+    if (fresh) {
+      ctx.shadowColor = 'rgba(255,200,60,0.9)';
+      ctx.shadowBlur = 18;
+    }
     ctx.stroke();
+    ctx.shadowColor = 'transparent';
     // Little speech-bubble tail.
     ctx.fillStyle = highlight ? '#fff6e6' : 'rgba(255,246,230,0.92)';
     ctx.beginPath();
@@ -33,6 +55,7 @@ function iconTexture(icon: string, highlight: boolean): THREE.CanvasTexture {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(icon, w / 2, h / 2 - 2);
+    if (fresh) drawSparkle(ctx, w - 38, 36, 34);
   });
 }
 
@@ -40,6 +63,9 @@ interface Marker {
   sprite: THREE.Sprite;
   base: THREE.Vector3;
   phase: number;
+  normal: THREE.Texture;
+  fresh: THREE.Texture | null;
+  icon: string;
 }
 
 export class InteractionSystem {
@@ -53,6 +79,7 @@ export class InteractionSystem {
   hovered: InteractableDef | null = null;
   private raycaster = new THREE.Raycaster();
   private time = 0;
+  private fresh = new Set<string>();
 
   constructor(private readonly defs: InteractableDef[]) {
     this.raycaster.layers.set(PROXY_LAYER);
@@ -67,12 +94,13 @@ export class InteractionSystem {
       this.proxies.push(proxy);
       this.root.add(proxy);
 
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: iconTexture(d.icon, false), depthTest: false, transparent: true }));
+      const normal = iconTexture(d.icon, false);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: normal, depthTest: false, transparent: true }));
       sprite.scale.setScalar(d.kind === 'teacher' ? 0.62 : 0.5);
       sprite.renderOrder = 20;
       const base = new THREE.Vector3(d.position.x, d.markerHeight, d.position.z);
       sprite.position.copy(base);
-      this.markers.set(d.id, { sprite, base, phase: rng() * 6 });
+      this.markers.set(d.id, { sprite, base, phase: rng() * 6, normal, fresh: null, icon: d.icon });
       this.root.add(sprite);
     }
 
@@ -96,6 +124,25 @@ export class InteractionSystem {
     this.dest = this.ring.clone();
     this.dest.material = (this.ring.material as THREE.MeshBasicMaterial).clone();
     this.root.add(this.dest);
+  }
+
+  /** Things not yet discovered get a sparkle and are visible from across the room. */
+  setFresh(ids: Iterable<string>): void {
+    this.fresh = new Set(ids);
+    for (const [id, m] of this.markers) {
+      const isFresh = this.fresh.has(id);
+      if (isFresh && !m.fresh) m.fresh = iconTexture(m.icon, false, true);
+      const mat = m.sprite.material as THREE.SpriteMaterial;
+      const next = isFresh ? m.fresh! : m.normal;
+      if (mat.map !== next) {
+        mat.map = next;
+        mat.needsUpdate = true;
+      }
+    }
+  }
+
+  isFresh(id: string): boolean {
+    return this.fresh.has(id);
   }
 
   byId(id: string): InteractableDef | undefined {
@@ -145,13 +192,16 @@ export class InteractionSystem {
       const m = this.markers.get(d.id);
       if (!m) continue;
       const isFocus = this.focused?.id === d.id || this.hovered?.id === d.id;
-      const near = Math.hypot(d.position.x - player.x, d.position.z - player.z) < 9;
-      // Teachers always show a gentle marker; objects only when nearby.
-      m.sprite.visible =
-        d.enabled && (isFocus || (d.kind === 'teacher' ? near : near && Math.hypot(d.position.x - player.x, d.position.z - player.z) < d.radius + 2.5));
-      const bob = Math.sin(this.time * 2.6 + m.phase) * 0.1;
+      const dist = Math.hypot(d.position.x - player.x, d.position.z - player.z);
+      const near = dist < 9;
+      const fresh = this.fresh.has(d.id);
+      // Undiscovered things sparkle from across the room; teachers show a gentle
+      // marker nearby; discovered objects only when close.
+      m.sprite.visible = d.enabled && (isFocus || (fresh ? dist < 22 : d.kind === 'teacher' ? near : near && dist < d.radius + 2.5));
+      const bob = Math.sin(this.time * (fresh ? 3.4 : 2.6) + m.phase) * (fresh ? 0.16 : 0.1);
       m.sprite.position.set(m.base.x, m.base.y + bob + (isFocus ? 0.15 : 0), m.base.z);
-      const target = (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : 1);
+      const pulse = fresh ? 1 + Math.sin(this.time * 3 + m.phase) * 0.06 : 1;
+      const target = (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : fresh ? 1.3 * pulse : 1);
       const s = m.sprite.scale.x + (target - m.sprite.scale.x) * Math.min(1, dt * 10);
       m.sprite.scale.setScalar(s);
       (m.sprite.material as THREE.SpriteMaterial).opacity = isFocus ? 1 : 0.85;

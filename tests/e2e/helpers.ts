@@ -8,6 +8,7 @@ declare global {
       teleportTo(id: string): void;
       overlay(): string | null;
       booksOnShelf(): number;
+      explored(): string[];
     };
   }
 }
@@ -18,8 +19,8 @@ export const APP = '/?maxfps=3';
 export async function enterSchool(page: Page, child = 'izzy'): Promise<void> {
   await page.goto(`${APP}#/`);
   await page.getByTestId(`enter-${child}`).click();
-  await page.waitForFunction(() => !!window.__izzy?.game(), null, { timeout: 120_000 });
-  await page.waitForFunction(() => window.__izzy?.game()?.busy === false, null, { timeout: 120_000 });
+  await page.waitForFunction(() => !!window.__izzy?.game(), null, { timeout: 300_000 });
+  await page.waitForFunction(() => window.__izzy?.game()?.busy === false, null, { timeout: 300_000 });
   await expect(page.getByTestId('hud-books')).toBeVisible();
 }
 

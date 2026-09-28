@@ -33,7 +33,11 @@ export function ConversationsPage({ data }: { data: ParentData }) {
     <div className="page">
       <PageHeader
         title="Teacher talk"
-        subtitle={`Every conversation ${child.name} has with her teachers, word for word. Stored only on this device — nothing is sent anywhere.`}
+        subtitle={`Every conversation ${child.name} has with her teachers, word for word. Stored only on this device. ${
+          data.household.settings.teacherAi.enabled && data.household.settings.teacherAi.consentToSend
+            ? 'AI teachers are on: what she says to a teacher is sent (as text) to Anthropic to write the reply — those replies are marked “AI”.'
+            : 'Teachers answer on this device — nothing is sent anywhere.'
+        }`}
       />
       <div className="toolbar">
         <div className="chip-row">
@@ -68,6 +72,7 @@ export function ConversationsPage({ data }: { data: ParentData }) {
                       {i.context.lessonId ? LESSON_TITLES[i.context.lessonId]?.childTitle : i.context.flow}
                     </span>
                     <span className="small">{i.outcome}</span>
+                    {i.parentNotes?.length ? <span className="small flag-inline">💛 {i.parentNotes.join(' · ')}</span> : null}
                   </div>
                   <span className="muted small">{i.transcript.length} lines</span>
                   {i.isDemo && <span className="demo-tag">demo</span>}
@@ -78,7 +83,19 @@ export function ConversationsPage({ data }: { data: ParentData }) {
                       {i.transcript.map((l, k) => (
                         <li key={k} className={`line line-${l.speaker}`}>
                           <span className="who">{l.speaker === 'teacher' ? t?.name : l.speaker === 'child' ? child.name : '·'}</span>
-                          <span className="what">{l.text}</span>
+                          <span className="what">
+                            {l.text}
+                            {l.via === 'voice' && (
+                              <span className="via-tag" title="Said out loud (speech-to-text)">
+                                🎤
+                              </span>
+                            )}
+                            {l.via === 'ai' && (
+                              <span className="via-tag" title="Written by the AI teacher">
+                                AI
+                              </span>
+                            )}
+                          </span>
                           <span className="when muted small">{time(l.at)}</span>
                         </li>
                       ))}

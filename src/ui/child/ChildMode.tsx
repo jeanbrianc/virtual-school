@@ -4,28 +4,42 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { navigate } from '../../app/router';
-import { useServices } from '../../app/services';
+import { useLiveQuery, useServices } from '../../app/services';
 import { FEATURE_FLAGS } from '../../config/gameConfig';
+import {
+  DISCOVERABLE_IDS,
+  EXPLORER_CELEBRATION,
+  describeDiscovery,
+  isTeacherDiscovery,
+  undiscovered,
+  welcomeDiscovery,
+  type Discovery,
+} from '../../domain/discovery';
 import { getLesson } from '../../domain/lessons/registry';
 import type { LessonRun } from '../../domain/lessons/engine';
 import { getReward } from '../../domain/rewards/catalog';
 import { ruleProgress } from '../../domain/rewards/engine';
+import { browserFamily, knownOnDevice, type OnDeviceAnswer } from '../../domain/talk';
+import { talkPhrases } from '../../domain/teachers/chat';
 import { TEACHERS, type TeacherId } from '../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../domain/types';
 import { toDay } from '../../domain/util/time';
 import { Game, type FocusInfo } from '../../engine/Game';
 import type { PetId } from '../../engine/characters/pets';
 import { recordConversation, recordLesson, startTierFor } from '../../services/lessonService';
-import { completeBook, logReading, type CompleteBookInput } from '../../services/readingService';
-import { markRewardsCelebrated, setActivePet, updateSettings } from '../../services/householdService';
+import { addBook, completeBook, logReading, type CompleteBookInput } from '../../services/readingService';
+import { markExplored, markRewardsCelebrated, setActivePet, updateSettings } from '../../services/householdService';
+import { getSpeechProbe, runSpeechProbe, settleInterruptedProbe } from '../../services/talkService';
 import { appStore } from '../../state/appState';
 import { useStore } from '../../state/store';
 import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
 import { HootFlow } from './flows/HootFlow';
 import { LessonFlow } from './flows/LessonFlow';
-import { BookshelfViewer, Celebration, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
+import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
+import { MIC_NEEDS_GROWNUP, MIC_NO_BROWSER_SUPPORT, type MicSetup, type TalkKit } from './Talk';
 import { useChildWorld, type ChildWorldData } from './useChildWorld';
+import type { TalkAvailability } from '../../voice/SpeechService';
 
 type Overlay =
   | { kind: 'hoot' }
@@ -34,7 +48,11 @@ type Overlay =
   | { kind: 'treasures' }
   | { kind: 'gate' }
   | { kind: 'celebrate'; items: CelebrationItem[]; rewardIds: string[] }
+  | { kind: 'discover'; discovery: Discovery }
   | null;
+
+/** Marker stored in `explored` once the "you found everything" celebration has played. */
+const EXPLORER_DONE = '__explorer';
 
 interface Hint {
   icon: string;
@@ -77,6 +95,12 @@ export function ChildMode({ childId }: { childId: string }) {
   const [toast, setToast] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [explored, setExplored] = useState<string[] | null>(null);
+  const exploredRef = useRef<string[]>([]);
+  const [available, setAvailable] = useState<string[]>([]);
+  const explorerPending = useRef(false);
+  /** What happened in the current Hoot conversation (for the parent transcript). */
+  const hootOutcome = useRef<string | null>(null);
 
   const household = data?.household;
   const muted = household?.settings.audio.muted ?? false;
@@ -98,6 +122,129 @@ export function ChildMode({ childId }: { childId: string }) {
     [services.speechOut, readAloud],
   );
 
+  // ── Talking to teachers (speech-to-text + conversation) ─────────────────
+  // The microphone shows whenever talking isn't off. Her first tap does the
+  // setup (asks the browser about on-device listening behind a crash marker —
+  // see domain/talk.ts — and downloads the voice pack if needed).
+  const talkMode = household?.settings.talkMode ?? 'off';
+  const family = browserFamily(navigator.userAgent);
+  const probe = useLiveQuery(() => getSpeechProbe(ctx), [], ['meta']);
+  const probingRef = useRef(false);
+  const [probing, setProbing] = useState(false);
+  useEffect(() => {
+    // A marker left "pending" by an earlier page means asking crashed the tab: remember that.
+    if (probe?.answer === 'pending' && !probingRef.current) void settleInterruptedProbe(ctx);
+  }, [ctx, probe]);
+  const known: OnDeviceAnswer = probing ? 'unknown' : knownOnDevice(probe, family);
+  const knownRef = useRef<OnDeviceAnswer>(known);
+  if (!probingRef.current) knownRef.current = known;
+  const modeRef = useRef(talkMode);
+  modeRef.current = talkMode;
+  const micState: TalkAvailability = services.speechIn.check(talkMode, known);
+  const ai = household?.settings.teacherAi;
+  const books = data?.records.books;
+  const talkKit: TalkKit = useMemo(() => {
+    const { speechIn, speechOut } = services;
+    const needsSetup = speechIn.canProbe && (known === 'unknown' || known === 'downloadable' || known === 'downloading');
+    const blocked = !speechIn.available ? MIC_NO_BROWSER_SUPPORT : micState.state === 'unsupported' ? MIC_NEEDS_GROWNUP : null;
+    const prepare = async (): Promise<MicSetup> => {
+      probingRef.current = true;
+      setProbing(true);
+      try {
+        let k = await runSpeechProbe(ctx, family, () => speechIn.probe());
+        if (k === 'downloadable' || k === 'downloading') {
+          await speechIn.install();
+          k = await runSpeechProbe(ctx, family, () => speechIn.probe());
+        }
+        knownRef.current = k;
+        const state = speechIn.check(modeRef.current, k).state;
+        return state === 'ready' ? 'ready' : state === 'needs-download' || state === 'downloading' ? 'downloading' : 'unsupported';
+      } catch {
+        return 'unsupported';
+      } finally {
+        probingRef.current = false;
+        setProbing(false);
+      }
+    };
+    return {
+      mic:
+        talkMode === 'off'
+          ? null
+          : {
+              onDevice: micState.onDevice,
+              needsSetup: needsSetup && !blocked,
+              blocked,
+              prepare,
+              listen: (o) => {
+                // Never let the teacher's own voice be heard as hers.
+                speechOut.cancel();
+                return speechIn.listen(modeRef.current, knownRef.current, { maxMs: 12_000, ...o });
+              },
+              stop: () => speechIn.stop(),
+            },
+      chat: services.teacherChat(dataRef.current?.household),
+      phrases: talkPhrases(books ?? []),
+      speakReply: (text: string) => speech.speak(text),
+      autoSpeaks: speech.auto,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [micState.state, micState.onDevice, known, talkMode, family, ai?.enabled, ai?.endpoint, ai?.consentToSend, books, speech, services, ctx]);
+
+  // ── Discovery (first day) ───────────────────────────────────────────────
+  useEffect(() => {
+    if (data && explored === null) {
+      exploredRef.current = data.child.explored ?? [];
+      setExplored(exploredRef.current);
+    }
+  }, [data, explored]);
+
+  const refreshDiscoveryMarkers = useCallback(() => {
+    const game = gameRef.current;
+    if (!game) return;
+    if (appStore.get().preview) {
+      game.setUndiscovered([]);
+      return;
+    }
+    const avail = game.availableInteractables().filter((id) => (DISCOVERABLE_IDS as readonly string[]).includes(id));
+    setAvailable(avail);
+    game.setUndiscovered(undiscovered(avail, exploredRef.current));
+  }, []);
+
+  useEffect(() => {
+    if (ready) refreshDiscoveryMarkers();
+  }, [ready, data, explored, refreshDiscoveryMarkers]);
+
+  /** Records a discovery; returns true if this was the first time. */
+  const discover = useCallback(
+    async (id: string): Promise<boolean> => {
+      if (appStore.get().preview || !(DISCOVERABLE_IDS as readonly string[]).includes(id) || exploredRef.current.includes(id)) return false;
+      exploredRef.current = [...exploredRef.current, id];
+      setExplored(exploredRef.current);
+      audio.play('sparkle', { volume: 0.6 });
+      const saved = await markExplored(ctx, childId, [id]);
+      exploredRef.current = [...new Set([...exploredRef.current, ...saved])];
+      const game = gameRef.current;
+      const avail = game ? game.availableInteractables().filter((x) => (DISCOVERABLE_IDS as readonly string[]).includes(x)) : [];
+      if (undiscovered(avail, exploredRef.current).length === 0 && !exploredRef.current.includes(EXPLORER_DONE)) explorerPending.current = true;
+      refreshDiscoveryMarkers();
+      return true;
+    },
+    [audio, childId, ctx, refreshDiscoveryMarkers],
+  );
+
+  /** After a card or conversation closes: celebrate once when everything has been found. */
+  const maybeCelebrateExplorer = useCallback(() => {
+    if (!explorerPending.current || overlayRef.current) return;
+    explorerPending.current = false;
+    void markExplored(ctx, childId, [EXPLORER_DONE]).then((saved) => {
+      exploredRef.current = saved;
+    });
+    gameRef.current?.setInputEnabled(false);
+    gameRef.current?.confetti();
+    audio.play('fanfare', { volume: 0.7 });
+    setOverlay({ kind: 'celebrate', rewardIds: [], items: [{ key: 'explorer', ...EXPLORER_CELEBRATION }] });
+  }, [audio, childId, ctx]);
+
   // ── Interactions from the 3D world ──────────────────────────────────────
   const handleInteract = useCallback(
     async (id: string) => {
@@ -110,6 +257,15 @@ export function ChildMode({ childId }: { childId: string }) {
         setHint({ icon: '✨', title: 'Preview mode', text: 'This is a peek at the future school. Lessons are paused in preview.' });
         return;
       }
+      // First touch: find out what this is. Teachers introduce themselves in their own conversation.
+      if (await discover(id)) {
+        const card = isTeacherDiscovery(id) ? null : describeDiscovery(id, { name: d.child.name, world: state, snapshot: d.snapshot });
+        if (card) {
+          game.setInputEnabled(false);
+          setOverlay({ kind: 'discover', discovery: card });
+          return;
+        }
+      }
       if (id === 'hoot') {
         teacherForSpeech.current = 'hoot';
         game.setInputEnabled(false);
@@ -121,6 +277,7 @@ export function ChildMode({ childId }: { childId: string }) {
         const teacher = id === 'digit' || id === 'rocket' ? 'digit' : 'nova';
         const lesson = getLesson(teacher === 'digit' ? 'moon-rocks' : 'sink-float');
         if (!lesson) return;
+        if (id !== teacher) void discover(teacher);
         teacherForSpeech.current = teacher;
         game.setInputEnabled(false);
         const startTier = await startTierFor(ctx, childId, lesson);
@@ -175,7 +332,26 @@ export function ChildMode({ childId }: { childId: string }) {
         });
       }
     },
-    [audio, childId, ctx],
+    [audio, childId, ctx, discover],
+  );
+
+  const closeDiscovery = useCallback(
+    (then?: string) => {
+      setOverlay(null);
+      const game = gameRef.current;
+      game?.setInputEnabled(true);
+      if (then === 'museum') {
+        navigate({ name: 'museum', childId, tour: true });
+        return;
+      }
+      if (then && game) {
+        // Walk over and interact (goes through handleInteract, so discoveries still count).
+        window.setTimeout(() => game.interactById(then), 150);
+        return;
+      }
+      window.setTimeout(maybeCelebrateExplorer, 250);
+    },
+    [childId, maybeCelebrateExplorer],
   );
 
   // A milestone preview lasts only while the school is open.
@@ -225,6 +401,10 @@ export function ChildMode({ childId }: { childId: string }) {
           .map((r) => rewardToCelebration(r!));
         if (items.length) setOverlay({ kind: 'celebrate', items, rewardIds: [] });
         else game.setInputEnabled(true);
+      } else if ((data.child.explored ?? []).length === 0) {
+        // Her very first visit: a welcome card instead of "welcome back".
+        game.setInputEnabled(false);
+        setOverlay({ kind: 'discover', discovery: welcomeDiscovery(data.child.name) });
       } else {
         setToast(`Welcome back, ${data.child.name}!`);
         window.setTimeout(() => setToast(null), 3500);
@@ -274,21 +454,27 @@ export function ChildMode({ childId }: { childId: string }) {
       teleportTo: (id: string) => gameRef.current?.teleportTo(id),
       overlay: () => overlayRef.current?.kind ?? null,
       booksOnShelf: () => dataRef.current?.shelfBooks.length ?? 0,
+      explored: () => exploredRef.current,
     };
   }, [handleInteract]);
 
   // ── Flow completions ───────────────────────────────────────────────────
   const endConversation = useCallback(
-    async (teacher: TeacherId, flow: string, transcript: TranscriptLine[], startedAt: string, outcome: string) => {
+    async (teacher: TeacherId, flow: string, transcript: TranscriptLine[], startedAt: string, outcome: string, parentNotes: string[] = []) => {
       setOverlay(null);
-      await recordConversation(ctx, childId, teacher, flow, startedAt, transcript, outcome);
+      const hoot = teacher === 'hoot' ? hootOutcome.current : null;
+      hootOutcome.current = null;
+      const talked = transcript.some((l) => l.via === 'voice' || l.via === 'typed');
+      await recordConversation(ctx, childId, teacher, talked ? 'talk' : flow, startedAt, transcript, hoot ?? outcome, parentNotes);
+      await reload();
       const game = gameRef.current;
       if (game) {
         await game.releaseCamera();
         game.setInputEnabled(true);
       }
+      maybeCelebrateExplorer();
     },
-    [ctx, childId],
+    [ctx, childId, reload, maybeCelebrateExplorer],
   );
 
   const finishBook = useCallback(
@@ -345,15 +531,10 @@ export function ChildMode({ childId }: { childId: string }) {
         ...(book?.totalChapters ? { chaptersRead: chapters } : { pagesRead: chapters }),
         source: 'child',
       });
-      await recordConversation(
-        ctx,
-        childId,
-        'hoot',
-        'read-more',
-        startedAt,
-        transcript,
-        `Logged ${chapters} ${book?.totalChapters ? 'chapters' : 'pages'} of ${book?.title ?? 'a book'}`,
-      );
+      // The conversation itself is recorded once, when she says goodbye.
+      hootOutcome.current = `Logged ${chapters} ${book?.totalChapters ? 'chapters' : 'pages'} of ${book?.title ?? 'a book'}`;
+      void transcript;
+      void startedAt;
       void reload();
       const b = res.book;
       if (b.totalChapters) {
@@ -367,15 +548,33 @@ export function ChildMode({ childId }: { childId: string }) {
     [childId, ctx, reload],
   );
 
+  const startBook = useCallback(
+    async (input: { title: string; author?: string; catalogId?: string }): Promise<string> => {
+      const book = await addBook(ctx, childId, {
+        title: input.title,
+        ...(input.author ? { author: input.author } : {}),
+        ...(input.catalogId ? { catalogId: input.catalogId } : {}),
+        status: 'reading',
+        needsParentReview: !input.catalogId,
+      });
+      hootOutcome.current = `Started reading ${book.title}`;
+      void reload();
+      return book.totalChapters
+        ? `Hoo-hoo! I’ve put a bookmark in ${book.title} for you. It has ${book.totalChapters} chapters. Come tell me when you read more — or when you finish it!`
+        : `Hoo-hoo! I’ve put a bookmark in ${book.title} for you. Come tell me when you read more — or when you finish it!`;
+    },
+    [childId, ctx, reload],
+  );
+
   const finishLesson = useCallback(
-    async (teacher: 'digit' | 'nova', run: LessonRun, transcript: TranscriptLine[], startedAt: string) => {
+    async (teacher: 'digit' | 'nova', run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[] = []) => {
       const game = gameRef.current;
       if (!game || busy) return;
       setBusy(true);
       setOverlay(null);
       game.setInputEnabled(false);
       try {
-        const res = await recordLesson(ctx, childId, run, startedAt, transcript);
+        const res = await recordLesson(ctx, childId, run, startedAt, transcript, parentNotes);
         const fresh = await reload();
         await game.releaseCamera();
         game.cheer(teacher);
@@ -420,7 +619,8 @@ export function ChildMode({ childId }: { childId: string }) {
       await game.releaseCamera();
       game.setInputEnabled(true);
     }
-  }, [ctx, childId]);
+    maybeCelebrateExplorer();
+  }, [ctx, childId, maybeCelebrateExplorer]);
 
   // ── HUD actions ─────────────────────────────────────────────────────────
   const toggleSound = async () => {
@@ -460,6 +660,8 @@ export function ChildMode({ childId }: { childId: string }) {
       : 'Remember our floating experiments? I have new mysteries!';
   };
   const booksCount = data?.shelfBooks.length ?? 0;
+  const metTeacher = (teacher: TeacherId) => data?.records.interactions.some((i) => i.teacherId === teacher) ?? false;
+  const focusIsNew = !!focus && !preview && !!explored && (DISCOVERABLE_IDS as readonly string[]).includes(focus.id) && !explored.includes(focus.id);
 
   return (
     <div className={`child-mode ${ready ? 'ready' : ''}`} data-testid="child-mode">
@@ -487,6 +689,24 @@ export function ChildMode({ childId }: { childId: string }) {
               <div className="hud-chip" title="Books on my shelf" data-testid="hud-books">
                 📚 <strong>{preview ? preview.books.length : booksCount}</strong>
               </div>
+              {!preview && explored && available.length > 0 && undiscovered(available, explored).length > 0 && (
+                <button
+                  type="button"
+                  className="hud-chip explore"
+                  data-testid="hud-discoveries"
+                  title="Things discovered in my school"
+                  onClick={() =>
+                    setHint({
+                      icon: '🧭',
+                      title: 'Explore your school!',
+                      text: `Look for the ✨ sparkles. You’ve discovered ${available.length - undiscovered(available, explored).length} of ${available.length} things.`,
+                    })
+                  }
+                >
+                  🧭 <strong>{available.length - undiscovered(available, explored).length}</strong>
+                  <small>/ {available.length}</small>
+                </button>
+              )}
             </div>
             <nav className="hud-right" aria-label="School menu">
               <button type="button" className="hud-btn" onClick={() => void toggleSound()} aria-label={muted ? 'Turn sound on' : 'Turn sound off'}>
@@ -530,7 +750,7 @@ export function ChildMode({ childId }: { childId: string }) {
 
           {toast && <div className="toast">{toast}</div>}
 
-          {showControls && !overlay && (
+          {showControls && !overlay && !focus && (
             <div className="controls-hint" role="note">
               <span className="keys">
                 <kbd>←</kbd>
@@ -543,9 +763,16 @@ export function ChildMode({ childId }: { childId: string }) {
           )}
 
           {focus && !overlay && !busy && (
-            <button type="button" className="interact-prompt" onClick={() => gameRef.current?.interactById(focus.id)} data-testid="interact-prompt">
+            <button
+              type="button"
+              className={`interact-prompt ${focusIsNew ? 'fresh' : ''}`}
+              onClick={() => gameRef.current?.interactById(focus.id)}
+              data-testid="interact-prompt"
+            >
               <span className="interact-icon">{focus.icon}</span>
-              <span className="interact-label">{focus.label}</span>
+              <span className="interact-label">
+                {focusIsNew ? (focus.kind === 'teacher' ? `Say hello to ${focus.label.replace(/^Talk to /, '')}!` : 'What’s this? ✨') : focus.label}
+              </span>
               <kbd className="interact-key">{gameRef.current?.inputDevice === 'gamepad' ? 'A' : 'Space'}</kbd>
             </button>
           )}
@@ -558,14 +785,14 @@ export function ChildMode({ childId }: { childId: string }) {
               books={data.records.books}
               mastery={data.records.mastery}
               visitsToday={visitsToday('hoot')}
+              firstMeeting={!metTeacher('hoot')}
               speech={speech}
               playSfx={(n) => audio.play(n)}
               onFinishBook={(input) => void finishBook(input)}
               onReadMore={readMore}
-              onClose={(t, s) => void endConversation('hoot', 'chat', t, s, 'Visited Professor Hoot')}
-              {...(data.household.settings.speechInput && services.speechIn.available
-                ? { listen: () => services.speechIn.listenOnce({ timeoutMs: 8000 }).then((r) => r?.transcript ?? null) }
-                : {})}
+              onStartBook={startBook}
+              onClose={(t, s, notes) => void endConversation('hoot', 'chat', t, s, 'Visited Professor Hoot', notes)}
+              talk={talkKit}
             />
           )}
           {overlay?.kind === 'lesson' && (
@@ -574,14 +801,16 @@ export function ChildMode({ childId }: { childId: string }) {
               lesson={getLesson(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')!}
               startTier={overlay.startTier}
               visitsToday={visitsToday(overlay.teacher)}
+              firstMeeting={!metTeacher(overlay.teacher)}
               childName={data.child.name}
               {...(lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')
                 ? { lastSummary: lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')! }
                 : {})}
               speech={speech}
               playSfx={(n) => audio.play(n)}
-              onComplete={(run, t, s) => void finishLesson(overlay.teacher, run, t, s)}
-              onClose={(t, s) => void endConversation(overlay.teacher, 'chat', t, s, `Visited ${TEACHERS[overlay.teacher].name}`)}
+              onComplete={(run, t, s, notes) => void finishLesson(overlay.teacher, run, t, s, notes)}
+              onClose={(t, s, notes) => void endConversation(overlay.teacher, 'chat', t, s, `Visited ${TEACHERS[overlay.teacher].name}`, notes)}
+              talk={talkKit}
             />
           )}
           {overlay?.kind === 'shelf' && <BookshelfViewer books={data.records.books} onClose={closeSheet} />}
@@ -612,6 +841,17 @@ export function ChildMode({ childId }: { childId: string }) {
             />
           )}
           {overlay?.kind === 'celebrate' && <Celebration items={overlay.items} onDone={() => void doneCelebrating()} />}
+          {overlay?.kind === 'discover' && (
+            <DiscoveryCard
+              discovery={overlay.discovery}
+              found={available.length - undiscovered(available, explored ?? []).length}
+              total={overlay.discovery.id === '__welcome' ? 0 : available.length}
+              {...(speech.canSpeak ? { speak: speech.speak } : {})}
+              autoSpeak={speech.auto}
+              onClose={() => closeDiscovery()}
+              onAction={(target) => closeDiscovery(target)}
+            />
+          )}
         </>
       )}
     </div>

@@ -17,6 +17,9 @@ export interface TeacherProfile {
   accent: string;
   /** Voice hints for text-to-speech (pitch/rate), used only if read-aloud is on. */
   voice: { pitch: number; rate: number };
+  /** The very first meeting: the teacher introduces themselves and their room. */
+  introductions: string[];
+  /** Later visits (they have met before). */
   greetings: string[];
   returnGreetings: string[];
   farewells: string[];
@@ -33,11 +36,10 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#8b6b4a',
     accent: '#e8b04b',
     voice: { pitch: 0.85, rate: 0.95 },
-    greetings: [
-      'Hoo-hoo! Welcome to the library, {name}!',
-      'Why, if it isn’t my favorite reader! Hoo-hoo!',
-      'Hello, {name}! The books have been whispering about you.',
+    introductions: [
+      'Hoo-hoo! Hello there — you must be {name}! I’m Professor Hoot, and this is the library, where stories live. Whenever you finish a book, come and tell me about it. We’ll chat about the story, and then it flies onto your very own bookshelf!',
     ],
+    greetings: ['Hoo-hoo! Hello again, {name}!', 'Why, if it isn’t my favorite reader! Hoo-hoo!', 'Hello, {name}! The books have been whispering about you.'],
     returnGreetings: ['Hoo-hoo, welcome back!', 'Back again? Wonderful — the library missed you!'],
     farewells: ['Happy reading, {name}!', 'Off you go — adventures are waiting between the pages!', 'Hoo-hoo! See you soon!'],
     praise: ['Magnificent thinking!', 'What a clever reader you are!', 'Hoo-hoo! Splendid!'],
@@ -51,6 +53,7 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#4aa3a8',
     accent: '#ffcf5c',
     voice: { pitch: 1.35, rate: 1.05 },
+    introductions: ['Beep boop! A new friend! Hello, {name} — I’m Digit, the math robot. I love counting, puzzles and rockets!'],
     greetings: ['Beep boop! Hello, {name}!', 'Greetings, Captain {name}! Systems ready for math!', 'Beep! My number sensors detect… {NAME}!'],
     returnGreetings: ['Beep boop! You’re back! My circuits are happy!', 'Welcome back, space helper!'],
     farewells: ['Beep boop, bye for now!', 'Mission complete. See you next launch!'],
@@ -65,6 +68,9 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#c65d3b',
     accent: '#7fc8c0',
     voice: { pitch: 1.15, rate: 1.0 },
+    introductions: [
+      'Oh, hello! You must be {name}. I’m Nova, and this is my science lab. Scientists ask questions and then test them to find out the answers!',
+    ],
     greetings: ['{name}! Perfect timing — I was just wondering about something!', 'Hi hi! Want to discover something amazing?'],
     returnGreetings: ['You’re back! I have SO many new questions!', 'Welcome back, fellow scientist!'],
     farewells: ['Keep wondering, {name}!', 'Stay curious! See you in the lab!'],
@@ -86,6 +92,8 @@ export function pickLine(lines: readonly string[], seed: number): string {
 export interface TeacherMemory {
   /** The learner's first name, substituted into greetings. */
   childName: string;
+  /** True until the child has had a conversation with this teacher. */
+  firstMeeting?: boolean;
   visitsToday: number;
   lastLessonSummary?: string;
   currentBookTitle?: string;
@@ -95,6 +103,14 @@ export interface TeacherMemory {
 
 export function teacherOpening(id: TeacherId, memory: TeacherMemory, seed: number): string[] {
   const t = TEACHERS[id];
+  if (memory.firstMeeting) {
+    const intro = [pickLine(t.introductions, seed)];
+    if (id === 'hoot')
+      intro.push(
+        memory.booksCompleted > 0 ? 'I see some books on your shelf already. What shall we do today?' : 'Your shelf is empty — shall we start filling it?',
+      );
+    return intro.map((l) => personalize(l, memory.childName));
+  }
   const lines = [pickLine(memory.visitsToday > 0 ? t.returnGreetings : t.greetings, seed)];
   if (id === 'hoot') {
     if (memory.currentBookTitle) {

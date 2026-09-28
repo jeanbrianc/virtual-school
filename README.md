@@ -5,8 +5,9 @@ parent studio for recordkeeping, curriculum tracking, portfolios and reports.
 
 - **Child mode** — an explorable, cozy 3D school. Izzy walks around (keyboard,
   tap-to-walk, or a game controller), talks to her teachers (Professor Hoot for
-  reading, Digit for math, Nova for science), finishes real books that fly onto
-  her own bookshelf, and watches the school grow as she learns.
+  reading, Digit for math, Nova for science) — by tapping, typing, or just
+  saying it out loud — finishes real books that fly onto her own bookshelf, and
+  watches the school grow as she learns.
 - **Parent studio** — describe the day in plain English ("we baked bread and she
   measured 2 cups of flour…") and the app suggests skills and evidence for you
   to review. Mastery, curriculum, portfolio, reports, and a word-for-word log of
@@ -28,13 +29,66 @@ npm install          # installs pinned dependencies
 npm run dev          # http://127.0.0.1:5173 with live reload
 ```
 
-Open the app, tap **Izzy** to enter the school. The **Grown-ups** button asks for
-the parent PIN — the demo PIN is **1234** (change it in *Settings & privacy*).
+Open the app and tap **Izzy**. The first launch is a brand-new, empty school:
+no books, no history, nothing unlocked. Everything she can touch sparkles until
+she discovers it, and her teachers introduce themselves the first time they
+meet. The **Grown-ups** button asks for the parent PIN — it starts as **1234**
+(change it in *Settings & privacy*).
+
+Want to see how things look after a few weeks? *Settings & privacy → Load
+sample data* replaces everything with a clearly labeled example history;
+*Start fresh* clears learning records again (names, avatars and settings stay).
+
+### Talking to teachers (and optional AI teachers)
+
+**Talk-to-text** is on by default in *on-device only* mode: Izzy taps the
+microphone and says “I read Daddy the Goodnight Leelanau book”; her words
+appear, Professor Hoot answers about *that* book, asks whether she read the
+whole thing, and offers **Put it on my shelf!** (the reading log notes “Izzy
+read it aloud to Daddy”). Current desktop Chrome recognizes speech entirely on
+the computer. The microphone button is always there (unless a parent turns
+talking off); Izzy's **first tap** sets it up — it asks the browser about
+on-device listening and downloads the voice pack if needed (a one-time ~60 MB
+download from the browser, so the first tap can take a minute), and Chrome asks
+once for microphone permission. *Settings & privacy → Talking to teachers* has
+the same steps (**Check this browser**, **Download the voice pack**) plus
+**Test the microphone**. Some browser builds crash the tab when asked about
+on-device listening, so that question is only asked on a tap, behind a saved
+marker that remembers a crash. In browsers without on-device recognition (Safari,
+Firefox, older Chrome) either pick *Also allow the browser's speech service*
+(the browser maker — Apple or Google — then hears the audio) or she can type.
+
+**AI teachers** are off by default. The built-in teachers already understand
+book talk (which book, who she read with, finished or not) without any network.
+To let Claude answer anything she says:
+
+```bash
+cp .env.example .env.local     # then paste your key after ANTHROPIC_API_KEY=
+npm run dev                    # also starts the AI helper on http://127.0.0.1:8787
+```
+
+Then *Settings & privacy → AI teachers*: **Check connection**, tick the consent
+box, and **Turn on AI teachers**. The key stays in `.env.local` on your computer
+(git-ignored) and never reaches the browser; the helper builds the teachers'
+instructions itself, only answers pages on this computer, and has a daily cap
+(`AI_DAILY_LIMIT`, default 300 replies ≈ well under a dollar a day with the
+default Claude Haiku 4.5 model). See [Privacy & safety](#privacy--safety) for
+exactly what is sent.
+
+### Your own domain (AWS)
+
+`npm run deploy:aws` puts the school on your AWS account at
+**lms.brianjeanbuilds.com** — private S3 + CloudFront with HTTPS, a family
+password in front of everything, and the AI teachers as a small Lambda at
+`/api` — for roughly the cost of the Route 53 zone you already have. After that,
+every push to `main` on GitHub deploys itself. Step by step:
+[docs/DEPLOY.md](docs/DEPLOY.md).
 
 **Hosted copy.** The production build is also published as a private claude.ai
 artifact. It runs the same code with its own browser storage. That viewer blocks
-file downloads and the print dialog, so report download/print and JSON export
-only work when you run the app locally (`npm run build && npm run preview`, or
+file downloads, the print dialog and the microphone, and can't reach the local
+AI helper — so talking out loud, AI teachers, report download/print and JSON
+export only work when you run the app locally (`npm run build && npm run preview`, or
 serve `dist/` from any static host).
 
 ### All commands
@@ -43,10 +97,13 @@ serve `dist/` from any static host).
 | --- | --- |
 | `npm run dev` | Dev server with live reload (esbuild) on port 5173 |
 | `npm run build` | Production build → `dist/` (static files; host anywhere) |
-| `npm run preview` | Serve `dist/` on http://127.0.0.1:4173 with a strict CSP |
+| `npm run preview` | Serve `dist/` on http://127.0.0.1:4173 with a strict CSP (starts the AI helper too, if a key is set) |
+| `npm run ai-helper` | Run only the local AI helper (normally started by `dev`/`preview`) |
+| `npm run deploy:aws` | Create/update the AWS stack and publish the site ([docs/DEPLOY.md](docs/DEPLOY.md)) |
+| `npm run build:lambda` | Bundle the AI helper for AWS Lambda → `dist-lambda/ai-helper.zip` |
 | `npm run typecheck` | `tsc --noEmit` (strict, `noUncheckedIndexedAccess`) |
 | `npm run lint` | Architecture boundaries + privacy/safety rules + Prettier check |
-| `npm test` | Unit tests (Node test runner + tsx), 68 tests |
+| `npm test` | Unit tests (Node test runner + tsx), 113 tests |
 | `npm run test:e2e` | Builds the e2e bundle and runs Playwright (desktop + phone) |
 | `npm run check` | typecheck + lint + unit tests + production build |
 | `npm run format` | Prettier write |
@@ -61,6 +118,21 @@ Playwright needs a Chromium: `npx playwright install chromium` on a new machine
 
 ## What works end to end
 
+0. **First day.** A welcome card, then ✨ sparkles on every teacher and object.
+   Touching something the first time explains what it does (the empty
+   bookshelf, Digit's launch pad, the locked greenhouse with its progress…); a
+   🧭 counter tracks discoveries and finding everything earns a "School
+   Explorer" cheer. Books appear only when Izzy tells Hoot about them or a
+   parent adds them.
+1. **Talk to a teacher.** Every teacher conversation has a microphone and a
+   “type it” box. Hoot works out which book she means (her own list first,
+   then a catalog of well-known titles — “frog and toad” → *Frog and Toad Are
+   Friends*), who she read with, and whether she finished; “yes” / “not yet”
+   answers carry on about the same book, and the next step is always a big
+   button (*Put it on my shelf!*, *Bookmark it!*). Digit and Nova chat before
+   their lessons (“let's go!” starts one). Worries (“my tummy hurts”, “someone
+   hit me”) always get the same on-device answer — *please go tell Mom or Dad
+   right now* — and a note on the parent's Today page.
 1. **Enter school → walk → library → Professor Hoot.** Arrow keys/WASD, tap/click
    to walk (A* pathfinding around furniture), or a gamepad. Big glowing markers
    and a prompt show what's interactive.
@@ -109,7 +181,8 @@ src/
     rewards/      reward catalog + unlock engine
     world/        WorldState derived from progress; milestone previews
     reports/      report generator (parent vs. family audience)
-    teachers/     teacher personas, memory-aware openers
+    teachers/     teacher personas, memory-aware openers, free conversation
+                  (on-device understanding, AI adapter, prompts for the helper)
   data/        Storage adapters (IndexedDB, in-memory), schema, repositories, demo seed
   services/    Use cases: completeBook, saveActivity, recordLesson, createReport…
                Every learning event commits atomically via one UnitOfWork
@@ -119,7 +192,9 @@ src/
   ui/          React 19 UI: child mode (HUD, dialogue, lessons), parent studio,
                Learning Museum, home screen.
   app/         Composition root (dependency injection), router, live queries.
-  audio/ voice/  Synthesized sound engine; speech output/input interfaces.
+  audio/ voice/  Synthesized sound engine; speech output/input (on-device first).
+scripts/ai-helper/  Optional local AI helper (Node, no dependencies) that keeps
+                    the API key and talks to Anthropic for the teachers.
 ```
 
 Boundaries are enforced by `npm run lint` (e.g. `domain` may not import
@@ -147,7 +222,7 @@ Key decisions (details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)):
 | --- | --- |
 | `households` | name, settings (PIN, audio, voice, graphics, interpretation provider + consent, demo tools) |
 | `parents` | displayName, role |
-| `children` | name, birthDate?, status (active/inactive), avatarId, activePetId |
+| `children` | name, birthDate?, status (active/inactive), avatarId, activePetId, explored (first-day discoveries) |
 | `avatars` | skin/hair/eyes/outfit/colors/accessory, inspirationMediaId? (local only) |
 | `books` | title, author, status, cover style, chapters/pages, reading mode, rating, favorite part, notes, tags, shelfIndex, photos |
 | `readingSessions` | book, date, chapters/pages/minutes, mode, source (child/parent/interpreter) |
@@ -228,7 +303,11 @@ on the device. To use an LLM:
    `skills[] {skillId, confidence, kind, independence, outcome, statement, excerpt}`,
    optional `topics`, `natureItems`, `followUps`.
 2. In **Settings & privacy → Activity interpretation**, choose "My own AI
-   endpoint", enter the HTTPS URL, and tick the explicit consent box.
+   endpoint", enter the URL (HTTPS, or `http://127.0.0.1…` for a helper on the
+   same computer), and tick the explicit consent box.
+
+**Easiest:** the bundled AI helper already implements this. With it running
+(see *Talking to teachers*), use `http://127.0.0.1:8787/v1/interpret`.
 
 Only the narrative text, first name and date are sent — no ids, photos or
 history. Responses are validated (unknown skills dropped, values clamped); on
@@ -239,16 +318,37 @@ return it from `createInterpretationService`.
 
 ---
 
-## Voice
+## Voice and teacher conversations
 
-- **Output**: `SpeechOutput` interface; the default uses the browser's built-in
-  `speechSynthesis` with per-teacher pitch/rate. A speaker button reads any
-  line; "read aloud automatically" is a parent setting. Text is always shown.
-- **Input** (off by default): `SpeechInput` wraps the Web Speech API so Izzy can
-  tell Professor Hoot her favorite part. The parent setting warns that browser
-  recognition may send audio to the browser vendor. Tapping always works.
-- To use a local/other TTS or STT engine, implement the interfaces in
-  `src/voice/SpeechService.ts` and inject them in `src/app/services.tsx`.
+- **Output**: `SpeechOutput`; the default uses the browser's `speechSynthesis`
+  with per-teacher pitch/rate and **only voices built into the computer**
+  (network voices would send the text away). A speaker button reads any line;
+  "read aloud automatically" is a parent setting, and when she talks by voice
+  the teacher answers out loud. Text is always shown.
+- **Input**: `SpeechInput` (`BrowserSpeechInput`) wraps the Web Speech API,
+  on-device first: `SpeechRecognition.available/install` + `processLocally`
+  (the `available()` probe runs only from Settings behind a crash marker —
+  `domain/talk.ts`, `services/talkService.ts`; child mode reads the saved answer),
+  phrase biasing with her book titles, live words while she talks, and clear
+  reasons when it can't listen. `talkMode` is `device` (default — never falls
+  back to a cloud recognizer), `browser` (parent allows the browser's service
+  when on-device isn't available) or `off`. Audio is never recorded or stored;
+  only the words are kept, in the transcript.
+- **Conversation**: `TeacherChatService` (`src/domain/teachers/chat.ts`).
+  `LocalTeacherChat` understands book talk on-device; `HttpTeacherChat`
+  (`chatRemote.ts`) calls the family's helper and validates/sanitizes every
+  reply, falling back to local on any problem. Worries are answered on-device
+  and never sent. Replies only *propose* actions; she confirms with a tap.
+- **AI helper** (`scripts/ai-helper/`): a ~150-line Node server on
+  `127.0.0.1` with no dependencies. It keeps `ANTHROPIC_API_KEY`, builds the
+  prompts (`src/domain/teachers/aiPrompt.ts`, forced tool use so replies are
+  structured), allows only local page origins plus a custom header (forces a
+  CORS preflight), caps body size, and rate-limits (20/min, `AI_DAILY_LIMIT`/day).
+  Endpoints: `GET /health`, `POST /v1/teacher`, `POST /v1/interpret`.
+  `AI_MODEL` overrides the default `claude-haiku-4-5-20251001`.
+- To use a different TTS/STT engine or AI provider, implement the interfaces in
+  `src/voice/SpeechService.ts` / `src/domain/teachers/chat.ts` and inject them
+  in `src/app/services.tsx`.
 
 All sound effects and ambience are synthesized with Web Audio (no music files,
 no copyrighted audio), with master/effects/ambience/voice volumes and mute.
@@ -287,22 +387,39 @@ font CDN is contacted.
 
 - Parent is the administrator; the studio is behind a PIN (a speed bump for
   little hands, not a security boundary against adults).
-- Data never leaves the device unless the parent configures and consents to an
-  external AI endpoint. No accounts, analytics, ads, trackers, social features,
-  or public profiles. The preview server sends a strict CSP.
+- Data never leaves the device unless the parent turns on and consents to an
+  AI service. No accounts, analytics, ads, trackers, social features, or public
+  profiles. The preview server sends a strict CSP (connections only to itself,
+  the local helper, or a parent-configured https endpoint).
+- **Talking**: by default her voice is recognized on the computer and the audio
+  is never recorded, stored or sent. Only if a parent picks *Also allow the
+  browser's speech service* may the browser send audio to Google/Apple.
+- **AI teachers** (off by default, explicit consent): for each reply the helper
+  sends Anthropic her first name, what she said (text), the last few lines of
+  that conversation and her book titles (the helper's instructions add that
+  she's a young child who reads well above her age) — never audio, photos,
+  birthdays, records or reports. Anthropic doesn't train models on API data by default.
+  Safety rules live in the helper, replies are checked on-device before she
+  sees them, worries are handled on-device and flagged for parents, and AI
+  lines are marked in *Teacher talk*.
 - No child-facing external links (lint-enforced).
 - Photos are downscaled and re-encoded on upload, which strips EXIF/GPS. No face
   recognition or biometric processing (lint-enforced). The avatar "inspiration
   photo" is only displayed beside the editor; features are chosen by hand.
-- Every teacher conversation is stored word for word and visible in *Teacher talk*.
+- Every teacher conversation is stored word for word and visible in *Teacher talk* (🎤 marks spoken lines, “AI” marks AI-written replies).
 - Export a child's complete records as JSON, or delete them, from Settings.
-- Demo data is labeled everywhere ("demo" tags and a banner) and can be reset.
+- Sample data is only ever loaded on purpose, is labeled everywhere ("demo" tags and a banner), and can be cleared with *Start fresh*.
 
 ---
 
 ## Tests & quality checks
 
-- **Unit (68 tests)** — mastery transitions and edge cases, reward unlocking at
+- **Unit (113 tests)** — AWS hosting (the edge password function, stack wiring, the Lambda adapter refusing traffic that skipped CloudFront), talking to teachers (the user's own example sentence,
+  catalog/own-book title matching, yes/not-yet follow-ups, worries → parent
+  notes, reply sanitizing and AI output validation, the browser adapter's
+  fallbacks and data minimization, prompt building, the helper's CORS/header/
+  key/size/rate-limit rules, on-device-first speech recognition with a fake
+  recognizer, settings upgrade, reading-log notes), first launch (empty school, upgrade of older auto-seeded samples without touching real records, start fresh, chosen sample data), first-day discovery and first-meeting dialogue, mastery transitions and edge cases, reward unlocking at
   every milestone, world-state derivation, milestone previews, book completion
   (shelf slots, honest supported evidence, duplicate protection), activity
   classification on the spec's own examples (and false-positive guards),
@@ -312,12 +429,17 @@ font CDN is contacted.
   adaptive lessons (tier up/down, scaffold ladder, modeled answers),
   recommendations and per-domain profiles, reports (period filtering,
   family = no jargon), catalog integrity, and navigation/collision.
-- **E2E (Playwright)** — the complete core loop (enter → Hoot → finish
-  *Charlotte's Web* with scaffolding → shelf/celebration → reload persistence →
-  parent sees evidence and transcript); parent flow (natural-language entry →
+- **E2E (Playwright)** — the first day in a brand-new school (welcome card →
+  meet Professor Hoot → finish her first book, *Charlotte's Web*, with
+  scaffolding → it flies onto the empty shelf → Pip the Bookworm → reload
+  persistence → parent sees evidence, transcript and the getting-started
+  checklist); parent flow (load sample data → natural-language entry →
   review → greenhouse unlock → curriculum evidence → family report → museum and
   tour) on desktop **and** a phone viewport, including a no-horizontal-overflow
-  check.
+  check; talking (a simulated on-device recognizer hears “i read daddy the
+  goodnight leelanau book” → Hoot answers about it → “yes the whole thing” →
+  onto the shelf → a typed worry reaches the parent's Today page → spoken
+  lines marked in Teacher talk → Settings shows on-device ready and AI off).
 - **Lint** — layering, privacy (no external links in child UI, no trackers, no
   network calls outside the AI adapter), safety (no eval/innerHTML/`any`/
   `console.log`/localStorage), Prettier.
@@ -345,7 +467,13 @@ so `npm install` reproduces them from npm on a normal machine.
 - The local interpreter is rule-based: good on common homeschool phrasing,
   conservative on ambiguity, and always reviewed by a parent — but it will miss
   unusual wording. The optional LLM endpoint is the upgrade path.
-- Speech recognition depends on browser support (Chrome/Edge/Safari).
+- On-device speech recognition needs a recent desktop Chrome (plus the one-time
+  voice pack); elsewhere it's the browser's cloud service (parent opt-in) or
+  typing. Recognizers are tuned for adults, so a 3-year-old's words are
+  sometimes misheard — she always sees what was heard, and titles are matched
+  forgivingly.
+- Without AI teachers, the on-device teachers understand book talk and simple
+  feelings/questions, and answer anything else with a friendly generic reply.
 - Data lives in one browser profile. Use *Export* for backups; there is no sync
   between devices yet.
 - Only two adaptive lessons (math, science) plus book conversations exist today;

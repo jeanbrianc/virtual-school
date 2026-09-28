@@ -2,6 +2,7 @@
 import * as esbuild from 'esbuild';
 import { rmSync, watch } from 'node:fs';
 import { join } from 'node:path';
+import { startAiHelper } from './ai-helper.mjs';
 import { copyPublic, ensureDir, esbuildOptions, root, writeIndexHtml } from './esbuild.shared.mjs';
 
 const outdir = join(root, '.dev');
@@ -32,3 +33,4 @@ watch(join(root, 'public'), { recursive: true }, () => copyPublic(outdir));
 watch(join(root, 'index.html'), () => ctx.rebuild());
 
 console.log(`\n  Izzy's Virtual Classroom → http://${hosts[0]}:${port}\n`);
+startAiHelper();

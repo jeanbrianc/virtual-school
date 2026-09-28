@@ -10,6 +10,7 @@ import { TEACHERS, personalize, pickLine, teacherOpening } from '../../../domain
 import type { TranscriptLine } from '../../../domain/types';
 import { hashString } from '../../../domain/util/random';
 import { Choices, DialogueShell, type Speech } from '../DialogueShell';
+import { TalkBar, useTeacherTalk, type TalkKit } from '../Talk';
 import { LessonStage } from '../lesson/Stages';
 
 type Phase = 'intro' | 'play' | 'complete';
@@ -20,12 +21,20 @@ export interface LessonFlowProps {
   startTier: number;
   visitsToday: number;
   childName: string;
+  /** True until she has had a conversation with this teacher. */
+  firstMeeting: boolean;
   lastSummary?: string;
   speech: Speech;
   playSfx: (name: 'correct' | 'tryAgain' | 'click' | 'sparkle' | 'splash' | 'plop') => void;
-  onComplete: (run: LessonRun, transcript: TranscriptLine[], startedAt: string) => void;
-  onClose: (transcript: TranscriptLine[], startedAt: string) => void;
+  onComplete: (run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[]) => void;
+  onClose: (transcript: TranscriptLine[], startedAt: string, parentNotes: string[]) => void;
+  /** Microphone and conversation service for chatting before the lesson. */
+  talk: TalkKit;
 }
+
+/** "yes" / "let's go" / "ready" — she wants to start. */
+const START_WORDS = /^(?:yes|yeah|yep|ok|okay|sure|ready|let'?s (?:go|do it|start|rescue|investigate|play)|go|start|i'?m ready)\b/i;
+const LATER_WORDS = /^(?:no|nope|maybe later|later|not now|bye|goodbye)\b/i;
 
 export function LessonFlow(props: LessonFlowProps) {
   const { teacher, lesson, speech, playSfx } = props;
@@ -37,7 +46,13 @@ export function LessonFlow(props: LessonFlowProps) {
   const [line, setLine] = useState(() => {
     const open = teacherOpening(
       teacher,
-      { childName: props.childName, visitsToday: props.visitsToday, booksCompleted: 0, ...(props.lastSummary ? { lastLessonSummary: props.lastSummary } : {}) },
+      {
+        childName: props.childName,
+        firstMeeting: props.firstMeeting,
+        visitsToday: props.visitsToday,
+        booksCompleted: 0,
+        ...(props.lastSummary ? { lastLessonSummary: props.lastSummary } : {}),
+      },
       seed.current,
     );
     return [...open, ...lesson.intro.map((l) => personalize(l, props.childName))].join(' ');
@@ -49,11 +64,36 @@ export function LessonFlow(props: LessonFlowProps) {
   const [, force] = useState(0);
   const [stars, setStars] = useState(0);
 
-  const log = (speaker: TranscriptLine['speaker'], text: string) => transcript.current.push({ speaker, text, at: new Date().toISOString() });
-  const say = (text: string, m: typeof mood = 'happy') => {
+  const log = (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via']) =>
+    transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}) });
+  const say = (text: string, m: typeof mood = 'happy', via?: TranscriptLine['via']) => {
     setLine(text);
     setMood(m);
-    log('teacher', text);
+    log('teacher', text, via);
+  };
+  const talk = useTeacherTalk({
+    teacher,
+    childName: props.childName,
+    books: [],
+    kit: props.talk,
+    transcript: () => transcript.current,
+    log,
+  });
+
+  /** She said something before the lesson: start, leave, or just chat. */
+  const tell = async (text: string, via: 'voice' | 'typed') => {
+    if (START_WORDS.test(text.trim())) {
+      log('child', text, via);
+      start();
+      return;
+    }
+    if (LATER_WORDS.test(text.trim())) {
+      log('child', text, via);
+      close();
+      return;
+    }
+    const reply = await talk.send(text, via);
+    say(reply.reply, reply.intent === 'question' ? 'thinking' : 'happy', reply.source === 'ai' ? 'ai' : undefined);
   };
 
   useEffect(() => {
@@ -61,7 +101,7 @@ export function LessonFlow(props: LessonFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const close = () => props.onClose(transcript.current, startedAt.current);
+  const close = () => props.onClose(transcript.current, startedAt.current, talk.notes);
 
   const start = () => {
     runRef.current = new LessonRun(lesson, props.startTier, seed.current);
@@ -161,18 +201,21 @@ export function LessonFlow(props: LessonFlowProps) {
   return (
     <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} speech={speech} wide={phase === 'play'}>
       {phase === 'intro' && (
-        <Choices
-          items={[
-            { id: 'go', label: teacher === 'digit' ? 'Let’s rescue them!' : 'Let’s investigate!', icon: teacher === 'digit' ? '🚀' : '🔬', tone: 'primary' },
-            { id: 'later', label: 'Maybe later', icon: '👋' },
-          ]}
-          onPick={(id) => {
-            playSfx('click');
-            log('child', id === 'go' ? 'Let’s go!' : 'Maybe later');
-            if (id === 'go') start();
-            else close();
-          }}
-        />
+        <>
+          <Choices
+            items={[
+              { id: 'go', label: teacher === 'digit' ? 'Let’s rescue them!' : 'Let’s investigate!', icon: teacher === 'digit' ? '🚀' : '🔬', tone: 'primary' },
+              { id: 'later', label: 'Maybe later', icon: '👋' },
+            ]}
+            onPick={(id) => {
+              playSfx('click');
+              log('child', id === 'go' ? 'Let’s go!' : 'Maybe later');
+              if (id === 'go') start();
+              else close();
+            }}
+          />
+          <TalkBar kit={props.talk} teacherName={TEACHERS[teacher].name} busy={talk.thinking} onSay={(t, via) => void tell(t, via)} />
+        </>
       )}
       {phase === 'play' && problem && (
         <div className="lesson-play">
@@ -199,7 +242,7 @@ export function LessonFlow(props: LessonFlowProps) {
             items={[{ id: 'yay', label: 'Yay!', icon: '🎉', tone: 'primary' }]}
             onPick={() => {
               playSfx('click');
-              if (run) props.onComplete(run, transcript.current, startedAt.current);
+              if (run) props.onComplete(run, transcript.current, startedAt.current, talk.notes);
             }}
           />
         </div>

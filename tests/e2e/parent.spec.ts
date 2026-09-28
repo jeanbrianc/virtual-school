@@ -9,9 +9,15 @@ test('log a learning moment, unlock the greenhouse, generate a family report', a
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
-  await page.goto(`${APP}#/parent/today`);
+  // Start from the labeled sample history (a parent's explicit choice).
+  await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
+  await page.getByTestId('load-sample').click();
+  await page.getByTestId('confirm-reset').click();
+  await expect(page.getByText('Sample data loaded')).toBeVisible();
+  await page.goto(`${APP}#/parent/today`);
   await expect(page.getByRole('heading', { name: /Today with Izzy/ })).toBeVisible();
+  await expect(page.getByText(/sample demo data/)).toBeVisible();
 
   // Natural-language entry from the Today composer.
   await page

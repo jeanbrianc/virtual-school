@@ -27,6 +27,7 @@ export async function recordLesson(
   run: LessonRun,
   startedAt: string,
   transcript: TranscriptLine[],
+  parentNotes: string[] = [],
 ): Promise<RecordLessonResult> {
   const def = run.definition;
   const now = nowIso(ctx);
@@ -102,6 +103,7 @@ export async function recordLesson(
     context: { lessonId: def.id, flow: 'lesson' },
     transcript,
     outcome: summary,
+    ...(parentNotes.length ? { parentNotes } : {}),
   };
 
   const uow = new UnitOfWork();
@@ -119,6 +121,7 @@ export async function recordConversation(
   startedAt: string,
   transcript: TranscriptLine[],
   outcome: string,
+  parentNotes: string[] = [],
 ): Promise<void> {
   if (transcript.length === 0) return;
   await ctx.repos.teacherInteractions.put({
@@ -130,7 +133,14 @@ export async function recordConversation(
     context: { flow },
     transcript,
     outcome,
+    ...(parentNotes.length ? { parentNotes } : {}),
   });
+}
+
+/** A parent has read the notes on a conversation. */
+export async function markNotesSeen(ctx: ServiceContext, interactionId: string): Promise<void> {
+  const i = await ctx.repos.teacherInteractions.get(interactionId);
+  if (i) await ctx.repos.teacherInteractions.put({ ...i, notesSeen: true });
 }
 
 function teacherName(id: string): string {
