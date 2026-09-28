@@ -32,12 +32,23 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
 
 ## One-time setup (on your Mac, ~20 minutes, mostly waiting)
 
-1. **Tools.** Install the AWS CLI and sign in:
+1. **Tools and sign-in.** Install the AWS CLI (and the GitHub CLI, so the script can
+   turn on automatic deploys for you), then sign in through IAM Identity Center:
 
    ```bash
-   brew install awscli        # needs AWS CLI 2.32+ for `aws login`
-   aws login                  # opens the browser; or use `aws configure sso`
+   brew install awscli gh
+   gh auth login                                   # once, for GitHub
+   aws sso login --profile bullybearai-prod        # browser sign-in
+   aws sts get-caller-identity --profile bullybearai-prod >/dev/null && echo "AWS: signed in"
    ```
+
+   Any profile works — pass it as `AWS_PROFILE`. The stack always goes to
+   **us-east-1** (CloudFront only takes certificates from there), whatever the
+   profile's default region; it's a separate stack (`virtual-school`) and doesn't
+   touch any other stacks in the account. It does add two records to the
+   `brianjeanbuilds.com` hosted zone (the `lms` alias and the certificate check),
+   so if that zone is covered by a deployment lock in another repo, take the lock
+   first.
 
 2. **Code on GitHub.** From the project folder:
 
@@ -55,7 +66,7 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
 3. **Create the site.**
 
    ```bash
-   npm run deploy:aws          # same as ./scripts/deploy/aws-deploy.sh
+   AWS_PROFILE=bullybearai-prod npm run deploy:aws
    ```
 
    It finds the `brianjeanbuilds.com` hosted zone, asks for a **site username and
@@ -64,12 +75,14 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
    and CloudFront take 5–15 minutes the first time — then builds and uploads the site
    and the AI helper.
 
-4. **Turn on automatic deploys.** The script prints a role ARN. In GitHub →
-   *jeanbrianc/virtual-school → Settings → Secrets and variables → Actions → Variables*,
-   add a repository variable `AWS_DEPLOY_ROLE_ARN` with that value. No AWS keys are
-   stored in GitHub: Actions signs in with OpenID Connect to a role that can only
-   upload this site, update this Lambda and refresh this CloudFront distribution —
-   and only for pushes to `main` of this repository.
+4. **Turn on automatic deploys.** With the GitHub CLI signed in, the script offers to
+   do it: it saves the deploy role as the repository **secret** `AWS_DEPLOY_ROLE_ARN`
+   (a secret, so your account ID never appears in this public repo's logs) and sets
+   the variable `AWS_DEPLOY_ENABLED=true`. Without `gh` it prints both for you to add
+   under *Settings → Secrets and variables → Actions*. No AWS keys are stored in
+   GitHub: Actions signs in with OpenID Connect to a role that can only upload this
+   site, update this Lambda and refresh this CloudFront distribution — and only for
+   pushes to `main` of this repository.
 
 5. **Open https://lms.brianjeanbuilds.com**, enter the site password, and set up the
    school like on your Mac. To use the AI teachers there: *Grown-ups → Settings & privacy
@@ -79,9 +92,10 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
 ## Everyday
 
 - **Change something → push to `main`.** Actions checks and deploys in a few minutes.
-- **Change the site password:** `npm run deploy:aws -- --password`
-- **Add or change the API key:** `npm run deploy:aws -- --api-key`
-- **Change the stack itself** (edited `infra/aws/stack.yaml`): `npm run deploy:aws`
+- **Change the site password:** `AWS_PROFILE=bullybearai-prod npm run deploy:aws -- --password`
+- **Add or change the API key:** `AWS_PROFILE=bullybearai-prod npm run deploy:aws -- --api-key`
+- **Change the stack itself** (edited `infra/aws/stack.yaml`): `AWS_PROFILE=bullybearai-prod npm run deploy:aws`
+- **Signed out?** `aws sso login --profile bullybearai-prod`, then re-run.
 
 ## Good to know
 
@@ -104,13 +118,15 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
 
 | What you see | Why / what to do |
 | --- | --- |
+| `Not signed in for profile …` | SSO sessions expire: `aws sso login --profile bullybearai-prod`, then re-run. |
+| `Couldn't find a public Route 53 hosted zone` | The `brianjeanbuilds.com` zone lives in a different AWS account than the profile. Use a profile for that account, or delegate `lms.brianjeanbuilds.com` to a zone in this one. |
 | `Deploy this stack in us-east-1` | The script already uses us-east-1; if you deploy by hand, add `--region us-east-1`. |
 | Stack creation sits on `Certificate` | DNS validation takes a few minutes; it needs the Route 53 zone to be the one the domain actually uses (check the NS records at your registrar). |
 | Password prompt keeps coming back | Wrong username/password; reset with `--password`. Safari/iPad: saved passwords are per site. |
 | AI teachers: "has no API key yet" | Run `npm run deploy:aws -- --api-key`. |
 | AI teachers: "not been uploaded yet" | The Lambda still has the placeholder; run `npm run deploy:aws` (or push to `main`). |
-| Actions deploy step skipped | Add the `AWS_DEPLOY_ROLE_ARN` repository variable (step 4). |
+| Actions deploy step skipped | Set the secret `AWS_DEPLOY_ROLE_ARN` and the variable `AWS_DEPLOY_ENABLED=true` (step 4). |
 
 **Removing everything:** empty the bucket (`aws s3 rm s3://<BucketName> --recursive`
 and delete old versions in the console), then
-`aws cloudformation delete-stack --stack-name virtual-school --region us-east-1`.
+`aws cloudformation delete-stack --stack-name virtual-school --region us-east-1 --profile bullybearai-prod`.

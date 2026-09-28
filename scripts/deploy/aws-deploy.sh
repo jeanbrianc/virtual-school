@@ -9,8 +9,12 @@
 # certificate + Route 53 record + site password + AI helper Lambda + GitHub
 # deploy role), then builds and uploads the site. Safe to re-run: it only asks
 # for things it doesn't already have. Settings via environment variables:
+#   AWS_PROFILE (e.g. an IAM Identity Center profile — sign in first with
+#     aws sso login --profile <name>)
 #   DOMAIN (lms.brianjeanbuilds.com)  STACK_NAME (virtual-school)
 #   GITHUB_REPO (jeanbrianc/virtual-school)  HOSTED_ZONE_ID (looked up)
+# The stack always goes to us-east-1, whatever the profile's default region:
+# CloudFront only uses HTTPS certificates from us-east-1.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -21,16 +25,22 @@ export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1 STACK_NAME
 export AWS_PAGER=""
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "Missing '$1'. $2" >&2; exit 1; }; }
-need aws "Install the AWS CLI v2 (brew install awscli), then sign in with: aws login"
+need aws "Install the AWS CLI v2 (brew install awscli), then sign in: aws sso login --profile <name>"
 need node "Install Node.js 20+ (brew install node)."
 need zip "Install zip."
 need openssl "Install openssl."
 
-if ! ACCOUNT="$(aws sts get-caller-identity --query Account --output text 2>/dev/null)"; then
-  echo "Not signed in to AWS. Run 'aws login' (AWS CLI 2.32+) or 'aws configure sso', then try again." >&2
+PROFILE_LABEL="${AWS_PROFILE:-default credentials}"
+if ! aws sts get-caller-identity >/dev/null 2>&1; then
+  if [ -n "${AWS_PROFILE:-}" ]; then
+    echo "Not signed in for profile $AWS_PROFILE. Run: aws sso login --profile $AWS_PROFILE" >&2
+  else
+    echo "Not signed in to AWS. Run 'aws sso login --profile <name>' and re-run with AWS_PROFILE=<name>, or 'aws login'." >&2
+  fi
   exit 1
 fi
-echo "AWS account $ACCOUNT · stack $STACK_NAME · https://$DOMAIN"
+# (The account ID is deliberately not printed.)
+echo "AWS profile: $PROFILE_LABEL · region us-east-1 · stack $STACK_NAME · https://$DOMAIN"
 
 stack_exists() { aws cloudformation describe-stacks --stack-name "$STACK_NAME" >/dev/null 2>&1; }
 wants() { [[ " $ARGS " == *" $1 "* ]]; }
@@ -108,13 +118,24 @@ AI_HELPER_URL=/api npm run build
 node scripts/deploy/build-lambda.mjs
 bash scripts/deploy/publish.sh
 
+# Automatic deploys from GitHub: the role ARN goes in a repository *secret* (so the
+# account ID never shows in public workflow logs) plus a variable that turns deploys on.
 ROLE_ARN="$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
   --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" --output text)"
+echo
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  read -r -p "Turn on automatic deploys for github.com/$GITHUB_REPO now (sets a secret and a variable with gh)? [Y/n] " ANSWER
+  if [[ ! "$ANSWER" =~ ^[Nn] ]]; then
+    printf '%s' "$ROLE_ARN" | gh secret set AWS_DEPLOY_ROLE_ARN --repo "$GITHUB_REPO"
+    gh variable set AWS_DEPLOY_ENABLED --repo "$GITHUB_REPO" --body true
+    echo "✓ GitHub will deploy every push to main."
+    exit 0
+  fi
+fi
 cat <<MSG
-
-Automatic deploys from GitHub (every push to main):
-  In https://github.com/$GITHUB_REPO → Settings → Secrets and variables → Actions → Variables,
-  add a repository variable:
-    AWS_DEPLOY_ROLE_ARN = $ROLE_ARN
-  (or: gh variable set AWS_DEPLOY_ROLE_ARN --repo $GITHUB_REPO --body "$ROLE_ARN")
+Automatic deploys from GitHub (every push to main) — one time, in
+https://github.com/$GITHUB_REPO → Settings → Secrets and variables → Actions:
+  • Secrets → New repository secret:  AWS_DEPLOY_ROLE_ARN = $ROLE_ARN
+  • Variables → New repository variable:  AWS_DEPLOY_ENABLED = true
+(Or install the GitHub CLI — brew install gh && gh auth login — and re-run this script.)
 MSG

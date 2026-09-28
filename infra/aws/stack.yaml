@@ -404,5 +404,5 @@ Outputs:
   AiFunctionName:
     Value: !Ref AiFunction
   DeployRoleArn:
-    Description: Put this in the GitHub repository variable AWS_DEPLOY_ROLE_ARN.
+    Description: Put this in the GitHub repository secret AWS_DEPLOY_ROLE_ARN.
     Value: !GetAtt GitHubDeployRole.Arn
