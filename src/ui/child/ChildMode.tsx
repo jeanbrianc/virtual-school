@@ -205,9 +205,11 @@ export function ChildMode({ childId }: { childId: string }) {
                 // Never let the teacher's own voice be heard as hers.
                 speechOut.cancel();
                 const childName = dataRef.current?.child.name;
+                const microphone = dataRef.current?.household.settings.microphone;
                 return speechIn.listen(modeRef.current, knownRef.current, {
                   maxMs: 12_000,
                   ...o,
+                  ...(microphone ? { microphone } : {}),
                   ...(helperEndpoint ? { helper: { endpoint: helperEndpoint, ...(childName ? { childName } : {}) } } : {}),
                 });
               },

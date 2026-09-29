@@ -9,6 +9,7 @@
  */
 import type { OnDeviceAnswer } from '../domain/talk';
 import type { TeacherId } from '../domain/teachers/teachers';
+import { openMicrophone, resolveMicrophone, type MicChoice } from './microphones';
 
 /** A natural AI voice from the family's helper (see voice/helperVoice.ts). */
 export interface NaturalVoice {
@@ -134,6 +135,8 @@ export interface ListenOptions {
   onInterim?: (text: string) => void;
   /** Where to send the recording in 'helper' mode. */
   helper?: { endpoint: string; childName?: string };
+  /** The microphone a parent chose (otherwise the default — unless that's an iPhone; see voice/microphones.ts). */
+  microphone?: MicChoice | null;
 }
 
 export interface ListenOutcome {
@@ -261,7 +264,8 @@ interface Recognition {
   onresult: ((e: { resultIndex: number; results: RecognitionResultList }) => void) | null;
   onerror: ((e: { error?: string }) => void) | null;
   onend: (() => void) | null;
-  start(): void;
+  /** Chrome 133+: listen to this track instead of the default microphone. */
+  start(track?: MediaStreamTrack): void;
   stop(): void;
   abort(): void;
 }
@@ -348,10 +352,30 @@ export class BrowserSpeechInput implements SpeechInput {
     const avail = this.check(mode, known);
     if (!Ctor || avail.state !== 'ready') return { result: null, error: 'unavailable' };
     this.stop();
-    const first = await this.run(Ctor, avail.onDevice, lang, opts, true);
-    // Some builds reject phrase lists; try once more without them.
-    if (first.error === 'aborted' && first.retryWithoutPhrases) return this.run(Ctor, avail.onDevice, lang, opts, false);
-    return first;
+    // Listen to a real microphone when the default isn't one she can use (an iPhone's
+    // Continuity mic) or a parent picked one: the recognizer takes a track (Chrome 133+).
+    const devices = this.win?.navigator?.mediaDevices ?? null;
+    const mic = typeof devices?.enumerateDevices === 'function' ? await resolveMicrophone(opts.microphone, devices) : null;
+    let stream: MediaStream | null = null;
+    if (mic && devices) {
+      try {
+        stream = await openMicrophone(mic.deviceId, devices);
+      } catch {
+        stream = null; // fall back to the browser's own choice
+      }
+    }
+    const track = stream?.getAudioTracks()[0] ?? null;
+    try {
+      let out = await this.run(Ctor, avail.onDevice, lang, opts, true, track);
+      // Some builds reject phrase lists; try once more without them.
+      if (out.error === 'aborted' && out.retryWithoutPhrases) out = await this.run(Ctor, avail.onDevice, lang, opts, false, track);
+      // A recognizer that can't listen to a chosen microphone: use its default one.
+      if (track && out.trackRejected) out = await this.run(Ctor, avail.onDevice, lang, opts, true, null);
+      const { retryWithoutPhrases: _r, trackRejected: _t, ...result } = out;
+      return result;
+    } finally {
+      stream?.getTracks().forEach((t) => t.stop());
+    }
   }
 
   private run(
@@ -360,7 +384,8 @@ export class BrowserSpeechInput implements SpeechInput {
     lang: string,
     opts: ListenOptions,
     withPhrases: boolean,
-  ): Promise<ListenOutcome & { retryWithoutPhrases?: boolean }> {
+    track: MediaStreamTrack | null = null,
+  ): Promise<ListenOutcome & { retryWithoutPhrases?: boolean; trackRejected?: boolean }> {
     return new Promise((resolve) => {
       const rec = new Ctor();
       this.active = rec;
@@ -383,7 +408,7 @@ export class BrowserSpeechInput implements SpeechInput {
       let interim = '';
       let confidence = 0;
       let settled = false;
-      const finish = (out: ListenOutcome & { retryWithoutPhrases?: boolean }) => {
+      const finish = (out: ListenOutcome & { retryWithoutPhrases?: boolean; trackRejected?: boolean }) => {
         if (settled) return;
         settled = true;
         this.win?.clearTimeout(timer);
@@ -410,16 +435,19 @@ export class BrowserSpeechInput implements SpeechInput {
         if (code === 'phrases-not-supported' && usedPhrases) return finish({ result: null, error: 'aborted', retryWithoutPhrases: true });
         const heard = `${finalText} ${interim}`.trim();
         if (heard) return finish({ result: { transcript: heard, confidence, onDevice } });
-        finish({ result: null, error: ERRORS[code] ?? 'unavailable' });
+        const error = ERRORS[code] ?? 'unavailable';
+        const trackProblem = !!track && (error === 'unavailable' || error === 'no-microphone');
+        finish({ result: null, error, ...(trackProblem ? { trackRejected: true } : {}) });
       };
       rec.onend = () => {
         const heard = (finalText || interim).trim();
         finish(heard ? { result: { transcript: heard, confidence, onDevice } } : { result: null, error: 'no-speech' });
       };
       try {
-        rec.start();
+        if (track) rec.start(track);
+        else rec.start();
       } catch {
-        finish({ result: null, error: 'unavailable' });
+        finish({ result: null, error: 'unavailable', ...(track ? { trackRejected: true } : {}) });
       }
     });
   }

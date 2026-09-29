@@ -12,6 +12,7 @@
  *  • RoutingSpeechInput — the browser's recognizer, or the helper, by talk mode.
  */
 import type { OnDeviceAnswer } from '../domain/talk';
+import { openMicrophone, resolveMicrophone } from './microphones';
 import {
   talkAvailability,
   type ListenOptions,
@@ -224,6 +225,8 @@ export class HelperListener {
   private finish: (() => void) | null = null;
   private autoFinish: (() => void) | null = null;
   private cancelled = false;
+  /** She tapped "done" while the microphone was still opening. */
+  private stopWanted = false;
 
   constructor(private readonly fetchImpl: typeof fetch = (...args) => fetch(...args)) {}
 
@@ -232,7 +235,8 @@ export class HelperListener {
   }
 
   stop(): void {
-    this.finish?.();
+    if (this.finish) this.finish();
+    else this.stopWanted = true;
   }
 
   abort(): void {
@@ -243,9 +247,12 @@ export class HelperListener {
   async listen(helper: HelperListenOptions, opts: ListenOptions = {}): Promise<ListenOutcome> {
     if (!this.available) return { result: null, error: 'unavailable' };
     this.cancelled = false;
+    this.stopWanted = false;
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+      // A real microphone: the parent's choice, or the built-in one when the default is an iPhone.
+      const mic = await resolveMicrophone(opts.microphone);
+      stream = await openMicrophone(mic?.deviceId);
     } catch (err) {
       return { result: null, error: micError(err) };
     }
@@ -299,6 +306,7 @@ export class HelperListener {
     });
     recorder.start(250);
     opts.onInterim?.('I’m listening…');
+    if (this.stopWanted) this.finish?.();
     meter = setInterval(() => {
       const now = Date.now();
       if (analyser) {

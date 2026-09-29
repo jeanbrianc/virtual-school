@@ -2263,3 +2263,40 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ── Microphone choice and level ────────────────────────────────────────── */
+.mic-picker {
+  margin: 8px 0 4px;
+}
+.mic-picker > label {
+  display: block;
+  margin-bottom: 4px;
+}
+.mic-picker .muted.small {
+  margin: 4px 0 0;
+}
+.mic-level {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 10px;
+}
+.mic-level-bar {
+  flex: 1 1 140px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--p-line, #e8ddcb);
+  overflow: hidden;
+}
+.mic-level-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--p-accent);
+  transition: width 80ms linear;
+}
+.mic-level .warn {
+  flex-basis: 100%;
+  color: #9a5b12;
+}

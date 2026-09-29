@@ -14,6 +14,7 @@ import { appStore } from '../../../state/appState';
 import { shelfBooksFrom } from '../../child/useChildWorld';
 import { Icon } from '../../shared/Icon';
 import { Card, PageHeader } from '../components';
+import { MicLevel, MicPicker, micInUse, useMicrophones } from './MicPicker';
 import { VoiceCard } from './VoiceCard';
 import type { ParentData } from '../ParentApp';
 
@@ -59,14 +60,20 @@ function TalkCard({
   onMode,
   helper,
   endpoint,
+  microphone,
+  onMicrophone,
 }: {
   mode: TalkMode;
   childName: string;
   onMode: (m: TalkMode) => void;
   helper: HelperStatus | null;
   endpoint: string;
+  microphone: HouseholdSettings['microphone'];
+  onMicrophone: (m: HouseholdSettings['microphone'] | null) => void;
 }) {
   const { ctx, speechIn, speechOut } = useServices();
+  const mics = useMicrophones();
+  const mic = micInUse(mics.list, microphone);
   const browser = browserFamily(navigator.userAgent);
   const probe = useLiveQuery(() => getSpeechProbe(ctx), [], ['meta']);
   const known = knownOnDevice(probe, browser);
@@ -97,7 +104,9 @@ function TalkCard({
       maxMs: 8000,
       onInterim: (t) => setTest({ state: 'listening', text: t }),
       ...(mode === 'helper' ? { helper: { endpoint, childName } } : {}),
+      ...(microphone ? { microphone } : {}),
     });
+    void mics.refresh(); // names appear after the first permission
     setTest({
       state: 'done',
       text: out.result
@@ -114,7 +123,7 @@ function TalkCard({
             ? 'No microphone was found.'
             : out.error === 'network'
               ? 'Your AI helper didn’t answer — check the connection under AI teachers.'
-              : 'Didn’t hear anything — try again a little closer to the microphone.',
+              : 'Didn’t hear anything — try again a little closer to the microphone, or choose another microphone above.',
     });
   };
 
@@ -175,6 +184,7 @@ function TalkCard({
           <p className="small" data-testid="talk-status">
             {status}
           </p>
+          <MicPicker list={mics.list} refresh={mics.refresh} saved={microphone} onChange={onMicrophone} />
           <div className="form-actions">
             {avail.state === 'needs-check' && (
               <button type="button" className="btn btn-primary btn-small" disabled={!!working} onClick={() => void checkBrowser()} data-testid="talk-check">
@@ -197,6 +207,7 @@ function TalkCard({
               </button>
             )}
           </div>
+          <MicLevel active={test.state === 'listening'} deviceId={mic?.deviceId} label={mic?.label} />
           {test.text && <p className="muted small">{test.text}</p>}
           <p className="muted small">
             The browser asks once for permission to use the microphone. She sees what was heard before a teacher answers, and when she talks by voice the
@@ -429,7 +440,15 @@ export function SettingsPage({ data }: { data: ParentData }) {
 
           <VoiceCard settings={s} child={child} patch={(p) => patch(p)} helper={helper} />
 
-          <TalkCard mode={s.talkMode} childName={child.name} onMode={(m) => void patch({ talkMode: m })} helper={helper} endpoint={s.teacherAi.endpoint} />
+          <TalkCard
+            mode={s.talkMode}
+            childName={child.name}
+            onMode={(m) => void patch({ talkMode: m })}
+            helper={helper}
+            endpoint={s.teacherAi.endpoint}
+            microphone={s.microphone}
+            onMicrophone={(m) => void patch({ microphone: m ?? undefined })}
+          />
 
           <Card title="Graphics" icon="eye">
             <label htmlFor="gq">3D quality</label>

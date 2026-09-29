@@ -350,6 +350,11 @@ return it from `createInterpretationService`.
   `gpt-transcribe`: `HelperListener` records only while the mic button is on,
   stops after a short silence, and posts the clip to `/v1/listen` with her book
   titles as keyword hints) or `off`. `RoutingSpeechInput` picks the recognizer.
+  **Which microphone** (`src/voice/microphones.ts`): a parent's choice in
+  Settings, otherwise the default — except an iPhone/iPad Continuity mic, which
+  is skipped for the built-in one. The browser recognizer gets it as a
+  `MediaStreamTrack` (`start(track)`, Chrome 133+; falls back to its default),
+  the helper recorder opens it directly. Settings has a live level meter.
   Audio is never stored; only the words are kept, in the transcript.
 - **Conversation**: `TeacherChatService` (`src/domain/teachers/chat.ts`).
   `LocalTeacherChat` understands book talk on-device; `HttpTeacherChat`

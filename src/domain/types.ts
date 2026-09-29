@@ -59,6 +59,12 @@ export interface HouseholdSettings {
    * may be used when on-device isn't available).
    */
   talkMode: 'off' | 'device' | 'browser' | 'helper';
+  /**
+   * The microphone a parent picked on this computer (name kept too, since ids
+   * differ between browsers). Unset = automatic: the default microphone, or the
+   * built-in one when the default is an iPhone/iPad (Continuity).
+   */
+  microphone?: { deviceId: string; label: string };
   graphicsQuality: GraphicsQuality;
   interpretation: InterpretationSettings;
   /** Optional AI teachers through the family's local helper (off until a parent consents). */
