@@ -324,7 +324,14 @@ return it from `createInterpretationService`.
   with per-teacher pitch/rate and **only voices built into the computer**
   (network voices would send the text away). A speaker button reads any line;
   "read aloud automatically" is a parent setting, and when she talks by voice
-  the teacher answers out loud. Text is always shown.
+  the teacher answers out loud. Text is always shown. The automatic voice
+  prefers a clear US voice (never the joke/robot ones); a parent can choose
+  another in *Settings → Voice*.
+- **Her name, said right**: computer voices guess names from spelling
+  ("EYE-zee"). *Settings → Voice → How the voices say "Izzy"* saves a
+  respelling (`Child.sayName`, e.g. "Izzee", with *Hear it* and suggestions)
+  that `domain/pronounce.ts` swaps in **only for speech**; the screen, records
+  and AI teachers keep her real name. Renaming her clears it.
 - **Input**: `SpeechInput` (`BrowserSpeechInput`) wraps the Web Speech API,
   on-device first: `SpeechRecognition.available/install` + `processLocally`
   (the `available()` probe runs only from Settings behind a crash marker —

@@ -19,6 +19,7 @@ import { getLesson } from '../../domain/lessons/registry';
 import type { LessonRun } from '../../domain/lessons/engine';
 import { getReward } from '../../domain/rewards/catalog';
 import { ruleProgress } from '../../domain/rewards/engine';
+import { speakableText } from '../../domain/pronounce';
 import { browserFamily, knownOnDevice, type OnDeviceAnswer } from '../../domain/talk';
 import { talkPhrases } from '../../domain/teachers/chat';
 import { TEACHERS, type TeacherId } from '../../domain/teachers/teachers';
@@ -116,7 +117,15 @@ export function ChildMode({ childId }: { childId: string }) {
         const settings = dataRef.current?.household.settings;
         if (settings?.audio.muted) return;
         const v = TEACHERS[teacherForSpeech.current].voice;
-        void services.speechOut.speak(text, { pitch: v.pitch, rate: v.rate, volume: settings?.audio.voice ?? 1 });
+        const child = dataRef.current?.child;
+        // Her name is respelled for the voice only (see domain/pronounce.ts).
+        const spoken = child ? speakableText(text, child.name, child.sayName) : text;
+        void services.speechOut.speak(spoken, {
+          pitch: v.pitch,
+          rate: v.rate,
+          volume: settings?.audio.voice ?? 1,
+          ...(settings?.voiceName ? { voiceName: settings.voiceName } : {}),
+        });
       },
     }),
     [services.speechOut, readAloud],

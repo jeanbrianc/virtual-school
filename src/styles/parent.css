@@ -2236,3 +2236,30 @@
 .flag-inline {
   color: var(--p-warn);
 }
+
+/* ── Voice: how the voices say her name ─────────────────────────────────── */
+.say-name {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--p-line, #eadfcb);
+}
+.say-name > label {
+  display: block;
+  margin-bottom: 2px;
+}
+.say-name .muted.small {
+  margin: 4px 0 8px;
+}
+.say-name-ideas {
+  margin-top: 8px;
+}
+.btn-text {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--p-accent-ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}

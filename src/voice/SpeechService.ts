@@ -13,12 +13,77 @@ export interface SpeakOptions {
   pitch?: number;
   rate?: number;
   volume?: number;
+  /** A built-in voice chosen by a parent (by name); ignored when this device doesn't have it. */
+  voiceName?: string;
+}
+
+/** A voice built into this device. */
+export interface VoiceInfo {
+  name: string;
+  lang: string;
+  isDefault: boolean;
 }
 
 export interface SpeechOutput {
   readonly available: boolean;
   speak(text: string, opts?: SpeakOptions): Promise<void>;
   cancel(): void;
+  /** English voices built into this device, best first (network voices are never used). */
+  voices(): VoiceInfo[];
+  /** The voice `speak` will use for this choice (undefined: the browser's default). */
+  voiceFor(voiceName?: string): VoiceInfo | undefined;
+  /** Calls back when the browser finishes loading its voices (Chrome loads them late). */
+  onVoicesChanged(cb: () => void): () => void;
+}
+
+// Joke and robot voices (macOS) plus the older low-fidelity ones, which misread
+// names the most. A parent can still choose one; they are never picked automatically.
+const NOVELTY_VOICE =
+  /^(albert|bad news|bahh|bells|boing|bubbles|cellos|good news|jester|organ|superstar|trinoids|whisper|wobble|zarvox|fred|junior|ralph|kathy|eddy|flo|grandma|grandpa|reed|rocko|sandy|shelley)\b/i;
+// Clear, natural voices on Apple, Windows and ChromeOS/Android devices, best first.
+const PREFERRED_VOICES = [
+  'samantha',
+  'ava',
+  'allison',
+  'susan',
+  'zoe',
+  'nicky',
+  'evan',
+  'nathan',
+  'tom',
+  'aria',
+  'jenny',
+  'zira',
+  'victoria',
+  'karen',
+  'moira',
+  'serena',
+  'tessa',
+];
+
+/** Higher is better; novelty voices score below every ordinary voice. */
+export function rankVoice(v: VoiceInfo): number {
+  if (NOVELTY_VOICE.test(v.name)) return -100;
+  const name = v.name.toLowerCase();
+  let score = /^en[-_]us$/i.test(v.lang) ? 20 : /^en[-_](gb|au|ie|ca|nz)$/i.test(v.lang) ? 12 : 8;
+  if (/premium|enhanced|natural|neural/.test(name)) score += 10;
+  const i = PREFERRED_VOICES.findIndex((p) => new RegExp(`\\b${p}\\b`).test(name));
+  if (i >= 0) score += 8 - i * 0.25;
+  if (v.isDefault) score += 3;
+  return score;
+}
+
+/** Sorts voices best first (stable for equal scores). */
+export function rankVoices(list: VoiceInfo[]): VoiceInfo[] {
+  return list
+    .map((v, i) => ({ v, i, s: rankVoice(v) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)
+    .map((x) => x.v);
+}
+
+/** The parent's chosen voice when this device has it, otherwise the best one. */
+export function pickVoice(list: VoiceInfo[], chosen?: string): VoiceInfo | undefined {
+  return (chosen ? list.find((v) => v.name === chosen) : undefined) ?? rankVoices(list)[0];
 }
 
 export interface SpeechInputResult {
@@ -98,6 +163,9 @@ export const silentOutput: SpeechOutput = {
   available: false,
   speak: async () => undefined,
   cancel: () => undefined,
+  voices: () => [],
+  voiceFor: () => undefined,
+  onVoicesChanged: () => () => undefined,
 };
 
 export const noInput: SpeechInput = {
@@ -115,6 +183,27 @@ export class BrowserSpeechOutput implements SpeechOutput {
     return typeof window !== 'undefined' && 'speechSynthesis' in window;
   }
 
+  /** Only voices built into this computer: network voices would send the text away. */
+  private localVoices(): SpeechSynthesisVoice[] {
+    if (!this.available) return [];
+    return window.speechSynthesis.getVoices().filter((v) => v.localService && /^en([-_]|$)/i.test(v.lang));
+  }
+
+  voices(): VoiceInfo[] {
+    return rankVoices(this.localVoices().map((v) => ({ name: v.name, lang: v.lang, isDefault: v.default })));
+  }
+
+  voiceFor(voiceName?: string): VoiceInfo | undefined {
+    return pickVoice(this.voices(), voiceName);
+  }
+
+  onVoicesChanged(cb: () => void): () => void {
+    if (!this.available) return () => undefined;
+    const synth = window.speechSynthesis;
+    synth.addEventListener('voiceschanged', cb);
+    return () => synth.removeEventListener('voiceschanged', cb);
+  }
+
   speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     if (!this.available) return Promise.resolve();
     return new Promise((resolve) => {
@@ -123,10 +212,12 @@ export class BrowserSpeechOutput implements SpeechOutput {
       u.pitch = opts.pitch ?? 1;
       u.rate = (opts.rate ?? 1) * 0.95;
       u.volume = opts.volume ?? 1;
-      // Only voices built into this computer: network voices would send the text away.
-      const local = window.speechSynthesis.getVoices().filter((v) => v.localService && /^en[-_]/i.test(v.lang));
-      const voice = local.find((v) => /female|samantha|karen|moira|serena|ava|allison|susan|victoria/i.test(v.name)) ?? local[0];
-      if (voice) u.voice = voice;
+      const pick = this.voiceFor(opts.voiceName);
+      const voice = pick && this.localVoices().find((v) => v.name === pick.name);
+      if (voice) {
+        u.voice = voice;
+        u.lang = voice.lang;
+      }
       u.onend = () => resolve();
       u.onerror = () => resolve();
       window.speechSynthesis.speak(u);

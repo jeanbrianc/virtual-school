@@ -14,6 +14,7 @@ import { appStore } from '../../../state/appState';
 import { shelfBooksFrom } from '../../child/useChildWorld';
 import { Icon } from '../../shared/Icon';
 import { Card, PageHeader } from '../components';
+import { VoiceCard } from './VoiceCard';
 import type { ParentData } from '../ParentApp';
 
 function Slider({ label, value, onChange, disabled }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean }) {
@@ -267,7 +268,7 @@ function AiTeachersCard({
 
 export function SettingsPage({ data }: { data: ParentData }) {
   const services = useServices();
-  const { ctx, audio, speechOut, persistent } = services;
+  const { ctx, audio, persistent } = services;
   const { household, child, records } = data;
   const s = household.settings;
   const [pin, setPin] = useState({ next: '', confirm: '' });
@@ -350,17 +351,7 @@ export function SettingsPage({ data }: { data: ParentData }) {
             <p className="muted small">All sounds are synthesized in the browser — no music files or streaming.</p>
           </Card>
 
-          <Card title="Voice" icon="mic">
-            <label className="check">
-              <input type="checkbox" checked={s.readAloud} disabled={!speechOut.available} onChange={(e) => void patch({ readAloud: e.target.checked })} />{' '}
-              Teachers read their lines aloud automatically
-            </label>
-            <p className="muted small">
-              {speechOut.available
-                ? 'Uses the voices built into this computer. A speaker button is always available for any line.'
-                : 'This browser has no built-in speech voices; text and pictures are always shown.'}
-            </p>
-          </Card>
+          <VoiceCard settings={s} child={child} patch={(p) => patch(p)} />
 
           <TalkCard mode={s.talkMode} childName={child.name} onMode={(m) => void patch({ talkMode: m })} />
 

@@ -46,6 +46,8 @@ export interface HouseholdSettings {
   parentPin: string;
   audio: AudioSettings;
   readAloud: boolean;
+  /** The built-in voice teachers read with (its name on this device); '' or unset = pick automatically. */
+  voiceName?: string;
   /**
    * Talking to teachers by voice: 'off', 'device' (on-device recognition only —
    * audio never leaves the computer) or 'browser' (the browser's speech service
@@ -82,6 +84,11 @@ export interface Child {
   name: string;
   /** Optional — used only to phrase age-relative notes for parents. */
   birthDate?: DayString;
+  /**
+   * How the read-aloud voices should say her name — a respelling such as
+   * "Izzee" (see domain/pronounce.ts). Used only for speech; never shown.
+   */
+  sayName?: string;
   status: 'active' | 'inactive';
   avatarId: ID;
   createdAt: Timestamp;

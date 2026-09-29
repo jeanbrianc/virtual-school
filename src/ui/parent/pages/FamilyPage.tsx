@@ -133,8 +133,11 @@ function ChildCard({ child, avatar, selected }: { child: Child; avatar: import('
   const [form, setForm] = useState({ name: child.name, birthDate: child.birthDate ?? '' });
   const age = child.birthDate ? ageAt(child.birthDate, toDay(new Date())) : null;
   const save = async () => {
-    const { birthDate: _b, ...rest } = child;
-    await updateChild(ctx, { ...rest, name: form.name.trim() || child.name, ...(form.birthDate ? { birthDate: form.birthDate } : {}) });
+    const { birthDate: _b, sayName, ...rest } = child;
+    const name = form.name.trim() || child.name;
+    // A respelling was for the old name; a new name starts from its own spelling.
+    const keepSay = sayName && name === child.name ? { sayName } : {};
+    await updateChild(ctx, { ...rest, ...keepSay, name, ...(form.birthDate ? { birthDate: form.birthDate } : {}) });
     setEdit(false);
   };
   const toggleStatus = async () => {
@@ -154,6 +157,13 @@ function ChildCard({ child, avatar, selected }: { child: Child; avatar: import('
               Birthday
               <input type="date" value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} />
             </label>
+            <p className="span-2 muted small">
+              Voices saying her name wrong? Keep the name as you write it and fix how it sounds in{' '}
+              <a href="#/parent/settings" onClick={() => parentStore.set({ childId: child.id })}>
+                Settings → Voice
+              </a>
+              .
+            </p>
             <div className="span-2 form-actions">
               <button type="button" className="btn btn-primary" onClick={() => void save()}>
                 Save
