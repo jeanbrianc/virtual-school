@@ -1,13 +1,15 @@
 # Hosting the school on your own AWS account
 
 This puts the school at **https://lms.brianjeanbuilds.com** (or any name in a
-Route 53 zone you own), behind a family password, with the AI teachers served
+Route 53 zone you own), with a branded welcome page and family sign-in in front
+of everything, and the AI teachers served
 from your account. After the one-time setup, every push to `main` on GitHub
 deploys automatically.
 
 ```
 Browser ──HTTPS──▶ CloudFront (lms.brianjeanbuilds.com)
-                    │  site password checked at the edge (CloudFront Function)
+                    │  signed out → branded welcome page + family sign-in (public/welcome)
+                    │  signed in  → session cookie checked at the edge (CloudFront Function)
                     ├─ /*      ─▶ private S3 bucket (the built site)
                     └─ /api/*  ─▶ Lambda: AI helper ─▶ Anthropic API
                                    (answers only requests that came through CloudFront)
@@ -20,7 +22,7 @@ Everything is one CloudFormation stack: [`infra/aws/stack.yaml`](../infra/aws/st
 
 | Piece | Monthly cost for a family |
 | --- | --- |
-| CloudFront (HTTPS, CDN, password function) | $0 — well inside AWS's always-free CloudFront allowance (1 TB, 10 million requests) |
+| CloudFront (HTTPS, CDN, sign-in function) | $0 — well inside AWS's always-free CloudFront allowance (1 TB, 10 million requests) |
 | S3 (≈3 MB of site files) | under $0.01 |
 | Lambda (AI helper) | $0 — inside the Lambda free tier |
 | HTTPS certificate (ACM) | $0 |
@@ -42,7 +44,9 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
    aws sts get-caller-identity --profile bullybearai-prod >/dev/null && echo "AWS: signed in"
    ```
 
-   Any profile works — pass it as `AWS_PROFILE`. The stack always goes to
+   Use the profile for the AWS account that holds the `brianjeanbuilds.com` Route 53
+   zone (zones are global, so the region doesn't matter — the account does). Any
+   profile works — pass it as `AWS_PROFILE`. The stack always goes to
    **us-east-1** (CloudFront only takes certificates from there), whatever the
    profile's default region; it's a separate stack (`virtual-school`) and doesn't
    touch any other stacks in the account. It does add two records to the
@@ -84,7 +88,8 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
    site, update this Lambda and refresh this CloudFront distribution — and only for
    pushes to `main` of this repository.
 
-5. **Open https://lms.brianjeanbuilds.com**, enter the site password, and set up the
+5. **Open https://lms.brianjeanbuilds.com**: the welcome page shows Izzy's classroom and a
+   *Family sign-in* card. Sign in once per device (it stays signed in for 60 days) and set up the
    school like on your Mac. To use the AI teachers there: *Grown-ups → Settings & privacy
    → AI teachers* → **Check connection** → tick consent → **Turn on AI teachers** (the
    helper address is already `/api`).
@@ -92,7 +97,8 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
 ## Everyday
 
 - **Change something → push to `main`.** Actions checks and deploys in a few minutes.
-- **Change the site password:** `AWS_PROFILE=bullybearai-prod npm run deploy:aws -- --password`
+- **Change the site password:** `AWS_PROFILE=bullybearai-prod npm run deploy:aws -- --password` (this also signs every device out)
+- **Sign a device out:** *Grown-ups → Settings & privacy → This device → Sign out*
 - **Add or change the API key:** `AWS_PROFILE=bullybearai-prod npm run deploy:aws -- --api-key`
 - **Change the stack itself** (edited `infra/aws/stack.yaml`): `AWS_PROFILE=bullybearai-prod npm run deploy:aws`
 - **Signed out?** `aws sso login --profile bullybearai-prod`, then re-run.
@@ -104,14 +110,20 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
   `lms.brianjeanbuilds.com` are separate, and an iPad has its own. Pick the address
   Izzy will use day to day. *Settings → Export* makes a backup file; there's no sync
   between devices yet.
-- **The password covers everything**, including `/api`, so nobody without it can
+- **How sign-in works.** The welcome page (`public/welcome/`) is the only public part of
+  the site. Its form sends the username and password to `/auth/session`; the CloudFront
+  Function compares a SHA-256 of them with the stored hash (the password itself is never
+  in AWS) and sets a signed, HttpOnly session cookie. There is no browser password pop-up.
+  Brute-force attempts aren't rate-limited at the edge, so use a long password.
+- **Sign-in covers everything else**, including `/api`, so nobody without it can
   use your API key. The Lambda also refuses any request that didn't come through
   CloudFront (a secret header only CloudFront adds). The parent PIN inside the
   school still guards the Parent Studio.
 - **Talking works on the hosted site** (it's HTTPS, and the page allows the
   microphone for itself). Her first tap on the microphone sets it up in that browser.
 - **The code on GitHub is public** and includes Izzy's name and birthday in
-  `src/data/seed/`. The live site is behind the password.
+  `src/data/seed/`. The live school is behind the sign-in; the welcome page shows her
+  first name, the teachers and screenshots, and tells search engines not to index it.
 - **Search engines are told not to index** the site (`X-Robots-Tag: noindex`).
 
 ## Troubleshooting
@@ -119,10 +131,11 @@ Console. The helper also caps replies per day (`AiDailyLimit`, 300).
 | What you see | Why / what to do |
 | --- | --- |
 | `Not signed in for profile …` | SSO sessions expire: `aws sso login --profile bullybearai-prod`, then re-run. |
-| `Couldn't find a public Route 53 hosted zone` | The `brianjeanbuilds.com` zone lives in a different AWS account than the profile. Use a profile for that account, or delegate `lms.brianjeanbuilds.com` to a zone in this one. |
+| `Couldn't find a public Route 53 hosted zone` | The `brianjeanbuilds.com` zone lives in a different AWS account than the profile (regions don't matter for Route 53). Use that account's profile, or delegate `lms.brianjeanbuilds.com` to a zone in this one. |
 | `Deploy this stack in us-east-1` | The script already uses us-east-1; if you deploy by hand, add `--region us-east-1`. |
 | Stack creation sits on `Certificate` | DNS validation takes a few minutes; it needs the Route 53 zone to be the one the domain actually uses (check the NS records at your registrar). |
-| Password prompt keeps coming back | Wrong username/password; reset with `--password`. Safari/iPad: saved passwords are per site. |
+| "That username or password didn't work" | Reset it with `--password`. The username is case-sensitive. |
+| Still see the old browser pop-up | The stack hasn't been updated yet — run `npm run deploy:aws` once (GitHub pushes don't change the stack). |
 | AI teachers: "has no API key yet" | Run `npm run deploy:aws -- --api-key`. |
 | AI teachers: "not been uploaded yet" | The Lambda still has the placeholder; run `npm run deploy:aws` (or push to `main`). |
 | Actions deploy step skipped | Set the secret `AWS_DEPLOY_ROLE_ARN` and the variable `AWS_DEPLOY_ENABLED=true` (step 4). |

@@ -6,6 +6,9 @@ export const LOCAL_AI_HELPER = 'http://127.0.0.1:8787';
 /** Hosted builds (AI_HELPER_URL=/api) use the site's own helper; local builds use this computer's. */
 export const DEFAULT_TEACHER_AI_ENDPOINT = (typeof __AI_HELPER_URL__ === 'string' && __AI_HELPER_URL__) || LOCAL_AI_HELPER;
 
+/** True for the build published to the family's own site (behind its sign-in page). */
+export const HOSTED_BUILD = DEFAULT_TEACHER_AI_ENDPOINT.startsWith('/');
+
 /**
  * Defaults for a new household. Privacy-first: on-device interpretation,
  * on-device speech recognition only, AI teachers off, no read-aloud until a

@@ -3,7 +3,8 @@ Description: >-
   Izzy's Virtual Classroom on your own AWS account: a private S3 bucket behind
   CloudFront with an HTTPS certificate and a Route 53 name, a site password
   (CloudFront Function), and the optional AI teachers helper (Lambda) at /api.
-  Deploy with scripts/deploy/aws-deploy.sh (region us-east-1).
+  Deploy with scripts/deploy/aws-deploy.sh (region us-east-1). Visitors land on
+  a branded sign-in page; the school and its AI helper need the family password.
 
 Parameters:
   DomainName:
@@ -17,12 +18,17 @@ Parameters:
     Type: String
     NoEcho: true
     AllowedPattern: '^[a-f0-9]{64}$'
-    Description: SHA-256 (hex) of the full Authorization header value "Basic base64(user:password)". The deploy script computes it; the password itself is never stored.
+    Description: SHA-256 (hex) of "Basic base64(user:password)" — what the sign-in page sends. The deploy script computes it; the password itself is never stored.
   AnthropicApiKey:
     Type: String
     NoEcho: true
     Default: ''
     Description: Anthropic API key for the AI teachers. Leave empty to keep them off (the site then uses its built-in teachers).
+  SessionSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Random key that signs family sign-in cookies. Changing it signs everyone out (the deploy script rotates it with --password).
   OriginSecret:
     Type: String
     NoEcho: true
@@ -120,36 +126,73 @@ Resources:
         - DomainName: !Ref DomainName
           HostedZoneId: !Ref HostedZoneId
 
-  # ── Site password: HTTP Basic auth at the edge ───────────────────────────
-  # Compares a SHA-256 of the browser's Authorization header with the stored
-  # hash, so the password itself is never in AWS. Covers the whole site,
-  # including /api, so the AI helper can't be used without the password.
+  # ── Family sign-in at the edge ───────────────────────────────────────────
+  # Visitors without a session see the branded landing page (public/welcome)
+  # at "/". Its form calls /auth/session with the username and password as a
+  # Basic Authorization header; this function compares a SHA-256 of that header
+  # with the stored hash (the password itself is never in AWS) and answers with
+  # a signed, HttpOnly session cookie. Every other path — the school, its
+  # assets and /api (the AI helper) — needs that cookie. No browser prompt.
   PasswordFunction:
     Type: AWS::CloudFront::Function
     Properties:
       Name: !Sub '${AWS::StackName}-password'
       AutoPublish: true
       FunctionConfig:
-        Comment: Family password for the virtual school
+        Comment: Family sign-in for the virtual school
         Runtime: cloudfront-js-2.0
       FunctionCode: !Sub |
         var crypto = require('crypto');
-        var EXPECTED = '${BasicAuthHash}';
+        var PASSWORD_HASH = '${BasicAuthHash}';
+        var SESSION_KEY = '${SessionSecret}';
+        var COOKIE = 'school_session';
+        var MAX_AGE = 5184000;
+        var PUBLIC = /^\/(welcome\/|favicon\.ico$|robots\.txt$)/;
+        function sign(expires) {
+          return crypto.createHmac('sha256', SESSION_KEY).update('v1.' + expires).digest('hex');
+        }
+        function signedIn(request) {
+          var cookie = request.cookies[COOKIE];
+          if (!cookie || !cookie.value) return false;
+          var parts = cookie.value.split('.');
+          if (parts.length !== 2) return false;
+          var expires = parseInt(parts[0], 10);
+          if (!(expires > Date.now() / 1000)) return false;
+          return sign(parts[0]) === parts[1];
+        }
+        function reply(status, text, headers, cookies) {
+          headers['cache-control'] = { value: 'no-store' };
+          var response = { statusCode: status, statusDescription: text, headers: headers };
+          if (cookies) response.cookies = cookies;
+          return response;
+        }
         function handler(event) {
           var request = event.request;
-          var auth = request.headers.authorization;
-          if (auth && crypto.createHash('sha256').update(auth.value).digest('hex') === EXPECTED) {
-            delete request.headers.authorization;
+          var uri = request.uri;
+          if (uri === '/auth/session') {
+            var auth = request.headers.authorization;
+            if (auth && crypto.createHash('sha256').update(auth.value).digest('hex') === PASSWORD_HASH) {
+              var expires = String(Math.floor(Date.now() / 1000) + MAX_AGE);
+              return reply(204, 'No Content', {}, {
+                school_session: { value: expires + '.' + sign(expires), attributes: 'Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=' + MAX_AGE }
+              });
+            }
+            return reply(401, 'Unauthorized', {});
+          }
+          if (uri === '/auth/logout') {
+            return reply(302, 'Found', { location: { value: '/' } }, {
+              school_session: { value: 'signed-out', attributes: 'Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0' }
+            });
+          }
+          delete request.headers.authorization;
+          if (signedIn(request)) return request;
+          if (uri === '/' || uri === '/index.html') {
+            request.uri = '/welcome/index.html';
             return request;
           }
-          return {
-            statusCode: 401,
-            statusDescription: 'Unauthorized',
-            headers: {
-              'www-authenticate': { value: 'Basic realm="Family School", charset="UTF-8"' },
-              'cache-control': { value: 'no-store' }
-            }
-          };
+          if (PUBLIC.test(uri)) return request;
+          if (uri.indexOf('/api/') === 0) return reply(401, 'Unauthorized', {});
+          return reply(302, 'Found', { location: { value: '/' } });
         }
 
   SecurityHeaders:

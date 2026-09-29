@@ -78,8 +78,8 @@ exactly what is sent.
 ### Your own domain (AWS)
 
 `npm run deploy:aws` puts the school on your AWS account at
-**lms.brianjeanbuilds.com** — private S3 + CloudFront with HTTPS, a family
-password in front of everything, and the AI teachers as a small Lambda at
+**lms.brianjeanbuilds.com** — private S3 + CloudFront with HTTPS, a branded
+welcome page with a family sign-in in front of everything, and the AI teachers as a small Lambda at
 `/api` — for roughly the cost of the Route 53 zone you already have. After that,
 every push to `main` on GitHub deploys itself. Step by step:
 [docs/DEPLOY.md](docs/DEPLOY.md).
@@ -103,7 +103,7 @@ serve `dist/` from any static host).
 | `npm run build:lambda` | Bundle the AI helper for AWS Lambda → `dist-lambda/ai-helper.zip` |
 | `npm run typecheck` | `tsc --noEmit` (strict, `noUncheckedIndexedAccess`) |
 | `npm run lint` | Architecture boundaries + privacy/safety rules + Prettier check |
-| `npm test` | Unit tests (Node test runner + tsx), 113 tests |
+| `npm test` | Unit tests (Node test runner + tsx), 117 tests |
 | `npm run test:e2e` | Builds the e2e bundle and runs Playwright (desktop + phone) |
 | `npm run check` | typecheck + lint + unit tests + production build |
 | `npm run format` | Prettier write |
@@ -414,7 +414,7 @@ font CDN is contacted.
 
 ## Tests & quality checks
 
-- **Unit (113 tests)** — AWS hosting (the edge password function, stack wiring, the Lambda adapter refusing traffic that skipped CloudFront), talking to teachers (the user's own example sentence,
+- **Unit (117 tests)** — AWS hosting (the edge sign-in function: welcome page, session cookies, sign-out; stack wiring, the Lambda adapter refusing traffic that skipped CloudFront), talking to teachers (the user's own example sentence,
   catalog/own-book title matching, yes/not-yet follow-ups, worries → parent
   notes, reply sanitizing and AI output validation, the browser adapter's
   fallbacks and data minimization, prompt building, the helper's CORS/header/

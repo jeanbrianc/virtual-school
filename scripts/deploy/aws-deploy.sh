@@ -54,7 +54,9 @@ if [ -z "${HOSTED_ZONE_ID:-}" ]; then
   HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name --dns-name "$ZONE." \
     --query "HostedZones[?Name=='$ZONE.' && Config.PrivateZone==\`false\`].Id | [0]" --output text | sed 's#/hostedzone/##')"
   if [ -z "$HOSTED_ZONE_ID" ] || [ "$HOSTED_ZONE_ID" = "None" ]; then
-    echo "Couldn't find a public Route 53 hosted zone named $ZONE in this account. Set HOSTED_ZONE_ID=... and re-run." >&2
+    echo "Couldn't find a public Route 53 hosted zone named $ZONE in the account for ${AWS_PROFILE:-these credentials}." >&2
+    echo "Route 53 zones are global (not per region), so the zone lives in another AWS account:" >&2
+    echo "re-run with that account's profile, e.g. AWS_PROFILE=<profile> npm run deploy:aws" >&2
     exit 1
   fi
 fi
@@ -65,7 +67,7 @@ stack_exists || FIRST_TIME=true
 
 if $FIRST_TIME || wants --password; then
   echo
-  echo "Choose the site password (the browser asks for it once; the school's own parent PIN still applies inside)."
+  echo "Choose the family sign-in (asked once per device on the welcome page; the school's own parent PIN still applies inside)."
   read -r -p "  Username [family]: " SITE_USER
   SITE_USER="${SITE_USER:-family}"
   read -r -s -p "  Password (8+ characters): " SITE_PASS; echo
@@ -81,6 +83,12 @@ if $FIRST_TIME || wants --password; then
     process.stdout.write(c.createHash("sha256").update(v).digest("hex"));')"
   unset SITE_PASS SITE_PASS2
   PARAMS+=("BasicAuthHash=$BASIC_AUTH_HASH")
+  # A new password also signs every device out.
+  PARAMS+=("SessionSecret=$(openssl rand -hex 32)")
+elif ! aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
+  --query "Stacks[0].Parameters[?ParameterKey=='SessionSecret'].ParameterKey" --output text | grep -q SessionSecret; then
+  # Stacks made before the welcome page need a key for sign-in cookies.
+  PARAMS+=("SessionSecret=$(openssl rand -hex 32)")
 fi
 
 if $FIRST_TIME || wants --api-key; then

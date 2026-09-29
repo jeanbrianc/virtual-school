@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f4ead9" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Izzy's Virtual Classroom</title>
+    <meta name="description" content="A cozy 3D school where Professor Hoot, Digit and Nova turn reading, math and science into adventures." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Izzy's Virtual Classroom" />
+    <meta property="og:description" content="A cozy 3D homeschool where every finished book flies onto her very own shelf." />
+    <meta property="og:image" content="https://lms.brianjeanbuilds.com/welcome/img/og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23f4ead9'/%3E%3Cpath d='M12 30 32 14l20 16v20a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4Z' fill='%23d9774b'/%3E%3Crect x='26' y='36' width='12' height='18' rx='3' fill='%23fff5e6'/%3E%3Ccircle cx='32' cy='27' r='4' fill='%23ffd166'/%3E%3C/svg%3E"
+    />
+    <link rel="preload" href="/welcome/fonts/Fraunces.woff" as="font" type="font/woff" crossorigin />
+    <link rel="preload" href="/welcome/fonts/Fredoka.woff" as="font" type="font/woff" crossorigin />
+    <link rel="stylesheet" href="/welcome/welcome.css" />
+    <script src="/welcome/signin.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#signin">Skip to family sign-in</a>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Izzy's Virtual Classroom — home">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="16" fill="#fff6e6" />
+          <path d="M12 30 32 14l20 16v20a4 4 0 0 1-4 4H16a4 4 0 0 1-4-4Z" fill="#d9774b" />
+          <rect x="26" y="36" width="12" height="18" rx="3" fill="#fff5e6" />
+          <circle cx="32" cy="27" r="4" fill="#ffd166" />
+        </svg>
+        <span>Izzy's <b>Virtual Classroom</b></span>
+      </a>
+      <span class="topbar-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" /><rect x="4.5" y="10" width="15" height="11" rx="3" /></svg>
+        A private family school
+      </span>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">A homeschool world, made at home</p>
+          <h1>
+            Where reading, math and science
+            <span class="swash">feel like play.</span>
+          </h1>
+          <p class="lead">
+            A cozy 3D school where Professor Hoot, Digit and Nova turn every lesson into an adventure &mdash; and every book Izzy finishes flies onto her very own
+            shelf.
+          </p>
+        </div>
+
+        <form class="signin" id="signin" novalidate autocomplete="on">
+          <div class="signin-badge" aria-hidden="true">
+            <img src="/welcome/img/hoot.webp" alt="" width="64" height="64" />
+          </div>
+          <h2>Family sign-in</h2>
+          <p class="signin-intro">Hoo-hoo! This school is just for our family. Enter the family password to open the doors.</p>
+          <label for="username">Username</label>
+          <input id="username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="family" required />
+          <label for="password">Password</label>
+          <div class="password">
+            <input id="password" name="password" type="password" autocomplete="current-password" required />
+            <button type="button" class="reveal" id="reveal" aria-pressed="false" aria-controls="password">Show</button>
+          </div>
+          <button type="submit" class="enter">
+            <span>Open the school</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6" /></svg>
+          </button>
+          <p class="signin-status" id="signin-status" role="status" aria-live="polite"></p>
+          <p class="signin-foot">Forgot the password? Ask a grown-up.</p>
+        </form>
+
+        <ul class="teacher-row" aria-label="Izzy's teachers">
+          <li>
+            <img src="/welcome/img/hoot.webp" alt="" width="72" height="72" />
+            <span><b>Professor Hoot</b>Reading</span>
+          </li>
+          <li>
+            <img src="/welcome/img/digit.webp" alt="" width="72" height="72" />
+            <span><b>Digit</b>Math</span>
+          </li>
+          <li>
+            <img src="/welcome/img/nova.webp" alt="" width="72" height="72" />
+            <span><b>Nova</b>Science</span>
+          </li>
+        </ul>
+      </section>
+
+      <figure class="showcase">
+        <div class="frame">
+          <img src="/welcome/img/library.webp" alt="The 3D library: tall bookshelves, a reading chair, a rainbow rug, Izzy's avatar and Professor Hoot at his lectern." width="1400" height="875" />
+        </div>
+        <figcaption>The library, where every finished book goes on Izzy's shelf.</figcaption>
+      </figure>
+
+      <section class="feature feature-split" aria-labelledby="talk-title">
+        <div class="feature-copy">
+          <p class="kicker">Talk it out</p>
+          <h2 id="talk-title">Teachers who listen to what she actually says</h2>
+          <p>
+            Tap the microphone and just tell them. &ldquo;I read Daddy the Goodnight Leelanau book&rdquo; gets a real answer, a question about the story, and a
+            big button to put it on her shelf. By default her voice is turned into words right on the device.
+          </p>
+        </div>
+        <div class="feature-media">
+          <img src="/welcome/img/talk.webp" alt="Professor Hoot replying: You read Goodnight Leelanau to Daddy? Did you read the whole book?" width="874" height="425" loading="lazy" />
+        </div>
+      </section>
+
+      <section class="cards" aria-label="What makes it special">
+        <article class="card">
+          <div class="card-icon card-icon-honey" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H9v16H5.5A1.5 1.5 0 0 1 4 18.5ZM9 4h3.5A1.5 1.5 0 0 1 14 5.5V20H9M15 6.5l3.2-.9a1.5 1.5 0 0 1 1.8 1l3 11a1.5 1.5 0 0 1-1 1.8L19 20" /></svg>
+          </div>
+          <h3>A bookshelf that grows</h3>
+          <p>Every finished book flies onto her shelf. At 10, 25, 50 and 100 books the library itself grows &mdash; a reading nook, a grand library, a book dragon.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon card-icon-teal" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3ZM9.5 19h5M10.5 21.5h3" /></svg>
+          </div>
+          <h3>Hints, never red X's</h3>
+          <p>Wrong answers get a gentle hint, a simpler step, or another way to see it. Questions get trickier as she's ready and easier when she isn't.</p>
+        </article>
+        <article class="card">
+          <div class="card-icon card-icon-terracotta" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+          </div>
+          <h3>Grown-ups see it all</h3>
+          <p>A parent studio with every teacher conversation word for word, progress on real standards, a portfolio, and reports for the family.</p>
+        </article>
+      </section>
+
+      <section class="feature feature-split feature-reverse" aria-labelledby="grow-title">
+        <div class="feature-copy">
+          <p class="kicker">A school that grows with her</p>
+          <h2 id="grow-title">What she learns changes the world she walks around in</h2>
+          <p>Plant beans and the greenhouse opens. Learn about space and a telescope appears. Finish Digit's missions and a rocket gets built, stage by stage.</p>
+        </div>
+        <div class="feature-media">
+          <img src="/welcome/img/science.webp" alt="Nova the red panda scientist in the science lab, next to the sink-or-float tank and the greenhouse door." width="990" height="620" loading="lazy" />
+        </div>
+      </section>
+
+      <section class="teachers" aria-labelledby="teachers-title">
+        <h2 id="teachers-title">Meet the teachers</h2>
+        <div class="teacher-cards">
+          <article>
+            <img src="/welcome/img/hoot.webp" alt="Professor Hoot, an owl with round glasses" width="120" height="120" loading="lazy" />
+            <h3>Professor Hoot</h3>
+            <p class="subject">Reading &amp; storytelling</p>
+            <p>Warm, curious, and wildly enthusiastic about books. Chats about every story before it goes on the shelf.</p>
+          </article>
+          <article>
+            <img src="/welcome/img/digit.webp" alt="Digit, a friendly robot" width="120" height="120" loading="lazy" />
+            <h3>Digit</h3>
+            <p class="subject">Math</p>
+            <p>Playful, precise, and delighted by puzzles. Rescues moon rocks by counting, adding and sharing.</p>
+          </article>
+          <article>
+            <img src="/welcome/img/nova.webp" alt="Nova, a red panda scientist with goggles" width="120" height="120" loading="lazy" />
+            <h3>Nova</h3>
+            <p class="subject">Science</p>
+            <p>Adventurous and always asking &ldquo;why?&rdquo; Predicts, tests and wonders out loud about what sinks and what floats.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="privacy" aria-label="Privacy">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.9 7.5-9.5V6Z" /><path d="m9 12 2 2 4-4" /></svg>
+        <p><b>Private by design.</b> No ads, no tracking, no public profiles. Her records stay on the family's own devices.</p>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Built at home by Brian Jean &middot; <a href="https://brianjeanbuilds.com" rel="noopener">brianjeanbuilds.com</a></p>
+    </footer>
+  </body>
+</html>

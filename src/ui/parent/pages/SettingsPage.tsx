@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { navigate } from '../../../app/router';
 import { useLiveQuery, useServices } from '../../../app/services';
-import { DEFAULT_TEACHER_AI_ENDPOINT } from '../../../domain/settings';
+import { DEFAULT_TEACHER_AI_ENDPOINT, HOSTED_BUILD } from '../../../domain/settings';
 import { checkHelper, isAllowedHelperUrl } from '../../../domain/teachers/chatRemote';
 import type { AudioSettings, GraphicsQuality, HouseholdSettings } from '../../../domain/types';
 import { browserFamily, knownOnDevice } from '../../../domain/talk';
@@ -547,6 +547,17 @@ export function SettingsPage({ data }: { data: ParentData }) {
               </div>
             </div>
           </Card>
+
+          {HOSTED_BUILD && (
+            <Card title="This device" icon="lock">
+              <p className="small">
+                This browser is signed in to the family school. Signing out shows the welcome page again until someone enters the family password.
+              </p>
+              <a className="btn btn-small" href="/auth/logout" data-testid="sign-out">
+                Sign out of the school on this device
+              </a>
+            </Card>
+          )}
 
           <Card title="Privacy" icon="lock">
             <ul className="privacy-points small">

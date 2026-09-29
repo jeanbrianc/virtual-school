@@ -30,7 +30,9 @@ echo "→ Uploading site to s3://$BUCKET"
 aws s3 sync dist/assets "s3://$BUCKET/assets" --exclude '*.map' \
   --cache-control 'public, max-age=31536000, immutable' --only-show-errors
 aws s3 sync dist "s3://$BUCKET" --delete --exclude 'assets/*' --exclude '*.map' --exclude 'meta.json' \
-  --cache-control 'no-cache' --only-show-errors
+  --exclude 'welcome/index.html' --cache-control 'no-cache' --only-show-errors
+# The welcome page is what "/" shows before sign-in, so browsers must never reuse it afterwards.
+aws s3 cp dist/welcome/index.html "s3://$BUCKET/welcome/index.html" --cache-control 'no-store' --only-show-errors
 aws s3 sync dist/assets "s3://$BUCKET/assets" --delete --exclude '*.map' \
   --cache-control 'public, max-age=31536000, immutable' --only-show-errors
 
