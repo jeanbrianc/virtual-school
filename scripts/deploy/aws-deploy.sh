@@ -4,6 +4,11 @@
 #   ./scripts/deploy/aws-deploy.sh               first time, or after changing infra/aws/stack.yaml
 #   ./scripts/deploy/aws-deploy.sh --password    change the site password
 #   ./scripts/deploy/aws-deploy.sh --api-key     add or change the Anthropic API key
+#   ./scripts/deploy/aws-deploy.sh --openai-secret <secret ARN>
+#        use an OpenAI key stored in AWS Secrets Manager (this account, any region):
+#        teacher replies, natural voices and listening. The Lambda reads the secret
+#        at run time; this script only checks it exists (it never reads the key).
+#        --openai-secret none turns OpenAI off again.
 #
 # Creates/updates one CloudFormation stack in us-east-1 (S3 + CloudFront + HTTPS
 # certificate + Route 53 record + site password + AI helper Lambda + GitHub
@@ -89,6 +94,49 @@ elif ! aws cloudformation describe-stacks --stack-name "$STACK_NAME" \
   --query "Stacks[0].Parameters[?ParameterKey=='SessionSecret'].ParameterKey" --output text | grep -q SessionSecret; then
   # Stacks made before the welcome page need a key for sign-in cookies.
   PARAMS+=("SessionSecret=$(openssl rand -hex 32)")
+fi
+
+# OpenAI key in Secrets Manager (--openai-secret <arn>, --openai-secret=<arn>, or OPENAI_SECRET_ARN).
+OPENAI_SECRET="${OPENAI_SECRET_ARN:-}"
+PREV_ARG=""
+for arg in "$@"; do
+  [ "$PREV_ARG" = "--openai-secret" ] && OPENAI_SECRET="$arg"
+  case "$arg" in --openai-secret=*) OPENAI_SECRET="${arg#*=}" ;; esac
+  PREV_ARG="$arg"
+done
+if [ "$OPENAI_SECRET" = "none" ]; then
+  PARAMS+=("OpenAiSecretArn=" "OpenAiSecretKmsKeyArn=")
+  echo "OpenAI: turning off (the secret itself is left alone)."
+elif [ -n "$OPENAI_SECRET" ]; then
+  if [[ ! "$OPENAI_SECRET" =~ ^arn:aws[a-z-]*:secretsmanager:([a-z0-9-]+):([0-9]{12}):secret:(.+)$ ]]; then
+    echo "--openai-secret needs the secret's full ARN: arn:aws:secretsmanager:<region>:<account>:secret:<name>" >&2
+    exit 1
+  fi
+  SECRET_REGION="${BASH_REMATCH[1]}"
+  SECRET_ACCOUNT="${BASH_REMATCH[2]}"
+  SECRET_NAME="${BASH_REMATCH[3]}"
+  # (Account IDs are compared, never printed.)
+  if [ "$SECRET_ACCOUNT" != "$(aws sts get-caller-identity --query Account --output text)" ]; then
+    echo "That secret belongs to a different AWS account than profile $PROFILE_LABEL." >&2
+    echo "Use the profile for the account that holds both the site and the secret (or copy the key into a secret there)." >&2
+    exit 1
+  fi
+  # Metadata only: proves the secret exists and which KMS key encrypts it. The key itself is never read here.
+  if ! KMS_KEY="$(aws secretsmanager describe-secret --secret-id "$OPENAI_SECRET" --region "$SECRET_REGION" --query KmsKeyId --output text 2>/dev/null)"; then
+    echo "Couldn't find that secret in $SECRET_REGION with profile $PROFILE_LABEL (or this profile may not describe it)." >&2
+    exit 1
+  fi
+  PARAMS+=("OpenAiSecretArn=$OPENAI_SECRET" "OpenAiSecretKmsKeyArn=")
+  # The default aws/secretsmanager key needs no extra permission; a customer-managed key does.
+  if [ -n "$KMS_KEY" ] && [ "$KMS_KEY" != "None" ]; then
+    KMS_META="$(aws kms describe-key --key-id "$KMS_KEY" --region "$SECRET_REGION" --query 'KeyMetadata.[KeyManager,Arn]' --output text 2>/dev/null || true)"
+    if [ "${KMS_META%%[[:space:]]*}" = "CUSTOMER" ]; then
+      PARAMS[${#PARAMS[@]}-1]="OpenAiSecretKmsKeyArn=${KMS_META##*[[:space:]]}"
+    elif [ -z "$KMS_META" ]; then
+      echo "Note: couldn't look up the secret's KMS key; if it's a customer-managed key, allow the AI helper's role to decrypt with it." >&2
+    fi
+  fi
+  echo "OpenAI key: secret ${SECRET_NAME%-??????} in $SECRET_REGION ✓ — the AI helper will read it when it needs it."
 fi
 
 if $FIRST_TIME || wants --api-key; then

@@ -70,11 +70,18 @@ Mic tap → Mic.listen (ChildMode: talkMode + the on-device answer a parent's
 ```
 
 The helper (`scripts/ai-helper/handler.ts`) is socket-free and unit-tested: it
-parses the browser's request with `parseTeacherAiInput`, builds the Anthropic
-Messages body with `buildTeacherRequest` (system prompt with persona + safety
-rules, alternating turns, forced `teacher_reply` tool), and returns only the
-tool input. `main.ts` wraps it in `node:http` on 127.0.0.1; `scripts/ai-helper.mjs`
-starts it from `dev`/`preview` when `.env.local` has a key.
+parses the browser's request with `parseTeacherAiInput`, builds the request —
+OpenAI Responses API (`openai.ts`: forced `teacher_reply` function call,
+`reasoning: none`, `store: false`) when an OpenAI key is configured, otherwise
+the Anthropic Messages body (`buildTeacherRequest`: forced `teacher_reply` tool) —
+with the same system prompt (persona + safety rules), and returns only the
+structured reply. With OpenAI it also speaks teacher lines (`/v1/speak`,
+`gpt-4o-mini-tts`, per-teacher voice) and turns her recordings into words
+(`/v1/listen`, `gpt-transcribe`); the browser side is `src/voice/helperVoice.ts`
+(consent-gated, falls back to the built-in voice / recognizer). `main.ts` wraps
+it in `node:http` on 127.0.0.1; `scripts/ai-helper.mjs` starts it from
+`dev`/`preview` when `.env.local` has a key; `lambda.ts` serves it on AWS and
+reads the OpenAI key from Secrets Manager (`awsSecret.ts`, SigV4, cached an hour).
 
 A parent-logged activity follows the identical `finalizeLearning` path, so a
 "we planted beans" entry can open the greenhouse; the unlock stays

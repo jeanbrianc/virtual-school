@@ -60,10 +60,11 @@ Firefox, older Chrome) either pick *Also allow the browser's speech service*
 
 **AI teachers** are off by default. The built-in teachers already understand
 book talk (which book, who she read with, finished or not) without any network.
-To let Claude answer anything she says:
+To let an AI model answer anything she says (and, with OpenAI, give the teachers
+natural voices and better listening):
 
 ```bash
-cp .env.example .env.local     # then paste your key after ANTHROPIC_API_KEY=
+cp .env.example .env.local     # then paste your key after OPENAI_API_KEY= (or ANTHROPIC_API_KEY=)
 npm run dev                    # also starts the AI helper on http://127.0.0.1:8787
 ```
 
@@ -193,8 +194,8 @@ src/
                Learning Museum, home screen.
   app/         Composition root (dependency injection), router, live queries.
   audio/ voice/  Synthesized sound engine; speech output/input (on-device first).
-scripts/ai-helper/  Optional local AI helper (Node, no dependencies) that keeps
-                    the API key and talks to Anthropic for the teachers.
+scripts/ai-helper/  Optional AI helper (Node, no dependencies; local or AWS Lambda)
+                    that keeps the API key and talks to OpenAI or Anthropic.
 ```
 
 Boundaries are enforced by `npm run lint` (e.g. `domain` may not import
@@ -327,6 +328,12 @@ return it from `createInterpretationService`.
   the teacher answers out loud. Text is always shown. The automatic voice
   prefers a clear US voice (never the joke/robot ones); a parent can choose
   another in *Settings → Voice*.
+- **Natural voices** (optional, OpenAI): `HelperSpeechOutput`
+  (`src/voice/helperVoice.ts`) sends each line to the helper's `/v1/speak`
+  (`gpt-4o-mini-tts`, a voice and performance note per teacher in
+  `TEACHERS[…].naturalVoice`), plays the MP3, keeps lines in Cache Storage so
+  repeats are free, and falls back to the built-in voice on any problem.
+  Turned on in *Settings → Voice*; turning it off clears the saved lines.
 - **Her name, said right**: computer voices guess names from spelling
   ("EYE-zee"). *Settings → Voice → How the voices say "Izzy"* saves a
   respelling (`Child.sayName`, e.g. "Izzee", with *Hear it* and suggestions)
@@ -339,20 +346,29 @@ return it from `createInterpretationService`.
   phrase biasing with her book titles, live words while she talks, and clear
   reasons when it can't listen. `talkMode` is `device` (default — never falls
   back to a cloud recognizer), `browser` (parent allows the browser's service
-  when on-device isn't available) or `off`. Audio is never recorded or stored;
-  only the words are kept, in the transcript.
+  when on-device isn't available), `helper` (the family's AI helper — OpenAI
+  `gpt-transcribe`: `HelperListener` records only while the mic button is on,
+  stops after a short silence, and posts the clip to `/v1/listen` with her book
+  titles as keyword hints) or `off`. `RoutingSpeechInput` picks the recognizer.
+  Audio is never stored; only the words are kept, in the transcript.
 - **Conversation**: `TeacherChatService` (`src/domain/teachers/chat.ts`).
   `LocalTeacherChat` understands book talk on-device; `HttpTeacherChat`
   (`chatRemote.ts`) calls the family's helper and validates/sanitizes every
   reply, falling back to local on any problem. Worries are answered on-device
   and never sent. Replies only *propose* actions; she confirms with a tap.
-- **AI helper** (`scripts/ai-helper/`): a ~150-line Node server on
-  `127.0.0.1` with no dependencies. It keeps `ANTHROPIC_API_KEY`, builds the
-  prompts (`src/domain/teachers/aiPrompt.ts`, forced tool use so replies are
-  structured), allows only local page origins plus a custom header (forces a
-  CORS preflight), caps body size, and rate-limits (20/min, `AI_DAILY_LIMIT`/day).
-  Endpoints: `GET /health`, `POST /v1/teacher`, `POST /v1/interpret`.
-  `AI_MODEL` overrides the default `claude-haiku-4-5-20251001`.
+- **AI helper** (`scripts/ai-helper/`): a small Node server on `127.0.0.1`
+  (or the AWS Lambda behind the site) with no dependencies. It keeps the key —
+  `OPENAI_API_KEY` (replies, voices, listening; used when set) or
+  `ANTHROPIC_API_KEY` (replies only); on AWS the OpenAI key is read from Secrets
+  Manager with a signed request (`awsSecret.ts`). It builds the prompts
+  (`src/domain/teachers/aiPrompt.ts`; OpenAI bodies in `openai.ts` — Responses
+  API, forced function call, `reasoning: none`, `store: false`), allows only the
+  family's page origins plus a custom header (forces a CORS preflight), caps body
+  size, and rate-limits replies (20/min, `AI_DAILY_LIMIT`/day), voices and
+  listening separately. Endpoints: `GET /health` (provider + what works),
+  `POST /v1/teacher`, `/v1/interpret`, `/v1/speak` (MP3), `/v1/listen`.
+  `OPENAI_MODEL` (default `gpt-6-luna`) and `AI_MODEL` (default
+  `claude-haiku-4-5-20251001`) pick the reply models.
 - To use a different TTS/STT engine or AI provider, implement the interfaces in
   `src/voice/SpeechService.ts` / `src/domain/teachers/chat.ts` and inject them
   in `src/app/services.tsx`.
@@ -400,12 +416,19 @@ font CDN is contacted.
   the local helper, or a parent-configured https endpoint).
 - **Talking**: by default her voice is recognized on the computer and the audio
   is never recorded, stored or sent. Only if a parent picks *Also allow the
-  browser's speech service* may the browser send audio to Google/Apple.
+  browser's speech service* may the browser send audio to Google/Apple, or
+  *Your AI helper (OpenAI)* — then her clip (only while the mic is on) goes to
+  the helper and OpenAI, which keeps no copy of transcription audio.
 - **AI teachers** (off by default, explicit consent): for each reply the helper
-  sends Anthropic her first name, what she said (text), the last few lines of
-  that conversation and her book titles (the helper's instructions add that
-  she's a young child who reads well above her age) — never audio, photos,
-  birthdays, records or reports. Anthropic doesn't train models on API data by default.
+  sends the AI service (OpenAI or Anthropic) her first name, what she said
+  (text), the last few lines of that conversation and her book titles (the
+  helper's instructions add that she's a young child who reads well above her
+  age) — never photos, birthdays, records or reports. Neither trains on API data
+  by default; OpenAI keeps reply and voice requests up to 30 days for abuse
+  monitoring unless the organization has zero data retention, which OpenAI asks
+  for before processing data of children under 13 (see docs/DEPLOY.md).
+- **Natural voices** (off by default, OpenAI): the teachers' lines are sent to be
+  spoken; Settings discloses that the voices are AI-generated.
   Safety rules live in the helper, replies are checked on-device before she
   sees them, worries are handled on-device and flagged for parents, and AI
   lines are marked in *Teacher talk*.

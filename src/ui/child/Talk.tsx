@@ -102,6 +102,7 @@ export function MicButton({
     onInterim?.('');
     const out = await mic.listen({ ...(phrases ? { phrases } : {}), ...(onInterim ? { onInterim } : {}) });
     setListening(false);
+    onInterim?.('');
     const text = out.result?.transcript.trim();
     if (text) onHeard(text);
     else onTrouble?.(MIC_TROUBLE[out.error ?? 'no-speech']);

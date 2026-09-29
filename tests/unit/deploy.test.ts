@@ -130,11 +130,23 @@ describe('stack wiring', () => {
   });
 
   it('never ships secrets as defaults and pins the region', () => {
-    for (const name of ['BasicAuthHash', 'SessionSecret', 'AnthropicApiKey', 'OriginSecret']) {
+    for (const name of ['BasicAuthHash', 'SessionSecret', 'AnthropicApiKey', 'OriginSecret', 'OpenAiSecretArn', 'OpenAiSecretKmsKeyArn']) {
       assert.match(template, new RegExp(`  ${name}:\\n    Type: String\\n    NoEcho: true`));
     }
     assert.match(template, /Assert: !Equals \[!Ref 'AWS::Region', us-east-1\]/);
     assert.match(template, /microphone=\(self\)/, 'talk-to-text still allowed');
+  });
+
+  it('lets only the AI helper read only the OpenAI secret — and never change it', () => {
+    assert.match(template, /OPENAI_SECRET_ARN: !Ref OpenAiSecretArn/);
+    assert.match(
+      template,
+      /- !If\n\s+- HasOpenAiSecret\n\s+- PolicyName: read-openai-key[\s\S]*?Action: secretsmanager:GetSecretValue\n\s+Resource: !Ref OpenAiSecretArn/,
+    );
+    assert.doesNotMatch(template, /secretsmanager:\*|secretsmanager:(Put|Update|Create|Delete|Rotate)/);
+    const deployRole = template.slice(template.indexOf('  GitHubDeployRole:'), template.indexOf('Outputs:'));
+    assert.doesNotMatch(deployRole, /secretsmanager|kms:/, 'GitHub deploys can’t read the key');
+    assert.match(template, /kms:ViaService: secretsmanager\.\*\.amazonaws\.com/);
   });
 
   it('only lets main of the configured repo deploy', () => {

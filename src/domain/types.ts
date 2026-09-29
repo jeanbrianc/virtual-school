@@ -40,6 +40,11 @@ export interface TeacherAiSettings {
   endpoint: string;
   /** Parent understands her words (not audio) are sent to the AI service. */
   consentToSend: boolean;
+  /**
+   * Natural teacher voices from the helper (OpenAI): the words each teacher
+   * says are sent to the helper to be spoken. Off until a parent turns it on.
+   */
+  naturalVoices?: boolean;
 }
 
 export interface HouseholdSettings {
@@ -53,7 +58,7 @@ export interface HouseholdSettings {
    * audio never leaves the computer) or 'browser' (the browser's speech service
    * may be used when on-device isn't available).
    */
-  talkMode: 'off' | 'device' | 'browser';
+  talkMode: 'off' | 'device' | 'browser' | 'helper';
   graphicsQuality: GraphicsQuality;
   interpretation: InterpretationSettings;
   /** Optional AI teachers through the family's local helper (off until a parent consents). */

@@ -35,7 +35,7 @@ export function ConversationsPage({ data }: { data: ParentData }) {
         title="Teacher talk"
         subtitle={`Every conversation ${child.name} has with her teachers, word for word. Stored only on this device. ${
           data.household.settings.teacherAi.enabled && data.household.settings.teacherAi.consentToSend
-            ? 'AI teachers are on: what she says to a teacher is sent (as text) to Anthropic to write the reply — those replies are marked “AI”.'
+            ? 'AI teachers are on: what she says to a teacher is sent (as text) through your AI helper to its AI service (OpenAI or Anthropic) to write the reply — those replies are marked “AI”.'
             : 'Teachers answer on this device — nothing is sent anywhere.'
         }`}
       />

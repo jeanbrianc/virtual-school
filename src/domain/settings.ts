@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS: HouseholdSettings = {
   talkMode: 'device',
   graphicsQuality: 'high',
   interpretation: { provider: 'local', consentToSend: false },
-  teacherAi: { enabled: false, endpoint: DEFAULT_TEACHER_AI_ENDPOINT, consentToSend: false },
+  teacherAi: { enabled: false, endpoint: DEFAULT_TEACHER_AI_ENDPOINT, consentToSend: false, naturalVoices: false },
   demoTools: true,
 };
 

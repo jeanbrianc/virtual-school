@@ -15,8 +15,13 @@ export interface TeacherProfile {
   personality: string;
   color: string;
   accent: string;
-  /** Voice hints for text-to-speech (pitch/rate), used only if read-aloud is on. */
+  /** Voice hints for the computer's built-in text-to-speech (pitch/rate). */
   voice: { pitch: number; rate: number };
+  /**
+   * The natural AI voice (OpenAI text-to-speech, used only when a parent turns
+   * natural voices on): a built-in voice name plus how to perform it.
+   */
+  naturalVoice: { voice: string; style: string };
   /** The very first meeting: the teacher introduces themselves and their room. */
   introductions: string[];
   /** Later visits (they have met before). */
@@ -36,6 +41,11 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#8b6b4a',
     accent: '#e8b04b',
     voice: { pitch: 0.85, rate: 0.95 },
+    naturalVoice: {
+      voice: 'cedar',
+      style:
+        'You are Professor Hoot, a kind, wise old owl who teaches reading to a three-year-old girl. Speak warmly and gently, a little slowly and very clearly, with delighted enthusiasm about books, like a favorite grandpa at story time. Say "hoo-hoo" as a soft, happy owl call.',
+    },
     introductions: [
       'Hoo-hoo! Hello there — you must be {name}! I’m Professor Hoot, and this is the library, where stories live. Whenever you finish a book, come and tell me about it. We’ll chat about the story, and then it flies onto your very own bookshelf!',
     ],
@@ -53,6 +63,11 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#4aa3a8',
     accent: '#ffcf5c',
     voice: { pitch: 1.35, rate: 1.05 },
+    naturalVoice: {
+      voice: 'verse',
+      style:
+        'You are Digit, a cheerful little helper robot who loves counting and rockets, talking with a three-year-old girl. Speak brightly and bouncily with crisp, precise words and a light, playful robot rhythm. Say "beep boop" like a happy sound effect. Keep it clear and easy to follow.',
+    },
     introductions: ['Beep boop! A new friend! Hello, {name} — I’m Digit, the math robot. I love counting, puzzles and rockets!'],
     greetings: ['Beep boop! Hello, {name}!', 'Greetings, Captain {name}! Systems ready for math!', 'Beep! My number sensors detect… {NAME}!'],
     returnGreetings: ['Beep boop! You’re back! My circuits are happy!', 'Welcome back, space helper!'],
@@ -68,6 +83,11 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     color: '#c65d3b',
     accent: '#7fc8c0',
     voice: { pitch: 1.15, rate: 1.0 },
+    naturalVoice: {
+      voice: 'marin',
+      style:
+        'You are Nova, an adventurous red panda scientist talking with a three-year-old girl. Speak with bright curiosity and excitement, full of wonder, friendly and very clear, not too fast.',
+    },
     introductions: [
       'Oh, hello! You must be {name}. I’m Nova, and this is my science lab. Scientists ask questions and then test them to find out the answers!',
     ],

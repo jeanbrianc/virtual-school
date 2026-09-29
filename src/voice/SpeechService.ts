@@ -8,6 +8,13 @@
  * scoring) implement the same interfaces — see docs/ARCHITECTURE.md.
  */
 import type { OnDeviceAnswer } from '../domain/talk';
+import type { TeacherId } from '../domain/teachers/teachers';
+
+/** A natural AI voice from the family's helper (see voice/helperVoice.ts). */
+export interface NaturalVoice {
+  endpoint: string;
+  teacher: TeacherId;
+}
 
 export interface SpeakOptions {
   pitch?: number;
@@ -15,6 +22,8 @@ export interface SpeakOptions {
   volume?: number;
   /** A built-in voice chosen by a parent (by name); ignored when this device doesn't have it. */
   voiceName?: string;
+  /** Speak with this teacher's natural voice from the helper (falls back to the built-in voice). */
+  natural?: NaturalVoice;
 }
 
 /** A voice built into this device. */
@@ -99,8 +108,10 @@ export interface SpeechInputResult {
  *  • device  — only the browser's ON-DEVICE recognizer (audio never leaves the computer).
  *  • browser — on-device when possible, otherwise the browser's own speech
  *              service (Chrome: Google; Safari: Apple), which receives the audio.
+ *  • helper  — the family's AI helper (OpenAI): her recording goes to the helper
+ *              and on to OpenAI to be turned into words (see voice/helperVoice.ts).
  */
-export type TalkMode = 'off' | 'device' | 'browser';
+export type TalkMode = 'off' | 'device' | 'browser' | 'helper';
 
 /** What this browser said about on-device recognition (asked only from the Parent Studio — see domain/talk.ts). */
 export type { OnDeviceAnswer };
@@ -121,6 +132,8 @@ export interface ListenOptions {
   phrases?: string[];
   /** Live words while she talks. */
   onInterim?: (text: string) => void;
+  /** Where to send the recording in 'helper' mode. */
+  helper?: { endpoint: string; childName?: string };
 }
 
 export interface ListenOutcome {
@@ -151,6 +164,7 @@ export interface SpeechInput {
 export function talkAvailability(mode: TalkMode, hasRecognizer: boolean, known: OnDeviceAnswer): TalkAvailability {
   if (mode === 'off') return { state: 'off', onDevice: false };
   if (!hasRecognizer) return { state: 'unsupported', onDevice: false };
+  if (mode === 'helper') return { state: 'ready', onDevice: false };
   if (known === 'available') return { state: 'ready', onDevice: true };
   if (mode === 'browser') return { state: 'ready', onDevice: false };
   if (known === 'downloadable') return { state: 'needs-download', onDevice: true };

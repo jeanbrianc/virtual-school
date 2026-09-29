@@ -242,7 +242,14 @@ describe('local AI helper', () => {
     const handle = createHelper({ apiKey: 'sk-test' });
     const health = await handle({ method: 'GET', path: '/health', headers: page });
     assert.equal(health.status, 200);
-    assert.deepEqual(JSON.parse(health.body), { ok: true, keyConfigured: true, model: 'claude-haiku-4-5-20251001' });
+    assert.deepEqual(JSON.parse(health.body as string), {
+      ok: true,
+      keyConfigured: true,
+      provider: 'anthropic',
+      model: 'claude-haiku-4-5-20251001',
+      voices: false,
+      listening: false,
+    });
     assert.equal(health.headers['Access-Control-Allow-Origin'], 'http://127.0.0.1:5173');
     assert.equal((await handle({ method: 'OPTIONS', path: '/v1/teacher', headers: { origin: 'http://localhost:4173' } })).status, 204);
     assert.equal((await handle({ method: 'OPTIONS', path: '/v1/teacher', headers: { origin: 'https://evil.example' } })).status, 403);
@@ -255,7 +262,7 @@ describe('local AI helper', () => {
     const handle = createHelper({ apiKey: 'sk-test', fetchImpl: claude(calls) });
     const res = await handle({ method: 'POST', path: '/v1/teacher', headers: page, body: teacherBody });
     assert.equal(res.status, 200);
-    assert.deepEqual(JSON.parse(res.body), { reply: 'Hoo-hoo!', intent: 'read_to_someone' });
+    assert.deepEqual(JSON.parse(res.body as string), { reply: 'Hoo-hoo!', intent: 'read_to_someone' });
     assert.equal(calls[0]!.url, 'https://api.anthropic.com/v1/messages');
     const headers = calls[0]!.init.headers as Record<string, string>;
     assert.equal(headers['x-api-key'], 'sk-test');
@@ -285,7 +292,7 @@ describe('local AI helper', () => {
     const handle = createHelper({ apiKey: 'bad', fetchImpl: claude([], 401) });
     const res = await handle({ method: 'POST', path: '/v1/teacher', headers: page, body: teacherBody });
     assert.equal(res.status, 502);
-    assert.match(JSON.parse(res.body).error, /key was rejected/);
+    assert.match(JSON.parse(res.body as string).error, /key was rejected/);
   });
 });
 
@@ -397,7 +404,7 @@ describe('settings and records', () => {
     assert.equal(normalizeSettings({ ...legacy, speechInput: true }).talkMode, 'browser');
     assert.equal(normalizeSettings({ ...legacy, speechInput: false }).talkMode, 'device');
     const n = normalizeSettings(legacy);
-    assert.deepEqual(n.teacherAi, { enabled: false, endpoint: 'http://127.0.0.1:8787', consentToSend: false });
+    assert.deepEqual(n.teacherAi, { enabled: false, endpoint: 'http://127.0.0.1:8787', consentToSend: false, naturalVoices: false });
     assert.equal('speechInput' in n, false);
   });
 

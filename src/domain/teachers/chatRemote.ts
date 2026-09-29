@@ -1,5 +1,6 @@
 /**
- * AI teachers through the family's own local helper (scripts/ai-helper.ts).
+ * AI teachers through the family's own helper (scripts/ai-helper — on this
+ * computer, or /api on the family's site), which uses OpenAI or Anthropic.
  *
  * Used only when a parent turns it on in Settings and consents. The browser
  * sends: which teacher, her first name, what she just said, the last few
@@ -85,33 +86,64 @@ export class HttpTeacherChat implements TeacherChatService {
   }
 }
 
-/** Asks the helper whether it's running and has a key. */
-export async function checkHelper(
-  endpoint: string,
-  fetchImpl: typeof fetch = (...args) => fetch(...args),
-): Promise<{ ok: boolean; model?: string; message: string }> {
+/** What the helper said about itself. */
+export interface HelperStatus {
+  ok: boolean;
+  message: string;
+  model?: string;
+  provider?: 'openai' | 'anthropic';
+  /** Natural teacher voices available (OpenAI). */
+  voices: boolean;
+  /** Listening (her recording → words) available (OpenAI). */
+  listening: boolean;
+}
+
+export const PROVIDER_NAMES = { openai: 'OpenAI', anthropic: 'Anthropic' } as const;
+
+/** Asks the helper whether it's running, which AI service it uses, and what it can do. */
+export async function checkHelper(endpoint: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): Promise<HelperStatus> {
+  const off = { voices: false, listening: false };
   if (!isAllowedHelperUrl(endpoint))
-    return { ok: false, message: 'Use /api for this website’s helper, http://127.0.0.1:… for a helper on this computer, or an https:// address.' };
+    return { ok: false, ...off, message: 'Use /api for this website’s helper, http://127.0.0.1:… for a helper on this computer, or an https:// address.' };
   const hosted = endpoint.startsWith('/');
   try {
     const res = await fetchImpl(`${endpoint.replace(/\/+$/, '')}/health`, { headers: { [HELPER_HEADER]: '1' } });
-    const body = (await res.json()) as { ok?: boolean; model?: string; keyConfigured?: boolean };
+    const body = (await res.json()) as { ok?: boolean; model?: string; keyConfigured?: boolean; provider?: unknown; voices?: unknown; listening?: unknown };
     if (!body.keyConfigured)
       return {
         ok: false,
+        ...off,
         message: hosted
-          ? 'This website’s AI helper has no API key yet. Run scripts/deploy/aws-deploy.sh again and paste your key when it asks.'
-          : 'The helper is running but has no API key. Add ANTHROPIC_API_KEY to .env.local and restart npm run dev.',
+          ? 'This website’s AI helper has no API key yet. Run npm run deploy:aws -- --openai-secret <secret ARN> (or -- --api-key for Anthropic).'
+          : 'The helper is running but has no API key. Add OPENAI_API_KEY (or ANTHROPIC_API_KEY) to .env.local and restart npm run dev.',
       };
-    return { ok: !!body.ok, ...(body.model ? { model: body.model } : {}), message: `Connected — AI teachers are using ${body.model ?? 'Claude'}.` };
+    const provider = body.provider === 'openai' || body.provider === 'anthropic' ? body.provider : undefined;
+    const voices = body.voices === true;
+    const listening = body.listening === true;
+    const who = provider ? `${PROVIDER_NAMES[provider]}${body.model ? ` (${body.model})` : ''}` : (body.model ?? 'the AI service');
+    const extras = voices && listening ? ' Natural voices and listening are available.' : '';
+    return {
+      ok: !!body.ok,
+      voices,
+      listening,
+      ...(provider ? { provider } : {}),
+      ...(body.model ? { model: body.model } : {}),
+      message: `Connected — AI teachers are using ${who}.${extras}`,
+    };
   } catch {
     return {
       ok: false,
+      ...off,
       message: hosted
         ? 'Can’t reach this website’s AI helper. See docs/DEPLOY.md (the AWS stack deploys it).'
         : 'Can’t reach the helper. Start the app with npm run dev after adding your API key to .env.local.',
     };
   }
+}
+
+/** Natural teacher voices: a parent turned them on and the helper address is valid. */
+export function naturalVoicesOn(settings: TeacherAiSettings | undefined): boolean {
+  return !!settings?.naturalVoices && isAllowedHelperUrl(settings.endpoint);
 }
 
 /** On-device teachers unless a parent turned AI teachers on, consented, and gave a valid helper address. */

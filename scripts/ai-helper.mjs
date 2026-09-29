@@ -1,5 +1,5 @@
 // Starts the optional local AI helper alongside `npm run dev` / `npm run preview`
-// when ANTHROPIC_API_KEY is set in .env.local (or the environment).
+// when OPENAI_API_KEY or ANTHROPIC_API_KEY is set in .env.local (or the environment).
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,8 +18,8 @@ function readEnvFile(path) {
 /** Spawns the helper if a key is configured; returns a stop function. */
 export function startAiHelper() {
   const env = { ...readEnvFile(join(root, '.env')), ...readEnvFile(join(root, '.env.local')), ...process.env };
-  if (!env.ANTHROPIC_API_KEY) {
-    console.log('  AI teachers: off (optional — add ANTHROPIC_API_KEY to .env.local and restart to turn them on)');
+  if (!env.OPENAI_API_KEY && !env.ANTHROPIC_API_KEY) {
+    console.log('  AI teachers: off (optional — add OPENAI_API_KEY or ANTHROPIC_API_KEY to .env.local and restart to turn them on)');
     return () => undefined;
   }
   const child = spawn(process.execPath, ['--import', 'tsx', join(root, 'scripts/ai-helper/main.ts')], { cwd: root, stdio: 'inherit' });

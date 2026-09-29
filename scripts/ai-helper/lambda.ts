@@ -1,12 +1,16 @@
 /**
  * The AI helper as an AWS Lambda (function URL), for the hosted site.
  *
- * CloudFront sends /api/* here after the site password check, adding a secret
+ * CloudFront sends /api/* here after the family sign-in check, adding a secret
  * X-Origin-Verify header; anything without it (someone calling the function
  * URL directly) is refused before any work. Everything else — prompts, safety
  * rules, size and rate limits — is the same handler the local helper uses.
+ *
+ * Keys: the OpenAI key is read from AWS Secrets Manager (OPENAI_SECRET_ARN) on
+ * first use and cached; an Anthropic key can come from ANTHROPIC_API_KEY.
  */
 import { timingSafeEqual } from 'node:crypto';
+import { lambdaCredentials, secretKeyReader } from './awsSecret';
 import { createHelper } from './handler';
 
 interface FunctionUrlEvent {
@@ -21,13 +25,25 @@ interface FunctionUrlResult {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
+  isBase64Encoded?: boolean;
 }
 
 const env = process.env;
+const secretArn = env.OPENAI_SECRET_ARN?.trim();
+const limit = (v: string | undefined, fallback: number) => (Number(v) > 0 ? Number(v) : fallback);
+
 const helper = createHelper({
   apiKey: env.ANTHROPIC_API_KEY || undefined,
-  ...(env.AI_MODEL ? { model: env.AI_MODEL } : {}),
-  perDay: Number(env.AI_DAILY_LIMIT || 300),
+  openaiKey: secretArn ? secretKeyReader({ arn: secretArn, credentials: () => lambdaCredentials(env) }) : env.OPENAI_API_KEY || undefined,
+  models: {
+    ...(env.OPENAI_MODEL ? { openai: env.OPENAI_MODEL } : {}),
+    ...(env.AI_MODEL ? { anthropic: env.AI_MODEL } : {}),
+  },
+  ...(env.OPENAI_VOICE_MODEL ? { voiceModel: env.OPENAI_VOICE_MODEL } : {}),
+  ...(env.OPENAI_LISTEN_MODEL ? { listenModel: env.OPENAI_LISTEN_MODEL } : {}),
+  perDay: limit(env.AI_DAILY_LIMIT, 300),
+  speakPerDay: limit(env.AI_VOICE_DAILY_LIMIT, 1500),
+  listenPerDay: limit(env.AI_LISTEN_DAILY_LIMIT, 500),
   extraOrigins: env.SITE_ORIGIN ? [env.SITE_ORIGIN] : [],
   log: (msg) => console.info(msg),
 });
@@ -52,5 +68,9 @@ export async function handler(event: FunctionUrlEvent): Promise<FunctionUrlResul
     headers,
     ...(body !== undefined ? { body } : {}),
   });
+  // Audio goes back base64-encoded (how function URLs return binary bodies).
+  if (typeof res.body !== 'string') {
+    return { statusCode: res.status, headers: res.headers, body: Buffer.from(res.body).toString('base64'), isBase64Encoded: true };
+  }
   return { statusCode: res.status, headers: res.headers, body: res.body };
 }

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { navigate } from '../../../app/router';
 import { useLiveQuery, useServices } from '../../../app/services';
 import { DEFAULT_TEACHER_AI_ENDPOINT, HOSTED_BUILD } from '../../../domain/settings';
-import { checkHelper, isAllowedHelperUrl } from '../../../domain/teachers/chatRemote';
+import { checkHelper, isAllowedHelperUrl, PROVIDER_NAMES, type HelperStatus } from '../../../domain/teachers/chatRemote';
 import type { AudioSettings, GraphicsQuality, HouseholdSettings } from '../../../domain/types';
 import { browserFamily, knownOnDevice } from '../../../domain/talk';
 import { getSpeechProbe, runSpeechProbe, settleInterruptedProbe } from '../../../services/talkService';
@@ -44,11 +44,28 @@ const TALK_OPTIONS: { mode: TalkMode; label: string; note: string }[] = [
     label: 'Also allow the browser’s speech service',
     note: 'If on-device listening isn’t available, the browser sends her audio to its maker (Google for Chrome, Apple for Safari) to turn it into words.',
   },
+  {
+    mode: 'helper',
+    label: 'Your AI helper (OpenAI) — most accurate',
+    note: 'Her recording (only while the microphone is on) goes to your AI helper and on to OpenAI to be turned into words, with her first name and book titles as spelling hints. OpenAI keeps no copy of audio it transcribes. Needs the helper with an OpenAI key (see AI teachers).',
+  },
   { mode: 'off', label: 'Off', note: 'No microphone in the school. She can still tap and type.' },
 ];
 
 /** Talking to teachers: which recognizer may hear her, plus a one-time voice pack download and a mic test. */
-function TalkCard({ mode, childName, onMode }: { mode: TalkMode; childName: string; onMode: (m: TalkMode) => void }) {
+function TalkCard({
+  mode,
+  childName,
+  onMode,
+  helper,
+  endpoint,
+}: {
+  mode: TalkMode;
+  childName: string;
+  onMode: (m: TalkMode) => void;
+  helper: HelperStatus | null;
+  endpoint: string;
+}) {
   const { ctx, speechIn, speechOut } = useServices();
   const browser = browserFamily(navigator.userAgent);
   const probe = useLiveQuery(() => getSpeechProbe(ctx), [], ['meta']);
@@ -76,38 +93,59 @@ function TalkCard({ mode, childName, onMode }: { mode: TalkMode; childName: stri
   const runTest = async () => {
     setTest({ state: 'listening' });
     speechOut.cancel();
-    const out = await speechIn.listen(mode, known, { maxMs: 8000, onInterim: (t) => setTest({ state: 'listening', text: t }) });
+    const out = await speechIn.listen(mode, known, {
+      maxMs: 8000,
+      onInterim: (t) => setTest({ state: 'listening', text: t }),
+      ...(mode === 'helper' ? { helper: { endpoint, childName } } : {}),
+    });
     setTest({
       state: 'done',
       text: out.result
-        ? `Heard: “${out.result.transcript}” — ${out.result.onDevice ? 'recognized on this computer.' : 'recognized by the browser’s speech service.'}`
+        ? `Heard: “${out.result.transcript}” — ${
+            mode === 'helper'
+              ? 'turned into words by your AI helper (OpenAI).'
+              : out.result.onDevice
+                ? 'recognized on this computer.'
+                : 'recognized by the browser’s speech service.'
+          }`
         : out.error === 'not-allowed'
           ? 'The browser blocked the microphone. Allow it in the address bar’s site settings, then try again.'
           : out.error === 'no-microphone'
             ? 'No microphone was found.'
-            : 'Didn’t hear anything — try again a little closer to the microphone.',
+            : out.error === 'network'
+              ? 'Your AI helper didn’t answer — check the connection under AI teachers.'
+              : 'Didn’t hear anything — try again a little closer to the microphone.',
     });
   };
 
   const crashed = probe?.answer === 'crashed' && probe.browser === browser;
+  const helperReady = !!helper?.listening;
   const status =
-    avail.state === 'ready'
-      ? avail.onDevice
-        ? '✅ Ready — listening happens on this computer.'
-        : '✅ Ready — using the browser’s speech service.'
-      : avail.state === 'needs-check'
-        ? 'Not set up yet. Her first tap on the microphone does this automatically — or check this browser now.'
-        : avail.state === 'needs-download'
-          ? 'One more step: download the on-device voice pack (a one-time download from your browser, around 60 MB).'
-          : avail.state === 'downloading'
-            ? '⏳ The voice pack is downloading…'
-            : avail.state === 'unsupported'
-              ? crashed
-                ? 'Checking for on-device listening closed this browser tab last time, so it’s turned off here. Choose the browser’s speech service below, or try current Google Chrome.'
-                : mode === 'device'
-                  ? 'This browser can’t recognize speech on-device. Current Chrome on a Mac or PC can — or choose the option below.'
-                  : 'This browser has no speech recognition. She can still tap and type.'
-              : 'Off.';
+    mode === 'helper'
+      ? avail.state !== 'ready'
+        ? 'This browser can’t record from the microphone. Try current Chrome, Safari or Edge.'
+        : helperReady
+          ? '✅ Ready — your AI helper (OpenAI) turns her voice into words.'
+          : helper
+            ? 'Your AI helper can’t listen yet — it needs an OpenAI key (see AI teachers below).'
+            : 'Check the connection under AI teachers to make sure your helper can listen.'
+      : avail.state === 'ready'
+        ? avail.onDevice
+          ? '✅ Ready — listening happens on this computer.'
+          : '✅ Ready — using the browser’s speech service.'
+        : avail.state === 'needs-check'
+          ? 'Not set up yet. Her first tap on the microphone does this automatically — or check this browser now.'
+          : avail.state === 'needs-download'
+            ? 'One more step: download the on-device voice pack (a one-time download from your browser, around 60 MB).'
+            : avail.state === 'downloading'
+              ? '⏳ The voice pack is downloading…'
+              : avail.state === 'unsupported'
+                ? crashed
+                  ? 'Checking for on-device listening closed this browser tab last time, so it’s turned off here. Choose the browser’s speech service below, or try current Google Chrome.'
+                  : mode === 'device'
+                    ? 'This browser can’t recognize speech on-device. Current Chrome on a Mac or PC can — or choose the option below.'
+                    : 'This browser has no speech recognition. She can still tap and type.'
+                : 'Off.';
 
   return (
     <Card title="Talking to teachers" icon="mic">
@@ -117,7 +155,14 @@ function TalkCard({ mode, childName, onMode }: { mode: TalkMode; childName: stri
       <fieldset className="radio-list">
         {TALK_OPTIONS.map((o) => (
           <label key={o.mode} className="check check-stacked">
-            <input type="radio" name="talk" checked={mode === o.mode} onChange={() => onMode(o.mode)} data-testid={`talk-${o.mode}`} />
+            <input
+              type="radio"
+              name="talk"
+              checked={mode === o.mode}
+              disabled={o.mode === 'helper' && mode !== 'helper' && !helperReady}
+              onChange={() => onMode(o.mode)}
+              data-testid={`talk-${o.mode}`}
+            />
             <span>
               {o.label}
               <span className="muted small check-note">{o.note}</span>
@@ -146,7 +191,7 @@ function TalkCard({ mode, childName, onMode }: { mode: TalkMode; childName: stri
                 Check again
               </button>
             )}
-            {avail.state === 'ready' && (
+            {avail.state === 'ready' && (mode !== 'helper' || helperReady) && (
               <button type="button" className="btn btn-small" disabled={test.state === 'listening'} onClick={() => void runTest()} data-testid="talk-test">
                 <Icon name="mic" size={14} /> {test.state === 'listening' ? 'Listening… say something' : 'Test the microphone'}
               </button>
@@ -163,24 +208,30 @@ function TalkCard({ mode, childName, onMode }: { mode: TalkMode; childName: stri
   );
 }
 
-/** Optional AI teachers through the family's local helper. */
+/** Optional AI teachers through the family's helper (OpenAI or Anthropic). */
 function AiTeachersCard({
   settings,
   childName,
   onPatch,
+  helper,
+  onCheck,
 }: {
   settings: HouseholdSettings['teacherAi'];
   childName: string;
   onPatch: (p: Partial<HouseholdSettings['teacherAi']>) => void;
+  helper: HelperStatus | null;
+  onCheck: (endpoint: string) => Promise<HelperStatus>;
 }) {
   const [endpoint, setEndpoint] = useState(settings.endpoint);
-  const [check, setCheck] = useState<{ ok: boolean; message: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const valid = isAllowedHelperUrl(endpoint.trim());
   const on = settings.enabled && settings.consentToSend;
+  const provider = helper?.provider ? PROVIDER_NAMES[helper.provider] : null;
+  const service = provider ?? 'the AI service your helper uses';
+  const hosted = DEFAULT_TEACHER_AI_ENDPOINT.startsWith('/');
   const runCheck = async () => {
     setChecking(true);
-    setCheck(await checkHelper(endpoint.trim()));
+    await onCheck(endpoint.trim());
     setChecking(false);
   };
   return (
@@ -188,34 +239,42 @@ function AiTeachersCard({
       <p className="small">
         <strong>{on ? 'On' : 'Off'}.</strong>{' '}
         {on
-          ? `Professor Hoot, Digit and Nova answer what ${childName} says with Claude, an AI model from Anthropic, through the helper on this computer.`
+          ? `Professor Hoot, Digit and Nova answer what ${childName} says with ${provider ? `${provider}${helper?.model ? ` (${helper.model})` : ''}` : 'an AI model'}, through your AI helper.`
           : `Teachers answer with built-in replies that run on this device. They understand things like which book she read, who she read it with, and whether she finished — but not much beyond books. Turn this on for replies to anything she says.`}
       </p>
       <details className="small">
         <summary>What is sent, and how to set it up</summary>
         <p>
-          <strong>Sent to Anthropic for each reply:</strong> {childName}’s first name, the words she said to the teacher (as text — never audio), the last few
-          lines of that conversation, and her book titles. The teachers’ instructions also say she’s a young child who reads well above her age.{' '}
-          <strong>Never sent:</strong> photos, birthdays, records, reports or her voice. Anthropic doesn’t train its models on API data by default.
+          <strong>Sent to {service} for each reply:</strong> {childName}’s first name, the words she said to the teacher (as text), the last few lines of that
+          conversation, and her book titles. The teachers’ instructions also say she’s a young child who reads well above her age. <strong>Never sent:</strong>{' '}
+          photos, birthdays, records or reports.{' '}
+          {helper?.provider === 'openai'
+            ? 'OpenAI doesn’t train on API data by default, and keeps it up to 30 days for abuse checks unless your OpenAI organization has zero data retention — which OpenAI asks for before processing data of children under 13 (request it from OpenAI).'
+            : helper?.provider === 'anthropic'
+              ? 'Anthropic doesn’t train its models on API data by default.'
+              : 'Neither OpenAI nor Anthropic trains on API data by default.'}
         </p>
         <p>
           <strong>Safety:</strong> the teachers’ instructions live in the helper (a web page can’t change them). Every reply is checked on this device before
           she sees it; anything unsuitable, and any problem, falls back to the built-in teacher. If she says she’s hurt, scared or unsafe, the answer is always
           the on-device “please tell Mom or Dad right now,” and you’ll see a note on Today. Every word is in Teacher talk, with AI lines marked.
         </p>
-        {DEFAULT_TEACHER_AI_ENDPOINT.startsWith('/') ? (
+        {hosted ? (
           <ol>
-            <li>Create an API key at console.anthropic.com (usage is billed to your account — roughly a fifth of a cent per reply with the default model).</li>
             <li>
-              This website has its own helper at <code>{DEFAULT_TEACHER_AI_ENDPOINT}</code> (a small AWS Lambda behind the site password). The key is stored in
-              your AWS account and never reaches the browser — run <code>scripts/deploy/aws-deploy.sh</code> to add or change it.
+              Put an OpenAI API key in AWS Secrets Manager (it also gives natural voices and listening), then run{' '}
+              <code>npm run deploy:aws -- --openai-secret &lt;secret ARN&gt;</code>. Or, for Claude replies only, <code>npm run deploy:aws -- --api-key</code>.
+            </li>
+            <li>
+              This website’s helper is at <code>{DEFAULT_TEACHER_AI_ENDPOINT}</code> (a small AWS Lambda behind the family sign-in). The key never reaches the
+              browser. Usage is billed to your account — a fraction of a cent per reply.
             </li>
           </ol>
         ) : (
           <ol>
-            <li>Create an API key at console.anthropic.com (usage is billed to your account — roughly a fifth of a cent per reply with the default model).</li>
             <li>
-              In the project folder, copy <code>.env.example</code> to <code>.env.local</code> and paste the key after <code>ANTHROPIC_API_KEY=</code>.
+              In the project folder, copy <code>.env.example</code> to <code>.env.local</code> and paste an OpenAI key after <code>OPENAI_API_KEY=</code>{' '}
+              (replies, natural voices and listening) — or an Anthropic key after <code>ANTHROPIC_API_KEY=</code> (replies only).
             </li>
             <li>
               Restart <code>npm run dev</code> — it starts the helper on <code>{DEFAULT_TEACHER_AI_ENDPOINT}</code> automatically. The key stays in that file
@@ -239,7 +298,11 @@ function AiTeachersCard({
           <button type="button" className="btn btn-small" disabled={!valid || checking} onClick={() => void runCheck()} data-testid="ai-check">
             {checking ? 'Checking…' : 'Check connection'}
           </button>
-          {check && <span className={`small ${check.ok ? 'good' : 'muted'}`}>{check.message}</span>}
+          {helper && (
+            <span className={`small ${helper.ok ? 'good' : 'muted'}`} data-testid="ai-check-result">
+              {helper.message}
+            </span>
+          )}
         </div>
         <label className="check span-2">
           <input
@@ -249,7 +312,7 @@ function AiTeachersCard({
             onChange={(e) => onPatch({ endpoint: endpoint.trim(), consentToSend: e.target.checked, ...(e.target.checked ? {} : { enabled: false }) })}
             data-testid="ai-consent"
           />
-          I understand {childName}’s words to her teachers (as text) and her first name will be sent to Anthropic to write the teachers’ replies.
+          I understand {childName}’s words to her teachers (as text) and her first name will be sent to {service} to write the teachers’ replies.
         </label>
         <label className="check span-2">
           <input
@@ -281,6 +344,19 @@ export function SettingsPage({ data }: { data: ParentData }) {
   useEffect(() => {
     void navigator.storage?.estimate?.().then((e) => setStorage({ usage: e.usage ?? 0, quota: e.quota ?? 0 }));
   }, [records]);
+
+  // What the AI helper can do (replies / natural voices / listening). Asked automatically on the
+  // hosted site or when something already uses it; otherwise when a parent taps "Check connection".
+  const [helper, setHelper] = useState<HelperStatus | null>(null);
+  const checkEndpoint = useCallback(async (endpoint: string) => {
+    const status = await checkHelper(endpoint);
+    setHelper(status);
+    return status;
+  }, []);
+  const usesHelper = HOSTED_BUILD || s.teacherAi.enabled || !!s.teacherAi.naturalVoices || s.talkMode === 'helper';
+  useEffect(() => {
+    if (usesHelper && isAllowedHelperUrl(s.teacherAi.endpoint)) void checkEndpoint(s.teacherAi.endpoint);
+  }, [usesHelper, s.teacherAi.endpoint, checkEndpoint]);
 
   const patch = async (p: Partial<HouseholdSettings>, note?: string) => {
     const h = await updateSettings(ctx, p);
@@ -351,9 +427,9 @@ export function SettingsPage({ data }: { data: ParentData }) {
             <p className="muted small">All sounds are synthesized in the browser — no music files or streaming.</p>
           </Card>
 
-          <VoiceCard settings={s} child={child} patch={(p) => patch(p)} />
+          <VoiceCard settings={s} child={child} patch={(p) => patch(p)} helper={helper} />
 
-          <TalkCard mode={s.talkMode} childName={child.name} onMode={(m) => void patch({ talkMode: m })} />
+          <TalkCard mode={s.talkMode} childName={child.name} onMode={(m) => void patch({ talkMode: m })} helper={helper} endpoint={s.teacherAi.endpoint} />
 
           <Card title="Graphics" icon="eye">
             <label htmlFor="gq">3D quality</label>
@@ -391,7 +467,13 @@ export function SettingsPage({ data }: { data: ParentData }) {
         </div>
 
         <div className="stack">
-          <AiTeachersCard settings={s.teacherAi} childName={child.name} onPatch={(p) => void patch({ teacherAi: { ...s.teacherAi, ...p } })} />
+          <AiTeachersCard
+            settings={s.teacherAi}
+            childName={child.name}
+            onPatch={(p) => void patch({ teacherAi: { ...s.teacherAi, ...p } })}
+            helper={helper}
+            onCheck={checkEndpoint}
+          />
 
           <Card title="Activity interpretation" icon="sparkle">
             <p className="small">
@@ -567,9 +649,12 @@ export function SettingsPage({ data }: { data: ParentData }) {
               <li>🙈 No face recognition or biometric processing, ever.</li>
               <li>👀 Every teacher conversation is visible to you in “Teacher talk”.</li>
               <li>
-                🎤 Her voice is never recorded or stored — only the words, and only{' '}
-                {s.talkMode === 'browser' ? 'the browser’s speech service (if needed) hears the audio' : 'this computer hears the audio'}.
+                🎤{' '}
+                {s.talkMode === 'helper'
+                  ? 'Her voice is recorded only while the microphone is on, sent to your AI helper and OpenAI to be turned into words, and never stored here (OpenAI keeps no copy of audio it transcribes).'
+                  : `Her voice is never recorded or stored — only the words, and only ${s.talkMode === 'browser' ? 'the browser’s speech service (if needed) hears the audio' : 'this computer hears the audio'}.`}
               </li>
+              {s.teacherAi.naturalVoices && <li>🔊 Natural voices: the words teachers say are sent to OpenAI to be spoken. These voices are AI-generated.</li>}
               <li>🤝 Nothing leaves this device unless you turn on an external service above.</li>
             </ul>
           </Card>

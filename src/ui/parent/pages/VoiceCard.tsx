@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useServices } from '../../../app/services';
 import { cleanSayName, nameTestLine, sayNameSuggestions } from '../../../domain/pronounce';
+import { isAllowedHelperUrl, naturalVoicesOn, type HelperStatus } from '../../../domain/teachers/chatRemote';
 import { TEACHERS } from '../../../domain/teachers/teachers';
 import type { Child, HouseholdSettings } from '../../../domain/types';
 import { updateChild } from '../../../services/householdService';
+import { clearNaturalVoiceCache } from '../../../voice/helperVoice';
 import type { VoiceInfo } from '../../../voice/SpeechService';
 import { Icon } from '../../shared/Icon';
 import { Card } from '../components';
@@ -15,17 +17,21 @@ function voiceLabel(v: VoiceInfo): string {
 }
 
 /**
- * Read-aloud: whether teachers read automatically, which built-in voice they
- * use, and how that voice should say her name (a respelling used only for speech).
+ * Read-aloud: whether teachers read automatically, natural AI voices (through
+ * the family's helper) or the voices built into this computer, and how the
+ * voices should say her name (a respelling used only for speech).
  */
 export function VoiceCard({
   settings: s,
   child,
   patch,
+  helper,
 }: {
   settings: HouseholdSettings;
   child: Child;
   patch: (p: Partial<HouseholdSettings>) => Promise<void>;
+  /** What the AI helper can do (null until checked). */
+  helper: HelperStatus | null;
 }) {
   const { ctx, speechOut } = useServices();
   const [voices, setVoices] = useState<VoiceInfo[]>(() => speechOut.voices());
@@ -47,6 +53,14 @@ export function VoiceCard({
   const current = child.sayName ?? '';
   const dirty = clean !== current && !(clean.toLowerCase() === child.name.toLowerCase() && !current);
 
+  const natural = naturalVoicesOn(s.teacherAi);
+  const canSpeak = speechOut.available || natural;
+  const setNatural = (on: boolean) => {
+    void patch({ teacherAi: { ...s.teacherAi, naturalVoices: on } });
+    // Spoken lines saved in this browser go when natural voices are turned off.
+    if (!on) void clearNaturalVoiceCache();
+  };
+
   const hear = (spoken: string) => {
     const hoot = TEACHERS.hoot.voice;
     void speechOut.speak(nameTestLine(spoken), {
@@ -54,6 +68,7 @@ export function VoiceCard({
       rate: hoot.rate,
       volume: s.audio.voice || 0.9,
       ...(s.voiceName ? { voiceName: s.voiceName } : {}),
+      ...(natural ? { natural: { endpoint: s.teacherAi.endpoint, teacher: 'hoot' as const } } : {}),
     });
   };
 
@@ -69,31 +84,62 @@ export function VoiceCard({
   return (
     <Card title="Voice" icon="mic">
       <label className="check">
-        <input type="checkbox" checked={s.readAloud} disabled={!speechOut.available} onChange={(e) => void patch({ readAloud: e.target.checked })} /> Teachers
-        read their lines aloud automatically
+        <input type="checkbox" checked={s.readAloud} disabled={!canSpeak} onChange={(e) => void patch({ readAloud: e.target.checked })} /> Teachers read their
+        lines aloud automatically
       </label>
-      {!speechOut.available ? (
+      <p className="muted small">A speaker button is always available for any line.</p>
+
+      <div className="natural-voices" data-testid="natural-voices">
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={natural}
+            disabled={!natural && (!helper?.voices || !isAllowedHelperUrl(s.teacherAi.endpoint))}
+            onChange={(e) => setNatural(e.target.checked)}
+            data-testid="natural-toggle"
+          />{' '}
+          Natural teacher voices (OpenAI)
+        </label>
+        <p className="muted small">
+          {helper?.voices || natural ? (
+            <>
+              Professor Hoot, Digit and Nova each get their own natural, AI-generated voice. The words a teacher says — including {child.name}’s name and their
+              answers to her — go to your AI helper and on to OpenAI to be spoken. OpenAI keeps them up to 30 days for abuse checks unless your OpenAI
+              organization has zero data retention. Spoken lines are saved in this browser, so a repeated line is instant and free. If the helper can’t be
+              reached, the computer’s own voice reads instead.
+            </>
+          ) : helper ? (
+            'Needs your AI helper with an OpenAI key (see AI teachers below).'
+          ) : (
+            'Needs your AI helper with an OpenAI key — tap Check connection under AI teachers.'
+          )}
+        </p>
+      </div>
+
+      {!canSpeak ? (
         <p className="muted small">This browser has no built-in speech voices; text and pictures are always shown.</p>
       ) : (
         <>
-          <p className="muted small">Uses the voices built into this computer. A speaker button is always available for any line.</p>
-
-          <label htmlFor="voice-pick">Reading voice</label>
-          <select
-            id="voice-pick"
-            data-testid="voice-pick"
-            value={s.voiceName && chosenHere ? s.voiceName : ''}
-            // '' = automatic (the best voice on whichever device she's using).
-            onChange={(e) => void patch({ voiceName: e.target.value })}
-          >
-            <option value="">Automatic{auto ? ` — ${voiceLabel(auto)}` : ''}</option>
-            {voices.map((v) => (
-              <option key={v.name} value={v.name}>
-                {voiceLabel(v)}
-              </option>
-            ))}
-          </select>
-          {s.voiceName && !chosenHere && <p className="muted small">“{s.voiceName}” isn’t on this device, so it uses the automatic voice here.</p>}
+          {speechOut.available && (
+            <>
+              <label htmlFor="voice-pick">{natural ? 'Backup voice (built into this computer)' : 'Reading voice (built into this computer)'}</label>
+              <select
+                id="voice-pick"
+                data-testid="voice-pick"
+                value={s.voiceName && chosenHere ? s.voiceName : ''}
+                // '' = automatic (the best voice on whichever device she's using).
+                onChange={(e) => void patch({ voiceName: e.target.value })}
+              >
+                <option value="">Automatic{auto ? ` — ${voiceLabel(auto)}` : ''}</option>
+                {voices.map((v) => (
+                  <option key={v.name} value={v.name}>
+                    {voiceLabel(v)}
+                  </option>
+                ))}
+              </select>
+              {s.voiceName && !chosenHere && <p className="muted small">“{s.voiceName}” isn’t on this device, so it uses the automatic voice here.</p>}
+            </>
+          )}
 
           <div className="say-name" data-testid="say-name">
             <label htmlFor="say-name-input">How the voices say “{child.name}”</label>

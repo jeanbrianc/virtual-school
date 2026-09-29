@@ -22,6 +22,7 @@ import { ruleProgress } from '../../domain/rewards/engine';
 import { speakableText } from '../../domain/pronounce';
 import { browserFamily, knownOnDevice, type OnDeviceAnswer } from '../../domain/talk';
 import { talkPhrases } from '../../domain/teachers/chat';
+import { isAllowedHelperUrl, naturalVoicesOn } from '../../domain/teachers/chatRemote';
 import { TEACHERS, type TeacherId } from '../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../domain/types';
 import { toDay } from '../../domain/util/time';
@@ -109,26 +110,30 @@ export function ChildMode({ childId }: { childId: string }) {
   // ── Speech (optional read-aloud) ────────────────────────────────────────
   const teacherForSpeech = useRef<TeacherId>('hoot');
   const readAloud = household?.settings.readAloud ?? false;
+  const naturalVoices = naturalVoicesOn(household?.settings.teacherAi);
   const speech: Speech = useMemo(
     () => ({
-      canSpeak: services.speechOut.available,
+      canSpeak: services.speechOut.available || naturalVoices,
       auto: readAloud,
       speak: (text: string) => {
         const settings = dataRef.current?.household.settings;
         if (settings?.audio.muted) return;
-        const v = TEACHERS[teacherForSpeech.current].voice;
+        const teacher = teacherForSpeech.current;
+        const v = TEACHERS[teacher].voice;
         const child = dataRef.current?.child;
         // Her name is respelled for the voice only (see domain/pronounce.ts).
         const spoken = child ? speakableText(text, child.name, child.sayName) : text;
+        const ai = settings?.teacherAi;
         void services.speechOut.speak(spoken, {
           pitch: v.pitch,
           rate: v.rate,
           volume: settings?.audio.voice ?? 1,
           ...(settings?.voiceName ? { voiceName: settings.voiceName } : {}),
+          ...(ai && naturalVoicesOn(ai) ? { natural: { endpoint: ai.endpoint, teacher } } : {}),
         });
       },
     }),
-    [services.speechOut, readAloud],
+    [services.speechOut, readAloud, naturalVoices],
   );
 
   // ── Talking to teachers (speech-to-text + conversation) ─────────────────
@@ -154,8 +159,20 @@ export function ChildMode({ childId }: { childId: string }) {
   const books = data?.records.books;
   const talkKit: TalkKit = useMemo(() => {
     const { speechIn, speechOut } = services;
-    const needsSetup = speechIn.canProbe && (known === 'unknown' || known === 'downloadable' || known === 'downloading');
-    const blocked = !speechIn.available ? MIC_NO_BROWSER_SUPPORT : micState.state === 'unsupported' ? MIC_NEEDS_GROWNUP : null;
+    const viaHelper = talkMode === 'helper';
+    const needsSetup = !viaHelper && speechIn.canProbe && (known === 'unknown' || known === 'downloadable' || known === 'downloading');
+    const helperEndpoint = ai?.endpoint && isAllowedHelperUrl(ai.endpoint) ? ai.endpoint : null;
+    const blocked = viaHelper
+      ? micState.state !== 'ready'
+        ? MIC_NO_BROWSER_SUPPORT
+        : helperEndpoint
+          ? null
+          : MIC_NEEDS_GROWNUP
+      : !speechIn.available
+        ? MIC_NO_BROWSER_SUPPORT
+        : micState.state === 'unsupported'
+          ? MIC_NEEDS_GROWNUP
+          : null;
     const prepare = async (): Promise<MicSetup> => {
       probingRef.current = true;
       setProbing(true);
@@ -187,7 +204,12 @@ export function ChildMode({ childId }: { childId: string }) {
               listen: (o) => {
                 // Never let the teacher's own voice be heard as hers.
                 speechOut.cancel();
-                return speechIn.listen(modeRef.current, knownRef.current, { maxMs: 12_000, ...o });
+                const childName = dataRef.current?.child.name;
+                return speechIn.listen(modeRef.current, knownRef.current, {
+                  maxMs: 12_000,
+                  ...o,
+                  ...(helperEndpoint ? { helper: { endpoint: helperEndpoint, ...(childName ? { childName } : {}) } } : {}),
+                });
               },
               stop: () => speechIn.stop(),
             },

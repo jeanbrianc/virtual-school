@@ -15,6 +15,7 @@ import { randomIds } from '../domain/util/ids';
 import { systemClock } from '../domain/util/time';
 import type { ServiceContext } from '../services/context';
 import { getHousehold } from '../services/householdService';
+import { HelperSpeechOutput, RoutingSpeechInput } from '../voice/helperVoice';
 import { BrowserSpeechInput, BrowserSpeechOutput, type SpeechInput, type SpeechOutput } from '../voice/SpeechService';
 
 /** Everything the UI needs, constructed once at startup (dependency injection root). */
@@ -67,8 +68,9 @@ export async function createAppServices(): Promise<AppServices> {
     ctx,
     persistent,
     audio,
-    speechOut: new BrowserSpeechOutput(),
-    speechIn: new BrowserSpeechInput(),
+    // Built-in voices and recognizer, plus the family's AI helper when a parent turns it on.
+    speechOut: new HelperSpeechOutput(new BrowserSpeechOutput()),
+    speechIn: new RoutingSpeechInput(new BrowserSpeechInput()),
     books: new LocalBookCatalogService(),
     interpreter: (h) => createInterpretationService(h?.settings.interpretation ?? { provider: 'local', consentToSend: false }),
     teacherChat: (h) => createTeacherChat(h?.settings.teacherAi),
