@@ -52,6 +52,12 @@ wants() { [[ " $ARGS " == *" $1 "* ]]; }
 ARGS=" $* "
 
 PARAMS=("DomainName=$DOMAIN" "GitHubRepo=$GITHUB_REPO")
+if [ "$GITHUB_REPO" != "jeanbrianc/virtual-school" ] && { [ -z "${GITHUB_OWNER_ID:-}" ] || [ -z "${GITHUB_REPO_ID:-}" ]; }; then
+  echo "A different GitHub repo needs GITHUB_OWNER_ID and GITHUB_REPO_ID (its immutable numeric IDs)." >&2
+  exit 1
+fi
+[ -z "${GITHUB_OWNER_ID:-}" ] || PARAMS+=("GitHubOwnerId=$GITHUB_OWNER_ID")
+[ -z "${GITHUB_REPO_ID:-}" ] || PARAMS+=("GitHubRepoId=$GITHUB_REPO_ID")
 
 # The Route 53 zone that holds the domain (brianjeanbuilds.com for lms.brianjeanbuilds.com).
 if [ -z "${HOSTED_ZONE_ID:-}" ]; then

@@ -96,6 +96,10 @@ welcome page with a family sign-in in front of everything, and the AI teachers a
 every push to `main` on GitHub deploys itself. Step by step:
 [docs/DEPLOY.md](docs/DEPLOY.md).
 
+GitHub's AWS deploy role matches this repository's immutable numeric owner and
+repository IDs plus the `main` branch. If copying the deployment to another
+repository, also set its `GITHUB_OWNER_ID` and `GITHUB_REPO_ID`; see the deploy guide.
+
 **Hosted copy.** The production build is also published as a private claude.ai
 artifact. It runs the same code with its own browser storage. That viewer blocks
 file downloads, the print dialog and the microphone, and can't reach the local

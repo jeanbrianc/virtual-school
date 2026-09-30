@@ -70,6 +70,16 @@ Parameters:
   GitHubBranch:
     Type: String
     Default: main
+  GitHubOwnerId:
+    Type: String
+    Default: '220031329'
+    AllowedPattern: '^[0-9]+$'
+    Description: Immutable numeric ID of the configured GitHub repository owner.
+  GitHubRepoId:
+    Type: String
+    Default: '1393011956'
+    AllowedPattern: '^[0-9]+$'
+    Description: Immutable numeric ID of the configured GitHub repository.
   CreateGitHubOidcProvider:
     Type: String
     AllowedValues: ['true', 'false']
@@ -539,7 +549,10 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:ref:refs/heads/${GitHubBranch}'
+                token.actions.githubusercontent.com:sub: !Sub
+                  - 'repo:${Owner}@${GitHubOwnerId}/${Repo}@${GitHubRepoId}:ref:refs/heads/${GitHubBranch}'
+                  - Owner: !Select [0, !Split ['/', !Ref GitHubRepo]]
+                    Repo: !Select [1, !Split ['/', !Ref GitHubRepo]]
       Policies:
         - PolicyName: publish-site
           PolicyDocument:
