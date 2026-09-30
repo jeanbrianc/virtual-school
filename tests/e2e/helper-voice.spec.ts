@@ -102,8 +102,11 @@ test('natural teacher voices and listening through the AI helper', async ({ page
   await page.getByTestId('ai-endpoint').blur();
   await page.getByTestId('ai-check').click();
   await expect(page.getByTestId('ai-check-result')).toHaveText(
-    'Connected — AI teachers are using OpenAI (gpt-6-luna). Natural voices and listening are available.',
+    'Connected to helper — OpenAI (gpt-6-luna) is configured; provider requests are not tested. Natural voices and listening are configured; not tested.',
   );
+  await page.getByTestId('natural-test').click();
+  await expect(page.getByTestId('natural-test-result')).toContainText('Voice generation passed');
+  expect(spoken.at(-1)).toEqual({ teacherId: 'hoot', text: 'Hoo-hoo! This is a teacher voice test.' });
   // (Saved settings update the switches a moment later, so click and then wait.)
   await page.getByTestId('natural-toggle').click();
   await expect(page.getByTestId('natural-toggle')).toBeChecked();

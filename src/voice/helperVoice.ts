@@ -43,6 +43,7 @@ export class HelperSpeechOutput implements SpeechOutput {
   private audio: HTMLAudioElement | null = null;
   private finishAudio: (() => void) | null = null;
   private inflight: AbortController | null = null;
+  private readonly cooldowns = new Map<string, number>();
   private readonly memory = new Map<string, Blob>();
 
   constructor(
@@ -104,6 +105,7 @@ export class HelperSpeechOutput implements SpeechOutput {
       this.remember(key, stored);
       return stored;
     }
+    if ((this.cooldowns.get(natural.endpoint) ?? 0) > Date.now()) throw new Error('voice cooldown');
     const controller = new AbortController();
     this.inflight = controller;
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -114,7 +116,20 @@ export class HelperSpeechOutput implements SpeechOutput {
         body: JSON.stringify({ teacherId: natural.teacher, text }),
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 429) {
+          let seconds = 60;
+          try {
+            const body = (await res.json()) as { retryAfterSeconds?: unknown };
+            if (typeof body.retryAfterSeconds === 'number' && Number.isFinite(body.retryAfterSeconds))
+              seconds = Math.max(1, Math.min(900, body.retryAfterSeconds));
+          } catch {
+            /* bounded default */
+          }
+          this.cooldowns.set(natural.endpoint, Date.now() + seconds * 1000);
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
       const blob = new Blob([await res.arrayBuffer()], { type: res.headers.get('content-type') || 'audio/mpeg' });
       if (blob.size < 100) throw new Error('empty audio');
       this.remember(key, blob);

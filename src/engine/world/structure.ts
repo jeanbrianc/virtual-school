@@ -298,7 +298,7 @@ export class Structure {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       toneMapped: false,
-      opacity: 0.55,
+      opacity: 0.22,
     });
     for (const [x, w] of [
       [-3.6, 2.2],
