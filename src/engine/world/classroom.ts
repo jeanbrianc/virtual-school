@@ -58,11 +58,17 @@ function roundTable(ctx: BuildContext, x: number, z: number, seed: number) {
   ctx.collide(x, z, 1.5, 1.5);
 }
 
+/** The alphabet rug in the middle of the classroom (its 1–10 numbers are the dance circuit). */
+export const CLASSROOM_RUG = { x: 0, z: -4.2, width: 7, depth: 5.25 } as const;
+
 export function buildClassroom(ctx: BuildContext, today: Date): void {
   // Alphabet rug.
-  const rug = new THREE.Mesh(new THREE.PlaneGeometry(7, 5.25), new THREE.MeshStandardMaterial({ map: rugTexture('classroom'), roughness: 1 }));
+  const rug = new THREE.Mesh(
+    new THREE.PlaneGeometry(CLASSROOM_RUG.width, CLASSROOM_RUG.depth),
+    new THREE.MeshStandardMaterial({ map: rugTexture('classroom'), roughness: 1 }),
+  );
   rug.rotation.x = -Math.PI / 2;
-  rug.position.set(0, 0.01, -4.2);
+  rug.position.set(CLASSROOM_RUG.x, 0.01, CLASSROOM_RUG.z);
   rug.receiveShadow = true;
   ctx.addStatic(rug);
 

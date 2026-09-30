@@ -126,6 +126,19 @@ celebrated with a camera shot of the new room.
   `buildMilestonePreview` boosts a *copy* of the snapshot for parent previews.
 - **reports/** — `generateReport(inputs, {audience, start, end})` produces an
   immutable `ReportContent` snapshot (parent record vs. family update).
+- **play/circuit.ts** — the rug's dance & gym circuit: the 17-move catalog,
+  `circuitFor(child)` (her family's 10 stations, defaults elsewhere),
+  `stepOn(run, n)` (1 starts, the right next number advances, 10 after 9
+  completes; any number still does its move) and the coach's lines. The
+  engine side is `engine/characters/moves.ts` (pure pose functions over
+  t = 0…1, eased so every move starts and ends standing; played by
+  `AvatarModel.perform`, which pivots flips around her middle and tips the
+  upper body at the hips) and `engine/world/danceMat.ts` (where the painted
+  numbers are, the next-number glow, the start flag). `Game` notices her
+  entering a number — only the one a tap was heading for — turns her a little
+  off the camera, leans the camera in, plays the move with its sounds and
+  sparkles, and reports `onStation(n)`; `ChildMode` keeps the run, the HUD
+  and the callouts, and saves `circuitsDone`.
 
 ## Persistence
 

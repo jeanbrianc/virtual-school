@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useServices } from '../../../app/services';
 import { ACCESSORIES, DEFAULT_AVATAR, EYE_COLORS, HAIR_COLORS, HAIR_STYLES, OUTFIT_COLORS, OUTFITS, SKIN_TONES } from '../../../domain/avatar';
+import type { DanceMoveId } from '../../../domain/play/circuit';
 import type { Avatar, AvatarConfig } from '../../../domain/types';
 import { addMedia, saveAvatar } from '../../../services/householdService';
 import { Icon } from '../../shared/Icon';
 import { Card, MediaImage, PageHeader, prepareImage } from '../components';
 import type { ParentData } from '../ParentApp';
+import { CircuitCard } from './CircuitCard';
 
-type PreviewHandle = { setConfig(cfg: AvatarConfig): void; resize(): void; dispose(): void };
+type PreviewHandle = { setConfig(cfg: AvatarConfig): void; perform(move: DanceMoveId): Promise<void>; resize(): void; dispose(): void };
 
 function configOf(a: Avatar | undefined): AvatarConfig {
   if (!a) return DEFAULT_AVATAR;
@@ -113,6 +115,16 @@ export function AvatarPage({ data }: { data: ParentData }) {
     setSaved(true);
   };
 
+  /** "Try it" on a circuit number: the preview does the move (scrolled into view on small screens). */
+  const tryMove = (move: DanceMoveId) => {
+    const el = host.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom < 80 || r.top > window.innerHeight - 80) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    void preview.current?.perform(move);
+  };
+
   const onPhoto = async (file: File | undefined) => {
     if (!file || !avatar) return;
     const img = await prepareImage(file);
@@ -172,17 +184,20 @@ export function AvatarPage({ data }: { data: ParentData }) {
             </ul>
           </Card>
         </div>
-        <Card className="avatar-controls">
-          <Swatches label="Skin tone" colors={SKIN_TONES} value={cfg.skinTone} onChange={(v) => set('skinTone', v)} />
-          <Options label="Hair style" options={HAIR_STYLES} value={cfg.hairStyle} onChange={(v) => set('hairStyle', v)} />
-          <Swatches label="Hair color" colors={HAIR_COLORS} value={cfg.hairColor} onChange={(v) => set('hairColor', v)} />
-          <Swatches label="Eye color" colors={EYE_COLORS} value={cfg.eyeColor} onChange={(v) => set('eyeColor', v)} />
-          <Options label="Outfit" options={OUTFITS} value={cfg.outfit} onChange={(v) => set('outfit', v)} />
-          <Swatches label="Outfit color" colors={OUTFIT_COLORS} value={cfg.outfitColor} onChange={(v) => set('outfitColor', v)} />
-          <Swatches label="Accent color" colors={OUTFIT_COLORS} value={cfg.accentColor} onChange={(v) => set('accentColor', v)} />
-          <Options label="Accessory" options={ACCESSORIES} value={cfg.accessory} onChange={(v) => set('accessory', v)} />
-          <Swatches label="Shoes" colors={OUTFIT_COLORS} value={cfg.shoeColor} onChange={(v) => set('shoeColor', v)} />
-        </Card>
+        <div className="avatar-right-col">
+          <Card className="avatar-controls">
+            <Swatches label="Skin tone" colors={SKIN_TONES} value={cfg.skinTone} onChange={(v) => set('skinTone', v)} />
+            <Options label="Hair style" options={HAIR_STYLES} value={cfg.hairStyle} onChange={(v) => set('hairStyle', v)} />
+            <Swatches label="Hair color" colors={HAIR_COLORS} value={cfg.hairColor} onChange={(v) => set('hairColor', v)} />
+            <Swatches label="Eye color" colors={EYE_COLORS} value={cfg.eyeColor} onChange={(v) => set('eyeColor', v)} />
+            <Options label="Outfit" options={OUTFITS} value={cfg.outfit} onChange={(v) => set('outfit', v)} />
+            <Swatches label="Outfit color" colors={OUTFIT_COLORS} value={cfg.outfitColor} onChange={(v) => set('outfitColor', v)} />
+            <Swatches label="Accent color" colors={OUTFIT_COLORS} value={cfg.accentColor} onChange={(v) => set('accentColor', v)} />
+            <Options label="Accessory" options={ACCESSORIES} value={cfg.accessory} onChange={(v) => set('accessory', v)} />
+            <Swatches label="Shoes" colors={OUTFIT_COLORS} value={cfg.shoeColor} onChange={(v) => set('shoeColor', v)} />
+          </Card>
+          <CircuitCard child={child} {...(previewError ? {} : { onTry: tryMove })} />
+        </div>
       </div>
     </div>
   );

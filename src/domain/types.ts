@@ -107,6 +107,10 @@ export interface Child {
   activePetId?: string;
   /** Things in the school she has already discovered (interactable ids). */
   explored?: string[];
+  /** The dance & gym circuit on the classroom mat: a move for each number 1–10 (see domain/play/circuit.ts). */
+  circuit?: { move: import('./play/circuit').DanceMoveId; name?: string }[];
+  /** How many times she has done the whole circuit, 1 to 10. */
+  circuitsDone?: number;
   isDemo?: boolean;
 }
 

@@ -18,6 +18,8 @@ export class PlayerController {
   private onArrive: (() => void) | null = null;
   private stepTimer = 0;
   private faceTarget: number | null = null;
+  /** A spot she glides onto while standing still (the middle of a dance-mat number). */
+  private settle: { x: number; z: number } | null = null;
 
   constructor(
     readonly avatar: AvatarModel,
@@ -32,6 +34,7 @@ export class PlayerController {
     this.velocity.set(0, 0, 0);
     this.path = [];
     this.onArrive = null;
+    this.settle = null;
     this.sync();
   }
 
@@ -50,6 +53,22 @@ export class PlayerController {
   cancelPath(): void {
     this.path = [];
     this.onArrive = null;
+  }
+
+  /** Stops right here (no path, no sliding). */
+  stop(): void {
+    this.cancelPath();
+    this.velocity.set(0, 0, 0);
+  }
+
+  /** Glides her onto (x, z) while she stands still — e.g. to the middle of a mat number. */
+  settleAt(x: number, z: number): void {
+    this.settle = { x, z };
+  }
+
+  /** Turns to a heading (radians) once she's standing still. */
+  faceYaw(yaw: number): void {
+    this.faceTarget = yaw;
   }
 
   get isWalkingPath(): boolean {
@@ -72,6 +91,7 @@ export class PlayerController {
     if (move && (move.x !== 0 || move.z !== 0)) {
       this.cancelPath();
       this.faceTarget = null;
+      this.settle = null;
       desired.set(move.x, 0, move.z).multiplyScalar(PLAYER.walkSpeed);
     } else if (this.path.length > 0) {
       const next = this.path[0] as Point;
@@ -92,6 +112,14 @@ export class PlayerController {
     if (this.velocity.lengthSq() < 0.0004 && desired.lengthSq() === 0) this.velocity.set(0, 0, 0);
 
     const next = this.position.clone().addScaledVector(this.velocity, dt);
+    if (this.settle && this.path.length === 0 && desired.lengthSq() === 0) {
+      const k2 = 1 - Math.exp(-10 * dt);
+      next.x += (this.settle.x - next.x) * k2;
+      next.z += (this.settle.z - next.z) * k2;
+      if (Math.hypot(this.settle.x - next.x, this.settle.z - next.z) < 0.01) this.settle = null;
+    } else if (this.path.length > 0) {
+      this.settle = null;
+    }
     const resolved = this.collisions.resolveCircle(next.x, next.z, PLAYER.radius);
     this.position.set(resolved.x, 0, resolved.z);
 

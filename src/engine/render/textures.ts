@@ -160,6 +160,19 @@ export function beadboardTexture(): THREE.CanvasTexture {
   );
 }
 
+/** The classroom rug's canvas size and its 1–10 number circles (texture pixels). */
+export const CLASSROOM_RUG_CANVAS = { w: 1024, h: 768, border: 64, numberRadius: 44 } as const;
+
+/** Where each number sits on the classroom rug, as 0…1 texture coordinates (u across, v down). */
+export function rugNumberSpots(): { n: number; u: number; v: number }[] {
+  const { w, h, border } = CLASSROOM_RUG_CANVAS;
+  return Array.from({ length: 10 }, (_, i) => {
+    const x = border + 60 + (i % 5) * ((w - 2 * border - 120) / 4);
+    const y = i < 5 ? h * 0.38 : h * 0.66;
+    return { n: i + 1, u: x / w, v: y / h };
+  });
+}
+
 export function rugTexture(kind: 'classroom' | 'library' | 'nook'): THREE.CanvasTexture {
   return canvasTexture(1024, kind === 'classroom' ? 768 : 1024, (ctx, w, h) => {
     const rng = createRng(kind.length * 13);
@@ -217,12 +230,12 @@ export function rugTexture(kind: 'classroom' | 'library' | 'nook'): THREE.Canvas
     ctx.fillRect(cell + 12, cell + 12, w - 2 * cell - 24, h - 2 * cell - 24);
     // Hopscotch-ish number path in the middle.
     ctx.font = `700 46px ${ROUNDED}`;
-    for (let i = 1; i <= 10; i++) {
-      const x = cell + 60 + ((i - 1) % 5) * ((w - 2 * cell - 120) / 4);
-      const y = i <= 5 ? h * 0.38 : h * 0.66;
+    for (const { n: i, u, v } of rugNumberSpots()) {
+      const x = u * w;
+      const y = v * h;
       ctx.fillStyle = colors[i % colors.length] ?? PALETTE.mustard;
       ctx.beginPath();
-      ctx.arc(x, y, 44, 0, Math.PI * 2);
+      ctx.arc(x, y, CLASSROOM_RUG_CANVAS.numberRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.fillStyle = PALETTE.cream;
       ctx.fillText(String(i), x, y + 3);

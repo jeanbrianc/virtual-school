@@ -19,6 +19,9 @@ export class CameraRig {
   private cineBlend = 0;
   private cineToken = 0;
   private initialized = false;
+  /** Leans in on Izzy (a little closer, centred on her) — e.g. while she does a dance move. */
+  spotlight = false;
+  private spot = 0;
 
   constructor(
     aspect: number,
@@ -96,11 +99,13 @@ export class CameraRig {
   }
 
   update(dt: number, focus: THREE.Vector3): void {
-    // Look slightly ahead of Izzy so she sits in the lower third with the room ahead in view.
+    this.spot = damp(this.spot, this.spotlight ? 1 : 0, 3, dt);
+    // Look slightly ahead of Izzy so she sits in the lower third with the room ahead in view
+    // (in the spotlight: closer, and on her).
     const desired = focus
       .clone()
-      .add(new THREE.Vector3(0, CAMERA.lookHeight, 0))
-      .addScaledVector(this.forward, CAMERA.lookAhead);
+      .add(new THREE.Vector3(0, CAMERA.lookHeight - 0.2 * this.spot, 0))
+      .addScaledVector(this.forward, CAMERA.lookAhead * (1 - this.spot));
     if (!this.initialized) {
       this.target.copy(desired);
       this.initialized = true;
@@ -110,10 +115,11 @@ export class CameraRig {
       this.target.z = damp(this.target.z, desired.z, CAMERA.followDamping, dt);
     }
     const cp = Math.cos(this.pitch);
+    const distance = this.distance * (1 - 0.34 * this.spot);
     this.followPos.set(
-      this.target.x + Math.sin(this.yaw) * cp * this.distance,
-      this.target.y + Math.sin(this.pitch) * this.distance,
-      this.target.z + Math.cos(this.yaw) * cp * this.distance,
+      this.target.x + Math.sin(this.yaw) * cp * distance,
+      this.target.y + Math.sin(this.pitch) * distance,
+      this.target.z + Math.cos(this.yaw) * cp * distance,
     );
     this.followLook.copy(this.target);
     if (this.cineBlend > 0.001) {

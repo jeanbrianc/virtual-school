@@ -9,6 +9,9 @@ declare global {
       overlay(): string | null;
       booksOnShelf(): number;
       explored(): string[];
+      stepOn(n: number): void;
+      performing(): boolean;
+      circuit(): { next: number } | null;
     };
   }
 }

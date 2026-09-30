@@ -27,7 +27,21 @@ export type SfxName =
   | 'plop'
   | 'dragon'
   | 'petHappy'
-  | 'pop';
+  | 'pop'
+  | 'boing'
+  | 'land'
+  | 'twirl'
+  | 'star'
+  | 'station';
+
+/**
+ * Stepping on number n of the dance circuit plays the n-th note of a C major
+ * scale (C5 … E6), so going 1 → 10 climbs a little tune.
+ */
+export function stationPitch(n: number): number {
+  const steps = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16];
+  return Math.pow(2, (steps[Math.max(0, Math.min(9, n - 1))] ?? 0) / 12);
+}
 
 const NOTE = (semitonesFromA4: number) => 440 * Math.pow(2, semitonesFromA4 / 12);
 const C5 = NOTE(3);
@@ -186,6 +200,29 @@ export class AudioEngine {
       case 'petHappy':
         this.tone('sine', 1400 * p, 2300 * p, 0.09, 0.1 * v);
         this.tone('sine', 1600 * p, 2600 * p, 0.09, 0.08 * v, 0.1);
+        break;
+      case 'boing':
+        // A springy "boing" for jumps and hops.
+        this.tone('sine', 230 * p, 700 * p, 0.2, 0.2 * v);
+        this.tone('triangle', 345 * p, 1050 * p, 0.16, 0.05 * v, 0.01);
+        break;
+      case 'land':
+        // Soft mat landing: a low thump and a little dust.
+        this.tone('sine', 150 * p, 55 * p, 0.17, 0.3 * v);
+        this.noise(0.09, 'lowpass', 700, 250, 0.1 * v);
+        break;
+      case 'twirl':
+        // A quick rising harp run.
+        [0, 2, 4, 7, 9, 12, 14].forEach((st, i) => this.bell(NOTE(3 + st) * p, 0.55, 0.06 * v, i * 0.045));
+        break;
+      case 'star':
+        this.bell(C6 * p, 1.1, 0.13 * v);
+        this.bell(NOTE(22) * p, 1.1, 0.1 * v, 0.09);
+        this.bell(NOTE(27) * p, 0.9, 0.06 * v, 0.18);
+        break;
+      case 'station':
+        this.marimba(C5 * p, 0, 0.24 * v);
+        this.bell(C6 * p, 0.6, 0.05 * v, 0.02);
         break;
     }
   }

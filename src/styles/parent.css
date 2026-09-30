@@ -1980,6 +1980,72 @@
 .avatar-stage canvas {
   display: block;
 }
+/* The right column on the avatar page: the look, then the dance circuit. */
+.avatar-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.circuit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.circuit-row {
+  display: grid;
+  grid-template-columns: 32px minmax(150px, 1.1fr) minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+.circuit-num {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--p-surface-2);
+  font-weight: 700;
+}
+.circuit-row select,
+.circuit-name {
+  min-width: 0;
+  width: 100%;
+}
+.circuit-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.circuit-try {
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  /* Number, move and Try on one line; her name for it underneath. */
+  .circuit-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'num move try'
+      '. name name';
+    row-gap: 6px;
+  }
+  .circuit-num {
+    grid-area: num;
+  }
+  .circuit-row select {
+    grid-area: move;
+  }
+  .circuit-name {
+    grid-area: name;
+  }
+  .circuit-try {
+    grid-area: try;
+  }
+}
 .avatar-controls {
   display: flex;
   flex-direction: column;

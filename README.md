@@ -164,6 +164,21 @@ Playwright needs a Chromium: `npx playwright install chromium` on a new machine
 9. **Persistence**: all of the above survives reloads (IndexedDB), and multiple
    open tabs stay in sync.
 
+**Dance & gym circuit.** The 1–10 numbers on the classroom rug are stations,
+like the circuits in her dance and gymnastics classes. Hopping onto a number
+(walking, tapping it, or Space on the one she's on) makes her avatar do that
+number's move — a plié, bunny hops, a ☀️ sunshine twirl, a star jump, a
+curtsey, an arabesque, a cartwheel, a frog jump, a backflip and a ta-da by
+default, from 17 moves. Each number plays the next note up a scale. The
+striped flag at the rug's edge (or just stepping on 1) starts "the circuit": a
+glowing ring and a bouncing star show the next number, a HUD counts 1 → 10,
+and finishing all ten in order gets confetti and is saved (`circuitsDone`).
+Digit calls out each station ("Three! Sunshine twirl! Next, number four!")
+when read-aloud is on. In the Parent Studio, **Avatar → Dance & gym circuit**
+picks the move for each number, what she calls it in class ("sunshine arms"),
+and previews any move on the avatar. The moves are procedural poses on the
+avatar rig (`engine/characters/moves.ts`), so they work with any outfit.
+
 Digit's **Moon Rock Rescue** (counting → comparing → add/subtract within 10 and
 20 → word problems → equal sharing/groups) and Nova's **Sink or Float?**
 (predict → test → observe → explain → generalize) are full adaptive lessons.
@@ -183,6 +198,7 @@ src/
     interpretation/  ActivityInterpretationService: local rules + optional AI
     rewards/      reward catalog + unlock engine
     world/        WorldState derived from progress; milestone previews
+    play/         the rug's dance & gym circuit: moves catalog, stations, 1 → 10 rules
     reports/      report generator (parent vs. family audience)
     teachers/     teacher personas, memory-aware openers, free conversation
                   (on-device understanding, AI adapter, prompts for the helper)

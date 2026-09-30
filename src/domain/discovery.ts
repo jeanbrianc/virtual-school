@@ -17,6 +17,7 @@ export const TEACHER_DISCOVERIES = ['hoot', 'digit', 'nova'] as const;
 export const DISCOVERABLE_IDS = [
   'hoot',
   'bookshelf',
+  'circuit',
   'digit',
   'rocket',
   'nova',
@@ -73,6 +74,14 @@ export function describeDiscovery(id: string, ctx: DiscoveryContext): Discovery 
             ? `This is YOUR bookshelf, ${name}! It’s empty right now. When you finish a book, tell Professor Hoot all about it — and the book will fly right onto this shelf!`
             : `This is YOUR bookshelf, ${name}! It has ${plural(snapshot.booksCompleted, 'book')} on it. Every book you finish with Professor Hoot flies onto this shelf.`,
         action: { label: 'Find Professor Hoot', target: 'hoot', icon: '🦉' },
+      };
+    case 'circuit':
+      return {
+        id,
+        icon: '🤸',
+        title: 'The Dance Circuit',
+        text: `The numbers on the rug are dance and gym stations, ${name}! Hop onto a number and you do a move — a twirl, a star jump, even a backflip! Go 1, 2, 3… all the way to 10 to finish the whole circuit.`,
+        action: { label: 'Start the circuit', target: 'circuit', icon: '🤸' },
       };
     case 'tank':
       return {

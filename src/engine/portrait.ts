@@ -3,6 +3,7 @@
  * dedicated renderer, so the UI shows the same character as the 3D world.
  */
 import * as THREE from 'three';
+import type { DanceMoveId } from '../domain/play/circuit';
 import type { AvatarConfig } from '../domain/types';
 import { AvatarModel } from './characters/avatarModel';
 
@@ -70,6 +71,8 @@ export class AvatarPreview {
   private raf = 0;
   private last = performance.now();
   private spin = 0;
+  /** 0 = turntable, 1 = showing a dance move (camera back, turned to the camera). */
+  private show = 0;
 
   constructor(
     private readonly container: HTMLElement,
@@ -93,8 +96,13 @@ export class AvatarPreview {
       const now = performance.now();
       const dt = Math.min(0.05, (now - this.last) / 1000);
       this.last = now;
-      this.spin += dt * 0.5;
-      this.model.root.rotation.y = Math.sin(this.spin) * 0.7;
+      const performing = this.model.performing;
+      this.show += ((performing ? 1 : 0) - this.show) * (1 - Math.exp(-4 * dt));
+      if (!performing) this.spin += dt * 0.5;
+      // A move gets the same slight three-quarter turn as in her school, and room for flips.
+      this.model.root.rotation.y = Math.sin(this.spin) * 0.7 * (1 - this.show) + 0.5 * this.show;
+      this.camera.position.set(0, 1.0 + 0.3 * this.show, 3.3 + 1.5 * this.show);
+      this.camera.lookAt(0, 0.62 + 0.3 * this.show, 0);
       this.model.update(dt, 0);
       this.renderer.render(this.scene, this.camera);
       this.raf = requestAnimationFrame(loop);
@@ -105,6 +113,11 @@ export class AvatarPreview {
   setConfig(cfg: AvatarConfig): void {
     this.model.setConfig(cfg);
     this.model.wave();
+  }
+
+  /** Plays a dance-circuit move (the parent's "Try it"). */
+  perform(move: DanceMoveId): Promise<void> {
+    return this.model.perform(move);
   }
 
   resize(): void {

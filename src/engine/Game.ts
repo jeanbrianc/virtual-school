@@ -10,12 +10,14 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import type { AudioEngine } from '../audio/AudioEngine';
+import { stationPitch, type AudioEngine } from '../audio/AudioEngine';
 import { CAMERA, INTERACTION, RENDER_QUALITY } from '../config/gameConfig';
 import type { TeacherId } from '../domain/teachers/teachers';
+import { DEFAULT_CIRCUIT, type DanceMoveId } from '../domain/play/circuit';
 import type { AvatarConfig, GraphicsQuality } from '../domain/types';
 import type { WorldState } from '../domain/world/worldState';
 import { AvatarModel } from './characters/avatarModel';
+import type { MoveCue } from './characters/moves';
 import { createPet, type PetId, type PetModel } from './characters/pets';
 import { NavGrid } from './core/navGrid';
 import { Tweens } from './core/tween';
@@ -41,6 +43,8 @@ export interface GameCallbacks {
   onFocus(info: FocusInfo | null): void;
   onInteract(id: string): void;
   onBack?(): void;
+  /** She landed on number n of the rug's dance circuit (her move has just started). */
+  onStation?(n: number): void;
 }
 
 export interface GameOptions {
@@ -123,6 +127,16 @@ export class Game {
   private quality: GraphicsQuality;
   private maxFps = Number(new URLSearchParams(window.location.search).get('maxfps') ?? 0) || 0;
   private cinematicDepth = 0;
+  // ── Dance circuit on the rug ──
+  private circuitMoves: DanceMoveId[] = [...DEFAULT_CIRCUIT];
+  /** The rug number she's standing on (null when off the numbers). */
+  private matTile: number | null = null;
+  /** Where a tap-to-walk is heading (so passing over a number on the way doesn't count). */
+  private walkGoal: { x: number; z: number } | null = null;
+  private moveDone: Promise<void> | null = null;
+  /** A tap made mid-move, done when the move ends. */
+  private afterMove: (() => void) | null = null;
+  private reducedMotion = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   private frameCount = 0;
   fps = 0;
   private fpsTime = 0;
@@ -192,6 +206,7 @@ export class Game {
     this.addSunbeams();
 
     this.avatar = new AvatarModel(opts.avatar);
+    this.avatar.onMoveCue = (cue) => this.moveCue(cue);
     this.scene.add(this.avatar.root);
     const hall = LAYOUT.hall;
     const nav = new NavGrid(
@@ -311,16 +326,29 @@ export class Game {
 
   private handleTap(ndc: THREE.Vector2) {
     const hit = this.interaction.pick(ndc, this.rig.camera);
-    if (hit) {
-      this.goInteract(hit);
+    const p = hit ? null : this.interaction.pickFloor(ndc, this.rig.camera);
+    if (this.avatar.performing) {
+      // Mid-move: remember the tap and go when she's done.
+      this.afterMove = hit ? () => this.goInteract(hit) : p ? () => this.walkToPoint(p) : null;
       return;
     }
-    const p = this.interaction.pickFloor(ndc, this.rig.camera);
-    if (p) {
-      if (this.player.walkTo(p.x, p.z)) {
-        this.interaction.showDestination(p);
-        this.opts.audio.play('hover', { volume: 1.5 });
-      }
+    if (hit) this.goInteract(hit);
+    else if (p) this.walkToPoint(p);
+  }
+
+  private walkToPoint(p: THREE.Vector3) {
+    const tile = this.world.danceMat.tileAt(p.x, p.z);
+    if (tile !== null && tile === this.matTile) {
+      // Tapping the number she's already on: do that move again.
+      this.station(tile);
+      return;
+    }
+    // A tap anywhere on a number heads for its middle (so she can't stop just short of it).
+    const to = tile !== null ? this.world.danceMat.center(tile) : p;
+    if (this.player.walkTo(to.x, to.z)) {
+      this.walkGoal = { x: to.x, z: to.z };
+      this.interaction.showDestination(to);
+      this.opts.audio.play('hover', { volume: 1.5 });
     }
   }
 
@@ -336,6 +364,7 @@ export class Game {
       return;
     }
     if (!this.player.walkTo(def.approach.x, def.approach.z, activate)) activate();
+    this.walkGoal = { x: def.approach.x, z: def.approach.z };
     this.interaction.showDestination(def.approach);
   }
 
@@ -378,12 +407,19 @@ export class Game {
       if (intents.cameraZoom) this.rig.zoom(intents.cameraZoom * dt * 6);
     }
     let move: { x: number; z: number } | null = null;
-    if (this.input.enabled && this.cinematicDepth === 0 && (intents.moveX || intents.moveY)) {
+    const performing = this.avatar.performing;
+    if (this.input.enabled && this.cinematicDepth === 0 && !performing && (intents.moveX || intents.moveY)) {
       const { forward, right } = this.rig.moveBasis();
       const v = forward.multiplyScalar(intents.moveY).add(right.multiplyScalar(intents.moveX));
       move = { x: v.x, z: v.z };
     }
     this.player.update(dt, move);
+    this.updateMat();
+    if (this.afterMove && !this.avatar.performing) {
+      const next = this.afterMove;
+      this.afterMove = null;
+      if (this.input.enabled && this.cinematicDepth === 0) next();
+    }
 
     // Focus + interaction.
     const focus = this.input.enabled && this.cinematicDepth === 0 ? this.interaction.computeFocus(this.player.position) : null;
@@ -393,7 +429,11 @@ export class Game {
       this.opts.callbacks.onFocus(focus ? { id: focus.id, label: focus.label, icon: focus.icon, kind: focus.kind } : null);
       if (focus) this.opts.audio.play('hover', { volume: 1.2 });
     }
-    if (this.input.consumeInteract() && focus && this.cinematicDepth === 0) this.activate(focus);
+    if (this.input.consumeInteract() && this.cinematicDepth === 0 && !this.avatar.performing) {
+      if (focus) this.activate(focus);
+      // Space / A on a number: that move again.
+      else if (this.input.enabled && this.matTile !== null) this.station(this.matTile);
+    }
     if (this.input.consumeBack()) this.opts.callbacks.onBack?.();
 
     this.interaction.update(dt, this.player.position);
@@ -406,6 +446,108 @@ export class Game {
 
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.rig.camera);
+  }
+
+  // ─── Dance circuit ──────────────────────────────────────────────────────
+
+  /** Notices her stepping onto a rug number. */
+  private updateMat() {
+    const p = this.player.position;
+    const n = this.world.danceMat.tileAt(p.x, p.z);
+    if (n === this.matTile) return;
+    this.matTile = n;
+    if (n === null || this.avatar.performing || this.cinematicDepth > 0 || !this.input.enabled) return;
+    // Walking somewhere by tap: only the number she's heading for counts.
+    if (this.player.isWalkingPath) {
+      const goal = this.walkGoal;
+      if (!goal || this.world.danceMat.tileAt(goal.x, goal.z) !== n) return;
+    }
+    this.station(n);
+  }
+
+  private station(n: number) {
+    const move = this.circuitMoves[n - 1] ?? DEFAULT_CIRCUIT[n - 1] ?? 'tada';
+    this.world.danceMat.flash(n);
+    this.opts.audio.play('station', { pitch: stationPitch(n) });
+    void this.performMove(move, this.world.danceMat.center(n));
+    // After the move has started, so the UI can wait for it (untilStill).
+    this.opts.callbacks.onStation?.(n);
+  }
+
+  /**
+   * Izzy does a dance or gym move (on the spot, or on `at`), turned a little
+   * off the camera so flips and leg lines read and her face still shows.
+   * Resolves when she's standing again.
+   */
+  performMove(move: DanceMoveId, at?: THREE.Vector3): Promise<void> {
+    this.player.stop();
+    this.walkGoal = null;
+    if (at) this.player.settleAt(at.x, at.z);
+    const cam = this.rig.camera.position;
+    const p = at ?? this.player.position;
+    this.player.faceYaw(Math.atan2(cam.x - p.x, cam.z - p.z) + 0.5);
+    if (!this.reducedMotion) this.rig.spotlight = true;
+    const done = this.avatar.perform(move).then(() => {
+      if (!this.avatar.performing) this.rig.spotlight = false;
+    });
+    this.moveDone = done;
+    return done;
+  }
+
+  private moveCue(cue: MoveCue) {
+    const audio = this.opts.audio;
+    const p = this.player.position;
+    switch (cue) {
+      case 'boing':
+        audio.play('boing');
+        break;
+      case 'land':
+        audio.play('land');
+        this.particles.sparkle(new THREE.Vector3(p.x, 0.08, p.z), { count: 14, color: '#eadcc0', speed: 1.1, gravity: 3, size: 0.12, life: 0.6 });
+        break;
+      case 'twirl':
+        audio.play('twirl');
+        break;
+      case 'chime':
+        audio.play('chime', { volume: 0.7 });
+        break;
+      case 'whoosh':
+        audio.play('whoosh', { volume: 0.8 });
+        break;
+      case 'sparkle':
+        audio.play('sparkle', { volume: 0.8 });
+        this.particles.sparkle(new THREE.Vector3(p.x, 1.0, p.z), { count: 30, speed: 1.8 });
+        break;
+      case 'star':
+        audio.play('star');
+        this.particles.sparkle(new THREE.Vector3(p.x, 1.3, p.z), { count: 45, color: '#ffd24a', speed: 2.4 });
+        break;
+    }
+  }
+
+  /** What each number does (10 moves, 1 → 10). */
+  setCircuit(moves: readonly DanceMoveId[]): void {
+    this.circuitMoves = DEFAULT_CIRCUIT.map((d, i) => moves[i] ?? d);
+  }
+
+  /** Glows the number to find next (null: no circuit going). */
+  setCircuitNext(n: number | null): void {
+    this.world.danceMat.setNext(n);
+  }
+
+  get performing(): boolean {
+    return this.avatar.performing;
+  }
+
+  /** Resolves once she's finished the move she's doing (right away if none). */
+  untilStill(): Promise<void> {
+    return this.avatar.performing && this.moveDone ? this.moveDone : Promise.resolve();
+  }
+
+  /** Puts her straight onto rug number n (tests and demos); the number reacts next frame. */
+  stepOn(n: number): void {
+    const c = this.world.danceMat.center(n);
+    this.player.teleport(c.x, c.z);
   }
 
   resize(): void {

@@ -16,6 +16,19 @@ import {
   type Discovery,
 } from '../../domain/discovery';
 import { getLesson } from '../../domain/lessons/registry';
+import {
+  CIRCUIT_DONE_LINE,
+  CIRCUIT_START_LINE,
+  DANCE_MOVES,
+  STATIONS,
+  circuitFor,
+  freshRun,
+  stationLabel,
+  stationLine,
+  stepOn,
+  type CircuitRun,
+  type DanceMoveId,
+} from '../../domain/play/circuit';
 import type { LessonRun } from '../../domain/lessons/engine';
 import { getReward } from '../../domain/rewards/catalog';
 import { ruleProgress } from '../../domain/rewards/engine';
@@ -30,7 +43,7 @@ import { Game, type FocusInfo } from '../../engine/Game';
 import type { PetId } from '../../engine/characters/pets';
 import { recordConversation, recordLesson, startTierFor } from '../../services/lessonService';
 import { addBook, completeBook, logReading, type CompleteBookInput } from '../../services/readingService';
-import { markExplored, markRewardsCelebrated, setActivePet, updateSettings } from '../../services/householdService';
+import { markExplored, markRewardsCelebrated, setActivePet, updateChild, updateSettings } from '../../services/householdService';
 import { getSpeechProbe, runSpeechProbe, settleInterruptedProbe } from '../../services/talkService';
 import { appStore } from '../../state/appState';
 import { useStore } from '../../state/store';
@@ -52,6 +65,15 @@ type Overlay =
   | { kind: 'celebrate'; items: CelebrationItem[]; rewardIds: string[] }
   | { kind: 'discover'; discovery: Discovery }
   | null;
+
+/** The big "Three! Sunshine twirl!" bubble when she lands on a rug number. */
+interface Callout {
+  key: number;
+  n: number | null;
+  emoji: string;
+  label: string;
+  big?: boolean;
+}
 
 /** Marker stored in `explored` once the "you found everything" celebration has played. */
 const EXPLORER_DONE = '__explorer';
@@ -278,6 +300,80 @@ export function ChildMode({ childId }: { childId: string }) {
     setOverlay({ kind: 'celebrate', rewardIds: [], items: [{ key: 'explorer', ...EXPLORER_CELEBRATION }] });
   }, [audio, childId, ctx]);
 
+  // ── Dance & gym circuit on the rug ──────────────────────────────────────
+  // Every number does a move; going 1 → 10 in order is "the circuit".
+  const circuitRef = useRef<CircuitRun | null>(null);
+  const [circuitRun, setCircuitRun] = useState<CircuitRun | null>(null);
+  const [callout, setCallout] = useState<Callout | null>(null);
+  const speechRef = useRef(speech);
+  speechRef.current = speech;
+
+  const setRun = useCallback((run: CircuitRun | null) => {
+    circuitRef.current = run;
+    setCircuitRun(run);
+    gameRef.current?.setCircuitNext(run?.next ?? null);
+  }, []);
+
+  /** Digit (the numbers teacher) calls the stations — when read-aloud is on. */
+  const coachSays = useCallback((text: string) => {
+    const s = speechRef.current;
+    if (!s.auto || !s.canSpeak) return;
+    teacherForSpeech.current = 'digit';
+    s.speak(text);
+  }, []);
+
+  const finishCircuit = useCallback(async () => {
+    const game = gameRef.current;
+    if (!game) return;
+    await game.untilStill();
+    game.confetti();
+    const d = dataRef.current;
+    const count = (d?.child.circuitsDone ?? 0) + 1;
+    setCallout({ key: Date.now(), n: null, emoji: '🏅', label: count > 1 ? `The whole circuit — ${count} times!` : 'The whole circuit!', big: true });
+    coachSays(CIRCUIT_DONE_LINE);
+    if (d && !appStore.get().preview) {
+      await updateChild(ctx, { ...d.child, circuitsDone: count });
+      void reload();
+    }
+  }, [coachSays, ctx, reload]);
+
+  const handleStation = useCallback(
+    (n: number) => {
+      const d = dataRef.current;
+      if (!d) return;
+      const station = circuitFor(d.child)[n - 1];
+      if (!station) return;
+      const { run, event } = stepOn(circuitRef.current, n);
+      setRun(run);
+      // The bubble stays up for the whole move (slow devices included), then a moment more.
+      const key = Date.now();
+      setCallout({ key, n, emoji: DANCE_MOVES[station.move].emoji, label: stationLabel(station) });
+      void gameRef.current?.untilStill().then(() => {
+        window.setTimeout(() => setCallout((c) => (c?.key === key ? null : c)), 1000);
+      });
+      coachSays(stationLine(n, station, event, run));
+      void discover('circuit');
+      if (event === 'complete') void finishCircuit();
+    },
+    [coachSays, discover, finishCircuit, setRun],
+  );
+  const stationRef = useRef(handleStation);
+  stationRef.current = handleStation;
+
+  useEffect(() => {
+    // Station bubbles close when the move ends (above); the others after a few seconds.
+    if (!callout || callout.n !== null) return;
+    const t = window.setTimeout(() => setCallout(null), callout.big ? 4300 : 2700);
+    return () => window.clearTimeout(t);
+  }, [callout]);
+
+  // Her family's choice of move for each number.
+  const circuitMoves = data ? circuitFor(data.child).map((st) => st.move) : null;
+  const circuitKey = circuitMoves?.join(',') ?? '';
+  useEffect(() => {
+    if (ready && circuitKey) gameRef.current?.setCircuit(circuitKey.split(',') as DanceMoveId[]);
+  }, [ready, circuitKey]);
+
   // ── Interactions from the 3D world ──────────────────────────────────────
   const handleInteract = useCallback(
     async (id: string) => {
@@ -298,6 +394,12 @@ export function ChildMode({ childId }: { childId: string }) {
           setOverlay({ kind: 'discover', discovery: card });
           return;
         }
+      }
+      if (id === 'circuit') {
+        setRun(freshRun());
+        setCallout({ key: Date.now(), n: null, emoji: '🤸', label: 'Hop onto number 1!' });
+        coachSays(CIRCUIT_START_LINE);
+        return;
       }
       if (id === 'hoot') {
         teacherForSpeech.current = 'hoot';
@@ -365,7 +467,7 @@ export function ChildMode({ childId }: { childId: string }) {
         });
       }
     },
-    [audio, childId, ctx, discover],
+    [audio, childId, ctx, discover, coachSays, setRun],
   );
 
   const closeDiscovery = useCallback(
@@ -404,6 +506,7 @@ export function ChildMode({ childId }: { childId: string }) {
       callbacks: {
         onFocus: (f) => setFocus(f),
         onInteract: (id) => void handleInteract(id),
+        onStation: (n) => stationRef.current(n),
         onBack: () => {
           const o = overlayRef.current;
           if (o && o.kind !== 'celebrate' && o.kind !== 'hoot' && o.kind !== 'lesson') setOverlay(null);
@@ -488,6 +591,9 @@ export function ChildMode({ childId }: { childId: string }) {
       overlay: () => overlayRef.current?.kind ?? null,
       booksOnShelf: () => dataRef.current?.shelfBooks.length ?? 0,
       explored: () => exploredRef.current,
+      stepOn: (n: number) => gameRef.current?.stepOn(n),
+      performing: () => gameRef.current?.performing ?? false,
+      circuit: () => circuitRef.current,
     };
   }, [handleInteract]);
 
@@ -782,6 +888,38 @@ export function ChildMode({ childId }: { childId: string }) {
           )}
 
           {toast && <div className="toast">{toast}</div>}
+
+          {circuitRun && !overlay && (
+            <div className="circuit-hud" data-testid="circuit-hud" role="status" aria-label={`Dance circuit: find number ${circuitRun.next}`}>
+              <span className="circuit-hud-icon" aria-hidden="true">
+                🤸
+              </span>
+              <ol className="circuit-dots" aria-hidden="true">
+                {Array.from({ length: STATIONS }, (_, i) => i + 1).map((n) => (
+                  <li key={n} className={n < circuitRun.next ? 'done' : n === circuitRun.next ? 'next' : ''}>
+                    {n}
+                  </li>
+                ))}
+              </ol>
+              <button type="button" className="circuit-stop" aria-label="Stop the circuit" onClick={() => setRun(null)}>
+                ✕
+              </button>
+            </div>
+          )}
+          {callout && !overlay && (
+            <div
+              key={callout.key}
+              className={`circuit-callout ${callout.big ? 'big' : callout.n === null ? 'timed' : ''}`}
+              data-testid="circuit-callout"
+              aria-live="polite"
+            >
+              {callout.n !== null && <span className="circuit-callout-num">{callout.n}</span>}
+              <span className="circuit-callout-emoji" aria-hidden="true">
+                {callout.emoji}
+              </span>
+              <span className="circuit-callout-label">{callout.label}</span>
+            </div>
+          )}
 
           {showControls && !overlay && !focus && (
             <div className="controls-hint" role="note">

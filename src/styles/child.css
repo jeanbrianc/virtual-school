@@ -291,6 +291,150 @@ kbd {
   gap: 4px;
 }
 
+/* ── Dance circuit (numbers on the rug) ──────────────────────────────── */
+.circuit-hud {
+  position: absolute;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 7px 14px;
+  border-radius: 999px;
+  background: rgba(255, 246, 230, 0.94);
+  box-shadow: var(--shadow-soft);
+  color: var(--walnut);
+  font-family: var(--font-child);
+  z-index: 10;
+  animation: toast-in 0.5s var(--ease-spring);
+}
+.circuit-hud-icon {
+  font-size: 1.5rem;
+}
+.circuit-dots {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.circuit-dots li {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(139, 94, 60, 0.12);
+  font-size: 1rem;
+  font-weight: 700;
+  transition:
+    background 0.3s,
+    color 0.3s;
+}
+.circuit-dots li.done {
+  background: var(--mustard);
+  color: #fff;
+}
+.circuit-dots li.next {
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--terracotta);
+  animation: circuit-next 1.1s ease-in-out infinite;
+}
+@keyframes circuit-next {
+  50% {
+    transform: scale(1.15);
+  }
+}
+.circuit-stop {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.circuit-stop:hover {
+  background: rgba(217, 119, 75, 0.12);
+}
+.circuit-callout {
+  position: absolute;
+  top: 140px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 28px 10px 12px;
+  border-radius: 999px;
+  border: 3px solid var(--mustard);
+  background: var(--cream);
+  box-shadow: var(--shadow-pop);
+  color: var(--walnut);
+  font-family: var(--font-child);
+  font-size: 1.6rem;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 11;
+  animation: callout-in 0.45s var(--ease-spring);
+}
+.circuit-callout.timed {
+  animation:
+    callout-in 0.45s var(--ease-spring),
+    fade-out 0.5s ease 2.2s forwards;
+}
+.circuit-callout.big {
+  padding-left: 22px;
+  font-size: 2rem;
+  animation:
+    callout-in 0.5s var(--ease-spring),
+    fade-out 0.6s ease 3.7s forwards;
+}
+.circuit-callout-num {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--terracotta);
+  color: #fff;
+  font-size: 1.8rem;
+}
+.circuit-callout-emoji {
+  font-size: 2.2rem;
+}
+@keyframes callout-in {
+  from {
+    transform: translate(-50%, -12px) scale(0.6);
+    opacity: 0;
+  }
+}
+@media (max-width: 600px) {
+  .circuit-hud {
+    gap: 6px;
+    padding-left: 10px;
+  }
+  .circuit-dots {
+    gap: 3px;
+  }
+  .circuit-dots li {
+    width: 24px;
+    height: 24px;
+    font-size: 0.8rem;
+  }
+  .circuit-callout {
+    font-size: 1.25rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circuit-dots li.next {
+    animation: none;
+  }
+}
+
 /* ── Interact prompt ───────────────────────────────────────────────────── */
 .interact-prompt {
   position: absolute;
