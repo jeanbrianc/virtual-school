@@ -23,4 +23,7 @@ test('school menu stays reachable on narrow phones and opens the parent studio',
   await page.getByTestId('hud-grownups').click();
   await unlockParent(page);
   await expect(page.getByRole('heading', { name: /Today with Izzy/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByRole('link', { name: 'Settings & privacy', exact: true }).click();
+  await expect(page.getByTestId('sync-card')).toBeVisible();
 });
