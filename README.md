@@ -15,8 +15,10 @@ parent studio for recordkeeping, curriculum tracking, portfolios and reports.
 - **Learning Museum** — a warm family showcase (with a TV-friendly guided tour)
   for grandparents and visitors.
 
-Everything is stored in the browser on your device (IndexedDB). There are no
-accounts, ads, analytics, trackers, social features or child-facing external links.
+Everything is stored in the browser on your device (IndexedDB). On the family's own
+hosted site, **family sync** (opt-in) keeps every signed-in device's school the same
+through the family's own AWS account. There are no accounts, ads, analytics,
+trackers, social features or child-facing external links.
 
 ---
 
@@ -205,6 +207,16 @@ Key decisions (details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)):
 
 - **Local-first.** IndexedDB with an in-memory fallback (private browsing shows
   a notice). `navigator.storage.persist()` is requested to avoid eviction.
+- **Family sync** (hosted site, opt-in). `SyncingDatabase`
+  (`src/data/storage/syncing.ts`) wraps the database: every write to a shared
+  table is stamped (`_mod` = time.counter.device) and noted in `syncOutbox` in the
+  same transaction; deletions leave tombstones. `SyncEngine` (`src/sync/`) sends
+  the outbox and pulls others' changes from the helper's `/v1/sync` (overlapping
+  window, paged), keeping the newest version of each record; photos travel
+  separately. A never-used device adopts the family's school; one with its own
+  records asks a parent. Server: `scripts/ai-helper/sync.ts` + `awsStore.ts`
+  (DynamoDB with a conditional "newer wins" write and a by-change index; S3 for
+  photos; SigV4, no SDK). `meta` stays on the device.
 - **The world is a pure function of progress.** `deriveWorldState(snapshot,
   unlockedRewards)` decides what the 3D school contains. The engine only
   renders it, so milestone previews are just a hypothetical snapshot.
@@ -217,7 +229,7 @@ Key decisions (details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)):
   geometry, static batching, quality presets and an automatic low-quality mode
   for software renderers.
 
-### Data model (IndexedDB, schema v1)
+### Data model (IndexedDB, schema v2 — v2 adds `syncOutbox`)
 
 | Store | Key fields |
 | --- | --- |

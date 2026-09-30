@@ -138,6 +138,7 @@ describe('the helper with an OpenAI key', () => {
       model: 'gpt-6-luna',
       voices: true,
       listening: true,
+      sync: false,
       voiceModel: 'gpt-4o-mini-tts',
       listenModel: 'gpt-transcribe',
     });

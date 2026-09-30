@@ -3,7 +3,8 @@ Description: >-
   Izzy's Virtual Classroom on your own AWS account: a private S3 bucket behind
   CloudFront with an HTTPS certificate and a Route 53 name, a site password
   (CloudFront Function), and the optional AI teachers helper (Lambda) at /api —
-  OpenAI (key read from Secrets Manager) or Anthropic.
+  OpenAI (key read from Secrets Manager) or Anthropic — plus family sync
+  (DynamoDB + S3) so every signed-in device shares the same school.
   Deploy with scripts/deploy/aws-deploy.sh (region us-east-1). Visitors land on
   a branded sign-in page; the school and its AI helper need the family password.
 
@@ -251,6 +252,59 @@ Resources:
               Value: 'noindex, nofollow'
               Override: true
 
+  # ── Family sync: the school shared by the family's devices ────────────────
+  # Records (books, progress, settings…) in DynamoDB, photos in S3. Both are kept
+  # if the stack is ever deleted, and both keep history for recovery.
+  FamilyRecordsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+        - { AttributeName: changedAt, AttributeType: N }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: byChange
+          KeySchema:
+            - { AttributeName: pk, KeyType: HASH }
+            - { AttributeName: changedAt, KeyType: RANGE }
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      # Encrypted at rest by default (AWS-owned key — no KMS charges or extra permissions).
+
+  FamilyMediaBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: keep-replaced-photos-90-days
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
   # ── AI teachers helper (Lambda, reached only through CloudFront /api/*) ──
   AiLogGroup:
     Type: AWS::Logs::LogGroup
@@ -278,6 +332,24 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub '${AiLogGroup.Arn}:*'
+        # Family sync: read and write the family's records and photos (nothing else).
+        - PolicyName: family-sync
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt FamilyRecordsTable.Arn
+                  - !Sub '${FamilyRecordsTable.Arn}/index/byChange'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource: !Sub '${FamilyMediaBucket.Arn}/media/*'
         # Read (never change) the one secret that holds the OpenAI key.
         - !If
           - HasOpenAiSecret
@@ -321,6 +393,8 @@ Resources:
           ANTHROPIC_API_KEY: !Ref AnthropicApiKey
           OPENAI_SECRET_ARN: !Ref OpenAiSecretArn
           OPENAI_MODEL: !Ref OpenAiModel
+          SYNC_TABLE: !Ref FamilyRecordsTable
+          SYNC_BUCKET: !Ref FamilyMediaBucket
           ORIGIN_SECRET: !Ref OriginSecret
           SITE_ORIGIN: !Sub 'https://${DomainName}'
           AI_MODEL: !Ref AiModel
@@ -488,6 +562,12 @@ Resources:
                 Resource: !Ref AWS::StackId
 
 Outputs:
+  FamilyRecordsTableName:
+    Value: !Ref FamilyRecordsTable
+    Description: DynamoDB table with the family's synced school (point-in-time recovery on).
+  FamilyMediaBucketName:
+    Value: !Ref FamilyMediaBucket
+    Description: S3 bucket with the family's synced photos (versioned).
   SiteUrl:
     Value: !Sub 'https://${DomainName}'
   BucketName:

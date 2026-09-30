@@ -15,6 +15,10 @@ import { randomIds } from '../domain/util/ids';
 import { systemClock } from '../domain/util/time';
 import type { ServiceContext } from '../services/context';
 import { getHousehold } from '../services/householdService';
+import { SyncingDatabase } from '../data/storage/syncing';
+import { HOSTED_BUILD } from '../domain/settings';
+import { SyncEngine } from '../sync/engine';
+import { HttpSyncTransport } from '../sync/transport';
 import { HelperSpeechOutput, RoutingSpeechInput } from '../voice/helperVoice';
 import { BrowserSpeechInput, BrowserSpeechOutput, type SpeechInput, type SpeechOutput } from '../voice/SpeechService';
 
@@ -36,19 +40,30 @@ export interface AppServices {
   loadSampleData(): Promise<void>;
   /** Erase learning records; keep names, avatars and settings. */
   startFresh(): Promise<void>;
+  /** Family sync: the same school on every signed-in device (hosted site). */
+  sync: SyncEngine;
+}
+
+/** Where family sync lives: this website's own helper. (End-to-end tests can point it elsewhere.) */
+function syncEndpoint(): string | null {
+  if (HOSTED_BUILD) return '/api';
+  if (typeof __E2E__ !== 'undefined' && __E2E__) return (window as unknown as { __izzySyncEndpoint?: string }).__izzySyncEndpoint ?? null;
+  return null;
 }
 
 export async function createAppServices(): Promise<AppServices> {
-  let db: Database;
+  let local: Database;
   let persistent = true;
   try {
-    db = await IndexedDbDatabase.open(DB_NAME, SCHEMA_VERSION, TABLES);
+    local = await IndexedDbDatabase.open(DB_NAME, SCHEMA_VERSION, TABLES);
   } catch (err) {
     // Private browsing or blocked storage: keep working in-memory, and say so in the UI.
     console.warn('IndexedDB unavailable; using in-memory storage.', err);
-    db = new MemoryDatabase(TABLES);
+    local = new MemoryDatabase(TABLES);
     persistent = false;
   }
+  // Every write is noted for family sync (it only leaves the device once a parent turns sync on).
+  const db = new SyncingDatabase(local, 'device');
   const repos = new Repositories(db);
   const ctx: ServiceContext = { repos, clock: systemClock, ids: randomIds };
 
@@ -58,6 +73,11 @@ export async function createAppServices(): Promise<AppServices> {
     // Ask the browser not to evict the family's records under storage pressure.
     void navigator.storage.persist().catch(() => undefined);
   }
+
+  // Family sync. A device that hasn't been used yet takes the family's saved school before it opens.
+  const endpoint = syncEndpoint();
+  const sync = new SyncEngine(db, repos, endpoint ? new HttpSyncTransport(endpoint) : null);
+  await Promise.race([sync.init().catch(() => undefined), new Promise((resolve) => setTimeout(resolve, 10_000))]);
 
   const audio = new AudioEngine();
   const household = await getHousehold(ctx);
@@ -77,6 +97,7 @@ export async function createAppServices(): Promise<AppServices> {
     launch,
     loadSampleData: () => loadSampleData(repos, systemClock),
     startFresh: () => startFresh(repos, systemClock),
+    sync,
   };
 }
 

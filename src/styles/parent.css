@@ -2300,3 +2300,14 @@
   flex-basis: 100%;
   color: #9a5b12;
 }
+
+/* ── Family sync ─────────────────────────────────────────────────────────── */
+.sync-details {
+  margin-top: 10px;
+}
+.sync-details p {
+  margin: 6px 0 0;
+}
+.small.warn {
+  color: #9a5b12;
+}

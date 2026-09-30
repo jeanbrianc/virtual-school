@@ -31,6 +31,7 @@ import {
   parseSpeakInput,
   transcriptFrom,
 } from './openai';
+import { syncRoutes, type SyncStore } from './sync';
 
 /** A key, or a function that fetches it (e.g. from AWS Secrets Manager) — called only when needed. */
 export type KeySource = string | undefined | (() => Promise<string | undefined>);
@@ -52,6 +53,8 @@ export interface HelperConfig {
   /** Spoken lines per day and recordings turned into words per day. */
   speakPerDay?: number;
   listenPerDay?: number;
+  /** Family sync storage (DynamoDB + S3 on AWS). Without it, /v1/sync… answers 404. */
+  syncStore?: SyncStore;
   fetchImpl?: typeof fetch;
   now?: () => number;
   log?: (msg: string) => void;
@@ -77,6 +80,10 @@ const LOCAL_ORIGIN = /^https?:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/;
 const MAX_JSON_BODY = 32 * 1024;
 /** Base64 grows audio by a third, plus a little JSON. */
 export const MAX_LISTEN_BODY = Math.ceil((MAX_AUDIO_BYTES * 4) / 3) + 8 * 1024;
+/** A sync batch or a photo (base64) — under Lambda's 6 MB request limit. */
+export const MAX_SYNC_BODY = 5_700_000;
+/** The largest request any route accepts (for servers that read the body first). */
+export const MAX_BODY = Math.max(MAX_LISTEN_BODY, MAX_SYNC_BODY);
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 
 type Result<T> = { ok: true; value: T } | { ok: false; status: number; error: string };
@@ -132,6 +139,8 @@ export function createHelper(config: HelperConfig) {
   const openaiKey = keyGetter(config.openaiKey, log);
   const replies = limiter(config.perMinute ?? 20, config.perDay ?? 300, now);
   const speaking = limiter(60, config.speakPerDay ?? 1500, now);
+  const syncing = limiter(240, 50_000, now);
+  const sync = config.syncStore ? syncRoutes(config.syncStore, now) : null;
   const listening = limiter(20, config.listenPerDay ?? 500, now);
 
   /** The provider in use right now (OpenAI wins when both keys exist). */
@@ -186,6 +195,7 @@ export function createHelper(config: HelperConfig) {
         model: p ? replyModel(p.provider) : null,
         voices: openai,
         listening: openai,
+        sync: !!sync,
         ...(openai ? { voiceModel: config.voiceModel || DEFAULT_OPENAI_VOICE_MODEL, listenModel: config.listenModel || DEFAULT_OPENAI_LISTEN_MODEL } : {}),
       },
       origin,
@@ -213,6 +223,38 @@ export function createHelper(config: HelperConfig) {
     if (req.headers['x-izzy-classroom'] !== '1') return respond(400, { error: 'Missing X-Izzy-Classroom header.' }, origin);
 
     if (req.method === 'GET' && req.path === '/health') return health(origin);
+
+    // ── Family sync (works without any AI key) ─────────────────────────────
+    if (req.path === '/v1/sync' || req.path.startsWith('/v1/sync/')) {
+      if (!sync) return respond(404, { error: 'Family sync isn’t set up on this helper.' }, origin);
+      if ((req.body?.length ?? 0) > MAX_SYNC_BODY) return respond(413, { error: 'Too large.' }, origin);
+      if (!syncing.take()) return respond(429, { error: 'Syncing too often — try again in a minute.' }, origin);
+      let bad = false;
+      const parsed = () => {
+        try {
+          return JSON.parse(req.body ?? '') as unknown;
+        } catch {
+          bad = true;
+          return null;
+        }
+      };
+      try {
+        const reply = await sync(req.method, req.path, parsed);
+        if (bad) return respond(400, { error: 'Invalid JSON.' }, origin);
+        if (!reply) return respond(404, { error: 'Not found' }, origin);
+        if (reply.bytes) {
+          return {
+            status: reply.status,
+            headers: { 'Content-Type': reply.bytes.type, 'Cache-Control': 'private, max-age=31536000, immutable', ...cors(origin) },
+            body: reply.bytes.data,
+          };
+        }
+        return respond(reply.status, reply.json, origin);
+      } catch (err) {
+        log(`sync failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+        return respond(502, { error: 'Couldn’t reach the family’s saved school. Try again in a minute.' }, origin);
+      }
+    }
     const routes = ['/v1/teacher', '/v1/interpret', '/v1/speak', '/v1/listen'];
     if (req.method !== 'POST' || !routes.includes(req.path)) return respond(404, { error: 'Not found' }, origin);
     const maxBody = req.path === '/v1/listen' ? MAX_LISTEN_BODY : MAX_JSON_BODY;

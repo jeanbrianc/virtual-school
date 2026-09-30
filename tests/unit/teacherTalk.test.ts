@@ -249,6 +249,7 @@ describe('local AI helper', () => {
       model: 'claude-haiku-4-5-20251001',
       voices: false,
       listening: false,
+      sync: false,
     });
     assert.equal(health.headers['Access-Control-Allow-Origin'], 'http://127.0.0.1:5173');
     assert.equal((await handle({ method: 'OPTIONS', path: '/v1/teacher', headers: { origin: 'http://localhost:4173' } })).status, 204);

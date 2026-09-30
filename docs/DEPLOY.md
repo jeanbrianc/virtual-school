@@ -10,9 +10,11 @@ deploys automatically.
 Browser ──HTTPS──▶ CloudFront (lms.brianjeanbuilds.com)
                     │  signed out → branded welcome page + family sign-in (public/welcome)
                     │  signed in  → session cookie checked at the edge (CloudFront Function)
+                    │               every signed-in device shares one school (family sync)
                     ├─ /*      ─▶ private S3 bucket (the built site)
                     └─ /api/*  ─▶ Lambda: AI helper ─▶ OpenAI (replies, natural voices, listening)
                                    │                   or Anthropic (replies only)
+                                   ├─ family sync: records in DynamoDB, photos in S3 (this stack)
                                    ├─ reads the OpenAI key from AWS Secrets Manager (never copied)
                                    └─ answers only requests that came through CloudFront
 GitHub push to main ─▶ Actions: typecheck · lint · tests · build ─▶ S3 + Lambda + cache refresh
@@ -29,6 +31,7 @@ Everything is one CloudFormation stack: [`infra/aws/stack.yaml`](../infra/aws/st
 | Lambda (AI helper) | $0 — inside the Lambda free tier |
 | HTTPS certificate (ACM) | $0 |
 | Route 53 | the $0.50 you already pay for the brianjeanbuilds.com zone |
+| Family sync (DynamoDB on-demand + S3) | a few cents: a family's school is a few MB, and each sync is a handful of tiny reads and writes |
 | AI teacher replies | OpenAI `gpt-6-luna`: a few hundredths of a cent per reply. (Anthropic Claude Haiku 4.5: about 0.2¢.) |
 | Natural teacher voices | OpenAI `gpt-4o-mini-tts`: about 1.5¢ per minute of speech. Lines are saved in the browser, so repeated lines are free. |
 | Listening | OpenAI `gpt-transcribe`: about 0.45¢ per minute of her talking (about 0.1¢ per sentence). |
@@ -146,6 +149,32 @@ OpenAI also asks that people are told when a voice is AI-generated — Settings 
 so next to the switch. **Turn OpenAI off again:** `npm run deploy:aws -- --openai-secret none`
 (the secret itself is left alone).
 
+## Family sync — the same school on every device
+
+Without it, each browser has its own school: the Mac has Izzy's history, and a phone or
+iPad starts empty. With it, every device you sign in on shares one school.
+
+1. **On the device that has her history** (your Mac's Chrome): *Grown-ups → Settings &
+   privacy → Family sync* → **Turn on family sync**. It saves the whole school — books,
+   reading, progress, conversations, photos and settings (the parent PIN too).
+2. **On the phone, the iPad, anything else:** sign in at lms.brianjeanbuilds.com. A device
+   that hasn't been used yet takes the family's school automatically before it opens.
+   A device that already has records of its own asks first (*Use the family's school
+   here* or *Make this device's school the family's*).
+3. **After that:** changes go out a few seconds after they happen and arrive on the other
+   devices when they open, come back to the front, or within about 45 seconds. If two
+   devices change the same thing, the newer change wins. Each device still works
+   offline and catches up later. *Stop syncing on this device* pauses one device.
+
+**Where it's kept:** in this stack — a DynamoDB table (`FamilyRecordsTable`, on-demand,
+point-in-time recovery for 35 days) for records, and a private, versioned S3 bucket
+(`FamilyMediaBucket`) for photos. Both are kept even if the stack is deleted. Only the AI
+helper Lambda can read or write them (no deletes, no scans), and only through the
+family sign-in; GitHub deploys can't touch them. Cost for a family: pennies a month.
+
+*Start fresh* and *Load sample data* change the school on **every** device while sync is
+on (Settings says so before you confirm).
+
 ## Everyday
 
 - **Change something → push to `main`.** Actions checks and deploys in a few minutes.
@@ -159,11 +188,10 @@ so next to the switch. **Turn OpenAI off again:** `npm run deploy:aws -- --opena
 
 ## Good to know
 
-- **Each browser keeps its own school.** Records live in the browser (IndexedDB), per
-  device and per address. The school at `127.0.0.1:5173` on your Mac and the one at
-  `lms.brianjeanbuilds.com` are separate, and an iPad has its own. Pick the address
-  Izzy will use day to day. *Settings → Export* makes a backup file; there's no sync
-  between devices yet.
+- **Family sync: the same school on every device.** Each browser keeps a copy of the
+  school (IndexedDB, so it works offline and opens instantly); with family sync on, the
+  copies stay the same through your own AWS account. See *Family sync* below. The school
+  at `127.0.0.1:5173` on your Mac (local development) is separate and never syncs.
 - **How sign-in works.** The welcome page (`public/welcome/`) is the only public part of
   the site. Its form sends the username and password to `/auth/session`; the CloudFront
   Function compares a SHA-256 of them with the stored hash (the password itself is never
@@ -192,6 +220,8 @@ so next to the switch. **Turn OpenAI off again:** `npm run deploy:aws -- --opena
 | Still see the old browser pop-up | The stack hasn't been updated yet — run `npm run deploy:aws` once (GitHub pushes don't change the stack). |
 | AI teachers: "has no API key yet" | Run `npm run deploy:aws -- --openai-secret <ARN>` (or `-- --api-key` for Anthropic). If you already did, the Lambda can't read the secret: see its log (CloudWatch → `/aws/lambda/virtual-school-ai-helper`) for `Secrets Manager refused (…)` — usually a customer-managed KMS key or a secret in another account. |
 | `That secret belongs to a different AWS account` | The secret must be in the account that holds the site (the `bullybearai-prod` profile's). Create it there, or share it with a resource policy (not covered here). |
+| The phone or iPad still starts empty | Family sync isn't on yet: turn it on in *Settings → Family sync* **on the Mac** first, then reload the other device. If Settings says "needs one more step", the stack hasn't been updated — run `npm run deploy:aws` once. |
+| "This device has records of its own too" | That device was used before sync. *Use the family's school here* replaces its records with the family's; *Make this device's school the family's* does the opposite (for every device). |
 | The microphone connects to your iPhone, then "I didn't hear anything" | macOS was offering the iPhone (Continuity) as the default microphone. The school now skips an iPhone/iPad mic and listens with the Mac's built-in one; to pick another, use *Settings → Talking to teachers → Microphone* and **Test the microphone** (the bar should move when you talk). To stop the Mac reaching for the phone everywhere: Mac *System Settings → Sound → Input → MacBook Pro Microphone*, or iPhone *Settings → General → AirPlay & Continuity → Continuity Camera* off. |
 | Natural voices sound like the computer's voice | The helper couldn't be reached or hit its daily voice limit, so the built-in voice read the line instead. *Check connection* in Settings. |
 | AI teachers: "not been uploaded yet" | The Lambda still has the placeholder; run `npm run deploy:aws` (or push to `main`). |

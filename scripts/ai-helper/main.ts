@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_AI_MODEL } from '../../src/domain/teachers/aiPrompt';
-import { createHelper, MAX_LISTEN_BODY } from './handler';
+import { createHelper, MAX_BODY } from './handler';
 import { DEFAULT_OPENAI_MODEL } from './openai';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
@@ -46,7 +46,7 @@ createServer((req, res) => {
   let size = 0;
   req.on('data', (c: Buffer) => {
     size += c.length;
-    if (size <= MAX_LISTEN_BODY + 1024) chunks.push(c);
+    if (size <= MAX_BODY + 1024) chunks.push(c);
   });
   req.on('end', () => {
     void handle({

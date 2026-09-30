@@ -69,6 +69,7 @@ const LAYER_RULES = [
   { layer: 'services', forbid: ['src:ui', 'src:engine', 'src:app', 'src:state', 'pkg:react', 'pkg:three'] },
   { layer: 'engine', forbid: ['src:ui', 'src:app', 'src:services', 'src:data', 'src:state', 'pkg:react', 'pkg:react-dom'] },
   { layer: 'shared', forbid: ['src:ui', 'src:engine', 'src:services', 'src:data', 'pkg:react', 'pkg:three'] },
+  { layer: 'sync', forbid: ['src:ui', 'src:engine', 'src:app', 'src:state', 'src:audio', 'src:voice', 'pkg:react', 'pkg:react-dom', 'pkg:three'] },
 ];
 for (const f of files) {
   const layer = f.rel.replace(/^src\//, '').split('/')[0];
@@ -101,7 +102,7 @@ const PATTERN_RULES = [
   },
   {
     id: 'network-only-in-ai-adapter',
-    applies: (f) => !/(?:interpretation\/remoteInterpreter|teachers\/chatRemote|voice\/helperVoice)\.ts$/.test(f.rel),
+    applies: (f) => !/(?:interpretation\/remoteInterpreter|teachers\/chatRemote|voice\/helperVoice|sync\/transport)\.ts$/.test(f.rel),
     re: /\bfetch\s*\(|XMLHttpRequest|new WebSocket|navigator\.sendBeacon/g,
     msg: 'network calls are only allowed in the consent-gated AI adapters',
   },

@@ -149,6 +149,24 @@ describe('stack wiring', () => {
     assert.match(template, /kms:ViaService: secretsmanager\.\*\.amazonaws\.com/);
   });
 
+  it('keeps the family’s synced school private, recoverable, and reachable only by the AI helper', () => {
+    const table = template.slice(template.indexOf('  FamilyRecordsTable:'), template.indexOf('  FamilyMediaBucket:'));
+    assert.match(table, /DeletionPolicy: Retain/);
+    assert.match(table, /PointInTimeRecoveryEnabled: true/);
+    assert.match(table, /IndexName: byChange/);
+    const bucket = template.slice(template.indexOf('  FamilyMediaBucket:'), template.indexOf('  # ── AI teachers helper'));
+    assert.match(bucket, /DeletionPolicy: Retain/);
+    assert.match(bucket, /RestrictPublicBuckets: true/);
+    assert.match(bucket, /Status: Enabled/);
+    const role = template.slice(template.indexOf('  AiRole:'), template.indexOf('  AiFunction:'));
+    assert.match(role, /dynamodb:GetItem\n\s+- dynamodb:PutItem\n\s+- dynamodb:Query\n/);
+    assert.doesNotMatch(role, /dynamodb:(\*|Delete|Scan|BatchWrite)/);
+    assert.match(role, /Resource: !Sub '\$\{FamilyMediaBucket\.Arn\}\/media\/\*'/);
+    assert.match(template, /SYNC_TABLE: !Ref FamilyRecordsTable\n\s+SYNC_BUCKET: !Ref FamilyMediaBucket/);
+    const deployRole = template.slice(template.indexOf('  GitHubDeployRole:'), template.indexOf('Outputs:'));
+    assert.doesNotMatch(deployRole, /FamilyRecordsTable|FamilyMediaBucket|dynamodb/, 'GitHub deploys can’t touch family data');
+  });
+
   it('only lets main of the configured repo deploy', () => {
     assert.match(template, /token\.actions\.githubusercontent\.com:sub: !Sub 'repo:\$\{GitHubRepo\}:ref:refs\/heads\/\$\{GitHubBranch\}'/);
   });

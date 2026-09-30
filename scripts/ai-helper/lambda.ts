@@ -11,6 +11,7 @@
  */
 import { timingSafeEqual } from 'node:crypto';
 import { lambdaCredentials, secretKeyReader } from './awsSecret';
+import { AwsSyncStore } from './awsStore';
 import { createHelper } from './handler';
 
 interface FunctionUrlEvent {
@@ -45,6 +46,17 @@ const helper = createHelper({
   speakPerDay: limit(env.AI_VOICE_DAILY_LIMIT, 1500),
   listenPerDay: limit(env.AI_LISTEN_DAILY_LIMIT, 500),
   extraOrigins: env.SITE_ORIGIN ? [env.SITE_ORIGIN] : [],
+  // Family sync: records in DynamoDB, photos in S3 (both in this stack).
+  ...(env.SYNC_TABLE && env.SYNC_BUCKET
+    ? {
+        syncStore: new AwsSyncStore({
+          table: env.SYNC_TABLE,
+          bucket: env.SYNC_BUCKET,
+          region: env.AWS_REGION || 'us-east-1',
+          credentials: () => lambdaCredentials(env),
+        }),
+      }
+    : {}),
   log: (msg) => console.info(msg),
 });
 

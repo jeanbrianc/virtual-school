@@ -31,7 +31,16 @@ export interface SeedMeta {
 }
 
 /** Records a person actually created (derived tables like mastery/reports don't count). */
-const AUTHORED_TABLES: TableName[] = ['books', 'readingSessions', 'activities', 'evidence', 'lessonAttempts', 'teacherInteractions', 'portfolio', 'media'];
+export const AUTHORED_TABLES: TableName[] = [
+  'books',
+  'readingSessions',
+  'activities',
+  'evidence',
+  'lessonAttempts',
+  'teacherInteractions',
+  'portfolio',
+  'media',
+];
 
 export type LaunchResult = 'seeded-fresh' | 'upgraded-to-fresh' | 'existing';
 

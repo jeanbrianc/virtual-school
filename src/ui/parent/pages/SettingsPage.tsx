@@ -15,6 +15,7 @@ import { shelfBooksFrom } from '../../child/useChildWorld';
 import { Icon } from '../../shared/Icon';
 import { Card, PageHeader } from '../components';
 import { MicLevel, MicPicker, micInUse, useMicrophones } from './MicPicker';
+import { SyncCard, useSyncView } from './SyncCard';
 import { VoiceCard } from './VoiceCard';
 import type { ParentData } from '../ParentApp';
 
@@ -345,6 +346,8 @@ export function SettingsPage({ data }: { data: ParentData }) {
   const { ctx, audio, persistent } = services;
   const { household, child, records } = data;
   const s = household.settings;
+  const syncView = useSyncView(services.sync);
+  const syncOn = !!syncView.joined && syncView.phase !== 'off';
   const [pin, setPin] = useState({ next: '', confirm: '' });
   const [endpoint, setEndpoint] = useState(s.interpretation.endpoint ?? '');
   const [msg, setMsg] = useState<string | null>(null);
@@ -486,6 +489,8 @@ export function SettingsPage({ data }: { data: ParentData }) {
         </div>
 
         <div className="stack">
+          <SyncCard childName={child.name} />
+
           <AiTeachersCard
             settings={s.teacherAi}
             childName={child.name}
@@ -582,8 +587,8 @@ export function SettingsPage({ data }: { data: ParentData }) {
               <div className="confirm-row">
                 <span className="small">
                   {confirmReset === 'fresh'
-                    ? 'This permanently erases all learning records on this device.'
-                    : 'This permanently replaces everything on this device with sample data.'}
+                    ? `This permanently erases all learning records ${syncOn ? 'on every device (family sync is on)' : 'on this device'}.`
+                    : `This permanently replaces everything ${syncOn ? 'on every device (family sync is on)' : 'on this device'} with sample data.`}
                 </span>
                 <button
                   type="button"
@@ -655,7 +660,8 @@ export function SettingsPage({ data }: { data: ParentData }) {
             <ul className="privacy-points small">
               <li>
                 🏠 All records and photos are stored in this browser on this device
-                {persistent ? '' : ' (currently in temporary memory — this browser blocked storage)'}.
+                {persistent ? '' : ' (currently in temporary memory — this browser blocked storage)'}
+                {syncOn ? ', and — with family sync on — in your own AWS account, behind the family sign-in' : ''}.
               </li>
               {storage && storage.quota > 0 && (
                 <li>
