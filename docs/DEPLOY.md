@@ -131,7 +131,7 @@ redeploy. The ARN is kept as a hidden stack parameter — not in GitHub. The sec
 can be a plain `sk-…` string or JSON such as `{"OPENAI_API_KEY": "sk-…"}`.
 
 Then open the site → *Grown-ups → Settings & privacy* → *AI teachers* → **Check
-connection** ("Connected — AI teachers are using OpenAI…"), and turn on whichever of
+connection** ("Connected to helper — OpenAI… is configured…"), and turn on whichever of
 the three you want. Each browser keeps its own settings. This checks configuration,
 not a successful provider request. Under *Voice*, use **Test natural voice** to
 generate a short sample without child information (a small API-credit cost), then
