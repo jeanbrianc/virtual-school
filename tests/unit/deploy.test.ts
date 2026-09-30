@@ -168,6 +168,11 @@ describe('stack wiring', () => {
   });
 
   it('only lets main of the configured repo deploy', () => {
-    assert.match(template, /token\.actions\.githubusercontent\.com:sub: !Sub 'repo:\$\{GitHubRepo\}:ref:refs\/heads\/\$\{GitHubBranch\}'/);
+    const role = template.slice(template.indexOf('  GitHubDeployRole:'), template.indexOf('Outputs:'));
+    assert.match(role, /token\.actions\.githubusercontent\.com:aud: sts\.amazonaws\.com/);
+    assert.match(role, /repo:\$\{Owner\}@\$\{GitHubOwnerId\}\/\$\{Repo\}@\$\{GitHubRepoId\}:ref:refs\/heads\/\$\{GitHubBranch\}/);
+    assert.match(role, /Owner: !Select \[0, !Split \['\/', !Ref GitHubRepo\]\]/);
+    assert.match(role, /Repo: !Select \[1, !Split \['\/', !Ref GitHubRepo\]\]/);
+    assert.doesNotMatch(role, /StringLike|ref:refs\/heads\/\*|repo:\*/);
   });
 });

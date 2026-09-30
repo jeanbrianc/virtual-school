@@ -131,6 +131,39 @@ function upstreamError(status: number): { status: number; error: string } {
   return { status: 502, error: `The AI service answered ${status}.` };
 }
 
+/** Only allowlisted categories leave the provider boundary; never forward its body. */
+async function voiceFailure(res: Response, now: number) {
+  let code = '';
+  try {
+    const body = (await res.json()) as { error?: { code?: unknown; type?: unknown } };
+    const values = [body.error?.code, body.error?.type];
+    if (values.includes('insufficient_quota') || values.includes('billing_hard_limit_reached')) code = 'provider_quota';
+    else if (values.includes('rate_limit_exceeded')) code = 'provider_rate_limit';
+  } catch {
+    /* Unknown upstream body stays unknown. */
+  }
+  const category = res.status === 429 ? code || 'provider_429' : res.status === 401 || res.status === 403 ? 'provider_auth' : 'provider_error';
+  const retry = res.headers.get('retry-after');
+  const seconds = retry ? (/^\d+(?:\.\d+)?$/.test(retry) ? Number(retry) : (Date.parse(retry) - now) / 1000) : 60;
+  const retryAfterSeconds = category === 'provider_quota' ? 900 : Math.max(1, Math.min(900, Number.isFinite(seconds) ? Math.ceil(seconds) : 60));
+  const error =
+    category === 'provider_quota'
+      ? 'OpenAI voice quota or credit is exhausted. Check the OpenAI project billing and budget, then test again. Built-in voices still work.'
+      : category === 'provider_rate_limit'
+        ? 'OpenAI voices are temporarily rate limited. Wait a moment, then test again. Built-in voices still work.'
+        : category === 'provider_429'
+          ? 'OpenAI rejected the voice request with 429; the cause is unknown. Check project credit and rate limits. Built-in voices still work.'
+          : upstreamError(res.status).error;
+  const requestId = res.headers.get('x-request-id');
+  return {
+    status: res.status === 429 ? 429 : 502,
+    category,
+    error,
+    retryAfterSeconds,
+    ...(requestId && /^req_[A-Za-z0-9_-]{1,100}$/.test(requestId) ? { requestId } : {}),
+  };
+}
+
 export function createHelper(config: HelperConfig) {
   const fetchImpl = config.fetchImpl ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const now = config.now ?? (() => Date.now());
@@ -138,6 +171,7 @@ export function createHelper(config: HelperConfig) {
   const anthropicKey = keyGetter(config.apiKey, log);
   const openaiKey = keyGetter(config.openaiKey, log);
   const replies = limiter(config.perMinute ?? 20, config.perDay ?? 300, now);
+  let voiceCooldown: { until: number; failure: Awaited<ReturnType<typeof voiceFailure>> } | null = null;
   const speaking = limiter(60, config.speakPerDay ?? 1500, now);
   const syncing = limiter(240, 50_000, now);
   const sync = config.syncStore ? syncRoutes(config.syncStore, now) : null;
@@ -276,16 +310,29 @@ export function createHelper(config: HelperConfig) {
         if (p.provider !== 'openai') return respond(501, { error: 'Natural voices need an OpenAI key.' }, origin);
         const input = parseSpeakInput(parsed);
         if (!input) return respond(400, { error: 'Invalid speak request.' }, origin);
-        if (!speaking.take()) return respond(429, { error: 'Daily or per-minute voice limit reached.' }, origin);
+        if (voiceCooldown && voiceCooldown.until > now()) {
+          return respond(
+            voiceCooldown.failure.status,
+            { ...voiceCooldown.failure, retryAfterSeconds: Math.ceil((voiceCooldown.until - now()) / 1000) },
+            origin,
+          );
+        }
+        if (!speaking.take())
+          return respond(
+            429,
+            { error: 'Daily or per-minute voice limit reached. Built-in voices still work.', category: 'helper_limit', retryAfterSeconds: 60 },
+            origin,
+          );
         const res = await fetchImpl(`${OPENAI_API}/audio/speech`, {
           method: 'POST',
           headers: { authorization: `Bearer ${p.key}`, 'content-type': 'application/json' },
           body: JSON.stringify(buildSpeechRequest(input, config.voiceModel || DEFAULT_OPENAI_VOICE_MODEL)),
         });
         if (!res.ok) {
-          const e = upstreamError(res.status);
-          log(`voice (${input.teacherId}) failed ${res.status}`);
-          return respond(e.status, { error: e.error }, origin);
+          const e = await voiceFailure(res, now());
+          if (res.status === 429) voiceCooldown = { until: now() + e.retryAfterSeconds * 1000, failure: e };
+          log(`voice failed status=${res.status} category=${e.category}${e.requestId ? ` request_id=${e.requestId}` : ''}`);
+          return respond(e.status, e, origin);
         }
         const audio = new Uint8Array(await res.arrayBuffer());
         log(`voice (${input.teacherId}) ${input.text.length} chars — ${speaking.today} today`);

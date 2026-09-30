@@ -167,6 +167,12 @@ refreshes.
   `InteractionSystem` (proxies, markers, focus ring), `Particles`.
 - Quality presets (`high`/`balanced`/`low`) scale shadows, pixel ratio and
   bloom; software renderers are detected and dropped to `low` automatically.
+- All qualities share softer sunlight, pendant lights, and window-light pools.
+  Rugs are matte and nonemissive; reduced exposure and a higher bloom threshold
+  keep pale surfaces from glowing while discovery cues remain distinct.
+- The dance start flag stands in the aisle beside the numbered rug. Its position
+  leaves room for the pennant and interaction marker in the follow camera;
+  station 1 continues to start the circuit automatically.
 - The child's name is passed in (chalkboard greeting, shelf plaque, art
   signatures) — nothing in the engine is specific to one child.
 

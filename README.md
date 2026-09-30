@@ -78,6 +78,15 @@ instructions itself, only answers pages on this computer, and has a daily cap
 default Claude Haiku 4.5 model). See [Privacy & safety](#privacy--safety) for
 exactly what is sent.
 
+**Check connection** confirms provider configuration; it does not prove that
+speech requests succeed. **Voice → Test natural voice** sends a short sample
+without child information, uses a small amount of API credit, and provides a
+play control when generation succeeds. Quota or rate-limit failures show
+recovery guidance; teacher read-aloud falls back to built-in voices.
+
+The classroom uses softer direct light and restrained glow so both rugs retain
+their colors and numbered stations remain readable across graphics settings.
+
 ### Your own domain (AWS)
 
 `npm run deploy:aws` puts the school on your AWS account at
@@ -86,6 +95,10 @@ welcome page with a family sign-in in front of everything, and the AI teachers a
 `/api` — for roughly the cost of the Route 53 zone you already have. After that,
 every push to `main` on GitHub deploys itself. Step by step:
 [docs/DEPLOY.md](docs/DEPLOY.md).
+
+GitHub's AWS deploy role matches this repository's immutable numeric owner and
+repository IDs plus the `main` branch. If copying the deployment to another
+repository, also set its `GITHUB_OWNER_ID` and `GITHUB_REPO_ID`; see the deploy guide.
 
 **Hosted copy.** The production build is also published as a private claude.ai
 artifact. It runs the same code with its own browser storage. That viewer blocks
@@ -170,7 +183,7 @@ like the circuits in her dance and gymnastics classes. Hopping onto a number
 number's move — a plié, bunny hops, a ☀️ sunshine twirl, a star jump, a
 curtsey, an arabesque, a cartwheel, a frog jump, a backflip and a ta-da by
 default, from 17 moves. Each number plays the next note up a scale. The
-striped flag at the rug's edge (or just stepping on 1) starts "the circuit": a
+striped flag in the aisle beside the rug (or just stepping on 1) starts "the circuit": a
 glowing ring and a bouncing star show the next number, a HUD counts 1 → 10,
 and finishing all ten in order gets confetti and is saved (`circuitsDone`).
 Digit calls out each station ("Three! Sunshine twirl! Next, number four!")

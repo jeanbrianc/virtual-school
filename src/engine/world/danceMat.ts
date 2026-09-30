@@ -16,6 +16,12 @@ import type { BuildContext, Feature } from './types';
 /** How close to a number's middle counts as standing on it (the painted circle is ~0.3). */
 export const TILE_RADIUS = 0.4;
 
+/** In the aisle beside the rug: leave room for the pennant and marker in the follow camera. */
+export const CIRCUIT_FLAG = {
+  x: CLASSROOM_RUG.x - CLASSROOM_RUG.width / 2 - 1,
+  z: CLASSROOM_RUG.z,
+} as const;
+
 export interface MatTile {
   n: number;
   x: number;
@@ -61,7 +67,7 @@ function ringMaterial(color: string): THREE.MeshBasicMaterial {
 
 export class DanceMat implements Feature {
   readonly tiles = matTiles();
-  /** Where the start flag stands (left edge of the rug, between numbers 1 and 6). */
+  /** Where the start flag stands (in the aisle outside the rug's left edge). */
   readonly flagAt: THREE.Vector3;
   private readonly glow: THREE.Mesh;
   private readonly star: THREE.Sprite;
@@ -93,9 +99,7 @@ export class DanceMat implements Feature {
     }
 
     // The start flag: a little striped pennant, like the cones and flags at gym class.
-    const t1 = this.tiles[0]!;
-    const t6 = this.tiles[5]!;
-    this.flagAt = new THREE.Vector3(CLASSROOM_RUG.x - CLASSROOM_RUG.width / 2 + 0.22, 0, (t1.z + t6.z) / 2);
+    this.flagAt = new THREE.Vector3(CIRCUIT_FLAG.x, 0, CIRCUIT_FLAG.z);
     const flag = new THREE.Group();
     flag.position.copy(this.flagAt);
     flag.add(cyl(0.13, 0.15, 0.05, mat(PALETTE.oak, { roughness: 0.6 }), 0, 0.025, 0));

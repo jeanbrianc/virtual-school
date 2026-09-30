@@ -221,6 +221,82 @@ describe('the helper with an OpenAI key', () => {
   });
 });
 
+describe('voice provider failures', () => {
+  for (const [providerCode, expected, retry] of [
+    ['insufficient_quota', 'provider_quota', 900],
+    ['rate_limit_exceeded', 'provider_rate_limit', 12],
+    ['unknown_private_code', 'provider_429', 12],
+  ] as const) {
+    it(`classifies ${expected}, sanitizes diagnostics and bounds calls until cooldown expires`, async () => {
+      let now = 100_000;
+      let calls = 0;
+      const logs: string[] = [];
+      const handle = createHelper({
+        openaiKey: 'fake-key',
+        now: () => now,
+        log: (line) => logs.push(line),
+        fetchImpl: (async () => {
+          calls += 1;
+          if (calls > 1) return new Response(new Uint8Array(4096), { headers: { 'content-type': 'audio/mpeg' } });
+          return Response.json(
+            { error: { code: providerCode, message: 'PRIVATE_PROVIDER_BODY' } },
+            { status: 429, headers: { 'retry-after': '12', 'x-request-id': 'req_test-123' } },
+          );
+        }) as typeof fetch,
+      });
+      const speak = () => handle({ method: 'POST', path: '/v1/speak', headers: page, body: JSON.stringify({ teacherId: 'hoot', text: 'PRIVATE_CHILD_LINE' }) });
+      const failed = await speak();
+      assert.equal(failed.status, 429);
+      const body = JSON.parse(text(failed));
+      assert.equal(body.category, expected);
+      assert.equal(body.retryAfterSeconds, retry);
+      assert.equal(body.requestId, 'req_test-123');
+      assert.equal((await speak()).status, 429);
+      assert.equal(calls, 1);
+      assert.doesNotMatch(text(failed) + logs.join(' '), /PRIVATE_PROVIDER_BODY|PRIVATE_CHILD_LINE|unknown_private_code|fake-key/);
+      assert.match(logs.join(' '), new RegExp(`category=${expected}`));
+      now += retry * 1000 + 1;
+      assert.equal((await speak()).status, 200);
+      assert.equal(calls, 2);
+    });
+  }
+  for (const [retryHeader, expected] of [
+    [undefined, 60],
+    ['malformed', 60],
+    ['99999999', 900],
+    ['0', 1],
+    [new Date(112_000).toUTCString(), 12],
+  ] as const) {
+    it(`bounds Retry-After ${retryHeader ?? 'absent'}`, async () => {
+      const handle = createHelper({
+        openaiKey: 'fake',
+        now: () => 100_000,
+        fetchImpl: (async () =>
+          Response.json(
+            { error: { code: 'rate_limit_exceeded' } },
+            { status: 429, headers: retryHeader === undefined ? {} : { 'retry-after': retryHeader } },
+          )) as typeof fetch,
+      });
+      const failed = await handle({ method: 'POST', path: '/v1/speak', headers: page, body: '{"teacherId":"hoot","text":"hi"}' });
+      assert.equal(JSON.parse(text(failed)).retryAfterSeconds, expected);
+    });
+  }
+  it('labels the local cap separately and never calls OpenAI after reaching it', async () => {
+    let calls = 0;
+    const handle = createHelper({
+      openaiKey: 'fake',
+      speakPerDay: 0,
+      fetchImpl: (async () => {
+        calls += 1;
+        return new Response();
+      }) as typeof fetch,
+    });
+    const failed = await handle({ method: 'POST', path: '/v1/speak', headers: page, body: '{"teacherId":"hoot","text":"hi"}' });
+    assert.equal(JSON.parse(text(failed)).category, 'helper_limit');
+    assert.equal(calls, 0);
+  });
+});
+
 describe('the OpenAI key in AWS Secrets Manager', () => {
   const creds = { accessKeyId: 'AKIDEXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY' };
   it('signs requests exactly like AWS Signature Version 4 (AWS test suite vectors)', () => {
@@ -364,9 +440,14 @@ describe('natural voices and listening in the browser', () => {
         ['A new line'],
       );
       assert.equal(device.spoken[0]!.opts?.natural, undefined, 'the computer’s voice gets no helper settings');
+      await out.speak('Another new line', { natural });
+      assert.equal(calls.length, 2, '429 cooldown prevents another provider request');
       fail = false;
       FakeAudio.fail = true;
-      await out.speak('Autoplay blocked', { natural });
+      const freshOutput = new HelperSpeechOutput(device, fetchImpl);
+      const callsBeforePlaybackFailure = calls.length;
+      await freshOutput.speak('Autoplay blocked', { natural });
+      assert.equal(calls.length, callsBeforePlaybackFailure + 1, 'playback failure reaches Audio rather than the existing cooldown');
       assert.equal(device.spoken.at(-1)!.text, 'Autoplay blocked');
 
       // Without natural voices, nothing goes to the helper.
@@ -425,7 +506,7 @@ describe('natural voices and listening in the browser', () => {
     assert.equal(openaiStatus.ok, true);
     assert.equal(openaiStatus.provider, 'openai');
     assert.equal(openaiStatus.voices, true);
-    assert.match(openaiStatus.message, /OpenAI \(gpt-6-luna\).*Natural voices and listening/);
+    assert.match(openaiStatus.message, /OpenAI \(gpt-6-luna\).*configured; not tested/);
     const claude = await checkHelper('/api', health({ ok: true, keyConfigured: true, model: 'claude-haiku-4-5-20251001' }));
     assert.equal(claude.voices, false);
     const none = await checkHelper('/api', health({ ok: true, keyConfigured: false }));

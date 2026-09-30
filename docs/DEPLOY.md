@@ -97,6 +97,18 @@ Tip: set a monthly budget on the OpenAI project that owns the key
    site, update this Lambda and refresh this CloudFront distribution — and only for
    pushes to `main` of this repository.
 
+   The trust policy uses GitHub's immutable OIDC subject:
+   `repo:OWNER@OWNER_ID/REPO@REPO_ID:ref:refs/heads/main`, with audience
+   `sts.amazonaws.com`. `GitHubOwnerId` and `GitHubRepoId` default to this
+   repository's verified numeric IDs. A deployment to a different repository must
+   also supply `GITHUB_OWNER_ID` and `GITHUB_REPO_ID` along with `GITHUB_REPO`.
+   Get those IDs from the repository metadata through GitHub; they are identifiers,
+   not credentials. Do not use wildcard trust or enable pull-request deployment.
+   Updating the repository secret alone cannot fix an AWS trust mismatch; deploy
+   the updated stack template. This changes the trusted identity, not the deploy
+   role's publishing permissions, and creates no additional resources or cost.
+   See [GitHub's OIDC reference](https://docs.github.com/en/actions/reference/security/oidc).
+
 5. **Open https://lms.brianjeanbuilds.com**: the welcome page shows Izzy's classroom and a
    *Family sign-in* card. Sign in once per device (it stays signed in for 60 days) and set up the
    school like on your Mac. To use the AI teachers there: *Grown-ups → Settings & privacy
@@ -131,8 +143,19 @@ redeploy. The ARN is kept as a hidden stack parameter — not in GitHub. The sec
 can be a plain `sk-…` string or JSON such as `{"OPENAI_API_KEY": "sk-…"}`.
 
 Then open the site → *Grown-ups → Settings & privacy* → *AI teachers* → **Check
-connection** ("Connected — AI teachers are using OpenAI…"), and turn on whichever of
-the three you want. Each browser keeps its own settings.
+connection** ("Connected to helper — OpenAI… is configured…"), and turn on whichever of
+the three you want. Each browser keeps its own settings. This checks configuration,
+not a successful provider request. Under *Voice*, use **Test natural voice** to
+generate a short sample without child information (a small API-credit cost), then
+press play to confirm sound on the device. This does not test microphone transcription.
+
+If speech fails, the helper classifies known quota/credit and temporary rate-limit
+errors, without exposing provider bodies or child text. Known quota failures pause
+provider voice calls for 15 minutes; transient/unknown 429 failures honor bounded
+`Retry-After` (1–900 seconds, default 60). The browser also pauses failed voice calls
+and uses built-in read-aloud. Helper cooldowns apply to each warm Lambda instance,
+not globally across instances. They do not change the existing daily caps or billing.
+The explicit parent test may be retried, but the warm helper cooldown still applies.
 
 **Children's privacy — please read.** OpenAI's guidance for apps used by
 children says: *"You should not use OpenAI services to process any personal data
@@ -223,9 +246,10 @@ on (Settings says so before you confirm).
 | The phone or iPad still starts empty | Family sync isn't on yet: turn it on in *Settings → Family sync* **on the Mac** first, then reload the other device. If Settings says "needs one more step", the stack hasn't been updated — run `npm run deploy:aws` once. |
 | "This device has records of its own too" | That device was used before sync. *Use the family's school here* replaces its records with the family's; *Make this device's school the family's* does the opposite (for every device). |
 | The microphone connects to your iPhone, then "I didn't hear anything" | macOS was offering the iPhone (Continuity) as the default microphone. The school now skips an iPhone/iPad mic and listens with the Mac's built-in one; to pick another, use *Settings → Talking to teachers → Microphone* and **Test the microphone** (the bar should move when you talk). To stop the Mac reaching for the phone everywhere: Mac *System Settings → Sound → Input → MacBook Pro Microphone*, or iPhone *Settings → General → AirPlay & Continuity → Continuity Camera* off. |
-| Natural voices sound like the computer's voice | The helper couldn't be reached or hit its daily voice limit, so the built-in voice read the line instead. *Check connection* in Settings. |
+| Natural voices sound like the computer's voice | Built-in read-aloud is the fallback. *Check connection* confirms configuration; use *Voice → Test natural voice* for a real provider request. Known quota failures require checking the OpenAI project's credit, billing/budget, and model limits; transient rate limits require waiting. Unknown 429 remains unclassified. Never paste keys or raw provider responses into issues. |
 | AI teachers: "not been uploaded yet" | The Lambda still has the placeholder; run `npm run deploy:aws` (or push to `main`). |
 | Actions deploy step skipped | Set the secret `AWS_DEPLOY_ROLE_ARN` and the variable `AWS_DEPLOY_ENABLED=true` (step 4). |
+| Actions fails with `Not authorized to perform sts:AssumeRoleWithWebIdentity` | Compare the actual subject in CloudTrail with the deploy role's exact trust condition. Verify repository owner/repository IDs and branch, then deploy the corrected stack template. Local SSO sign-in does not repair GitHub OIDC. Confirm a future main deployment authenticates successfully; avoid rerunning an older failed main run, which would publish its older code. |
 
 **Removing everything:** empty the bucket (`aws s3 rm s3://<BucketName> --recursive`
 and delete old versions in the console), then

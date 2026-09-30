@@ -121,14 +121,14 @@ export async function checkHelper(endpoint: string, fetchImpl: typeof fetch = (.
     const voices = body.voices === true;
     const listening = body.listening === true;
     const who = provider ? `${PROVIDER_NAMES[provider]}${body.model ? ` (${body.model})` : ''}` : (body.model ?? 'the AI service');
-    const extras = voices && listening ? ' Natural voices and listening are available.' : '';
+    const extras = voices && listening ? ' Natural voices and listening are configured; not tested.' : '';
     return {
       ok: !!body.ok,
       voices,
       listening,
       ...(provider ? { provider } : {}),
       ...(body.model ? { model: body.model } : {}),
-      message: `Connected — AI teachers are using ${who}.${extras}`,
+      message: `Connected to helper — ${who} is configured; provider requests are not tested.${extras}`,
     };
   } catch {
     return {
@@ -150,4 +150,30 @@ export function naturalVoicesOn(settings: TeacherAiSettings | undefined): boolea
 export function createTeacherChat(settings: TeacherAiSettings | undefined): TeacherChatService {
   if (settings?.enabled && settings.consentToSend && isAllowedHelperUrl(settings.endpoint)) return new HttpTeacherChat(settings.endpoint);
   return new LocalTeacherChat();
+}
+
+/** Parent-triggered nonpersonal sample; never called by a passive connection check. */
+export async function testNaturalVoice(endpoint: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): Promise<{ message: string; audio?: Blob }> {
+  if (!isAllowedHelperUrl(endpoint)) return { message: 'Choose a valid helper address before testing.' };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const res = await fetchImpl(`${endpoint.replace(/\/+$/, '')}/v1/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', [HELPER_HEADER]: '1' },
+      body: JSON.stringify({ teacherId: 'hoot', text: 'Hoo-hoo! This is a teacher voice test.' }),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = (await res.json()) as { error?: unknown };
+      return { message: typeof body.error === 'string' ? body.error : 'Voice test failed. Built-in voices still work.' };
+    }
+    const audio = await res.blob();
+    if (!audio.type.startsWith('audio/') || audio.size < 100) throw new Error('invalid audio');
+    return { message: 'Voice generation passed. Press play to check the sound on this device.', audio };
+  } catch {
+    return { message: 'Could not complete the voice test. Built-in voices still work.' };
+  } finally {
+    clearTimeout(timer);
+  }
 }

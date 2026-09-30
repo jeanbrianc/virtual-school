@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useServices } from '../../../app/services';
 import { cleanSayName, nameTestLine, sayNameSuggestions } from '../../../domain/pronounce';
-import { isAllowedHelperUrl, naturalVoicesOn, type HelperStatus } from '../../../domain/teachers/chatRemote';
+import { isAllowedHelperUrl, naturalVoicesOn, testNaturalVoice, type HelperStatus } from '../../../domain/teachers/chatRemote';
 import { TEACHERS } from '../../../domain/teachers/teachers';
 import type { Child, HouseholdSettings } from '../../../domain/types';
 import { updateChild } from '../../../services/householdService';
@@ -36,6 +36,21 @@ export function VoiceCard({
   const { ctx, speechOut } = useServices();
   const [voices, setVoices] = useState<VoiceInfo[]>(() => speechOut.voices());
   const [draft, setDraft] = useState(child.sayName ?? '');
+  const [voiceTest, setVoiceTest] = useState<{ busy: boolean; message?: string; url?: string }>({ busy: false });
+  useEffect(() => {
+    setVoiceTest({ busy: false });
+  }, [s.teacherAi.endpoint]);
+  useEffect(
+    () => () => {
+      if (voiceTest.url) URL.revokeObjectURL(voiceTest.url);
+    },
+    [voiceTest.url],
+  );
+  const testVoice = async () => {
+    setVoiceTest({ busy: true });
+    const result = await testNaturalVoice(s.teacherAi.endpoint);
+    setVoiceTest({ busy: false, message: result.message, ...(result.audio ? { url: URL.createObjectURL(result.audio) } : {}) });
+  };
   const [saved, setSaved] = useState<string | null>(null);
 
   useEffect(() => {
@@ -114,6 +129,28 @@ export function VoiceCard({
             'Needs your AI helper with an OpenAI key — tap Check connection under AI teachers.'
           )}
         </p>
+        {helper?.voices && (
+          <>
+            <p className="muted small">
+              Connection checks confirm configuration. This test sends a short sample with no child information to OpenAI and uses a small amount of API credit.
+            </p>
+            <button
+              type="button"
+              className="btn btn-small"
+              data-testid="natural-test"
+              disabled={voiceTest.busy || !isAllowedHelperUrl(s.teacherAi.endpoint)}
+              onClick={() => void testVoice()}
+            >
+              {voiceTest.busy ? 'Testing…' : 'Test natural voice'}
+            </button>
+            {voiceTest.message && (
+              <p className="small" role="status" data-testid="natural-test-result">
+                {voiceTest.message}
+              </p>
+            )}
+            {voiceTest.url && <audio controls src={voiceTest.url} aria-label="Natural teacher voice test" />}
+          </>
+        )}
       </div>
 
       {!canSpeak ? (

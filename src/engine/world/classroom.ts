@@ -152,7 +152,7 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
     [0, 1.8],
   ].forEach(([x, z], i) => {
     const l = new THREE.Group();
-    const paper = sphere(0.36, mat(lanternColors[i] ?? '#fff1d6', { emissive: '#ffd79a', emissiveIntensity: 0.9, roughness: 1 }), 0, 0, 0, 20);
+    const paper = sphere(0.36, mat(lanternColors[i] ?? '#fff1d6', { emissive: '#ffd79a', emissiveIntensity: 0.35, roughness: 1 }), 0, 0, 0, 20);
     paper.castShadow = false;
     for (let r = -2; r <= 2; r++) {
       const rib = torus(0.36 * Math.cos((r * Math.PI) / 7), 0.006, mat('#d8c3a5'));
@@ -160,7 +160,7 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
       rib.position.y = 0.36 * Math.sin((r * Math.PI) / 7);
       l.add(rib);
     }
-    const light = new THREE.PointLight('#ffd9a8', 5, 7, 1.7);
+    const light = new THREE.PointLight('#ffd9a8', 2.5, 7, 1.7);
     l.add(paper, light, cyl(0.004, 0.004, 1.1, mat('#6b5a45'), 0, 0.9, 0, 4));
     l.position.set(x ?? 0, 3.5, z ?? 0);
     ctx.addStatic(l);

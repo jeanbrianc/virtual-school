@@ -160,7 +160,7 @@ export class Game {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.maxPixelRatio));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.92;
+    this.renderer.toneMappingExposure = 0.82;
     this.renderer.shadowMap.enabled = q.shadows;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     const canvas = this.renderer.domElement;
@@ -181,7 +181,7 @@ export class Game {
     this.scene.add(hemi);
     // Late-morning sun from the north-west, high enough to light the whole
     // dollhouse and cast soft furniture shadows.
-    this.sun = new THREE.DirectionalLight('#ffe9c7', 2.0);
+    this.sun = new THREE.DirectionalLight('#ffe9c7', 1.45);
     this.sun.position.set(-9, 22, -12);
     this.sun.target.position.set(2, 0, 1);
     this.sun.castShadow = q.shadows;
@@ -242,7 +242,9 @@ export class Game {
     const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: q.msaa });
     this.composer = new EffectComposer(this.renderer, target);
     this.composer.addPass(new RenderPass(this.scene, this.rig.camera));
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.22, 0.5, 0.96));
+    // Reserve bloom for emissive discovery cues; pale rugs and walls should
+    // retain their fabric/color detail instead of contributing a broad halo.
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.12, 0.4, 1.15));
     this.composer.addPass(new OutputPass());
   }
 
@@ -260,7 +262,7 @@ export class Game {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
-      opacity: 0.35,
+      opacity: 0.16,
       toneMapped: false,
     });
     for (const [x, w] of [

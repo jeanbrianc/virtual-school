@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import * as THREE from 'three';
 import { stationPitch } from '../../src/audio/AudioEngine';
 import { DEFAULT_AVATAR } from '../../src/domain/avatar';
 import {
@@ -22,7 +23,10 @@ import {
 } from '../../src/domain/play/circuit';
 import { AvatarModel } from '../../src/engine/characters/avatarModel';
 import { MOVES, poseAt } from '../../src/engine/characters/moves';
-import { TILE_RADIUS, matTiles, tileAt } from '../../src/engine/world/danceMat';
+import { Tweens } from '../../src/engine/core/tween';
+import { LAYOUT } from '../../src/engine/palette';
+import { CameraRig } from '../../src/engine/systems/cameraRig';
+import { CIRCUIT_FLAG, TILE_RADIUS, matTiles, tileAt } from '../../src/engine/world/danceMat';
 
 describe('circuit rules', () => {
   it('stepping on 1 starts; the right next number moves on; 10 after 9 completes', () => {
@@ -172,6 +176,33 @@ describe('move animations', () => {
 });
 
 describe('the rug', () => {
+  it('keeps the flag, pennant and marker clear of numbered stations in the follow camera', () => {
+    const tiles = matTiles();
+    const views = [LAYOUT.spawn, tiles[0]!, tiles[5]!, { x: CIRCUIT_FLAG.x - 0.5, z: CIRCUIT_FLAG.z + 0.1 }];
+    for (const aspect of [1100 / 720, 393 / 851]) {
+      for (const view of views) {
+        for (const yaw of [-0.12, 0, 0.12]) {
+          const rig = new CameraRig(aspect, new Tweens());
+          rig.yaw = yaw;
+          if (aspect < 1) rig.camera.fov = 55;
+          rig.camera.updateProjectionMatrix();
+          rig.update(1, new THREE.Vector3(view.x, 0, view.z));
+          rig.camera.updateMatrixWorld();
+          const projectX = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z).project(rig.camera).x;
+          // Include the pennant tip and the marker's width + bob above the pole.
+          const flagRight = Math.max(...[0.02, 1.2, 1.85].map((y) => projectX(CIRCUIT_FLAG.x + 0.6, y, CIRCUIT_FLAG.z)));
+          for (const tile of tiles) {
+            const stationLeft = Math.min(
+              ...[-TILE_RADIUS, TILE_RADIUS].flatMap((dx) => [-TILE_RADIUS, TILE_RADIUS].map((dz) => projectX(tile.x + dx, 0, tile.z + dz))),
+            );
+            assert.ok(flagRight < stationLeft, `flag overlaps station ${tile.n}, aspect ${aspect}, yaw ${yaw}`);
+          }
+        }
+      }
+    }
+    assert.equal(tileAt(tiles, CIRCUIT_FLAG.x, CIRCUIT_FLAG.z), null);
+  });
+
   it('numbers sit where the rug paints them, in two rows of five', () => {
     const tiles = matTiles();
     assert.equal(tiles.length, 10);
