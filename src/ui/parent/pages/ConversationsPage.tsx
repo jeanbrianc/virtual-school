@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { getSkill } from '../../../domain/curriculum';
 import { LESSON_TITLES } from '../../../domain/lessons/registry';
+import { isTeacherId } from '../../../domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../../domain/teachers/teachers';
 import type { LessonAttempt, TeacherInteraction } from '../../../domain/types';
 import { dayFromTimestamp, formatDay } from '../../../domain/util/time';
@@ -58,7 +59,7 @@ export function ConversationsPage({ data }: { data: ParentData }) {
       ) : (
         <div className="convo-list">
           {items.map((i) => {
-            const t = TEACHERS[i.teacherId as TeacherId];
+            const t = isTeacherId(i.teacherId) ? TEACHERS[i.teacherId] : undefined;
             const lesson = lessonFor(i);
             const isOpen = open === i.id;
             return (
@@ -66,7 +67,7 @@ export function ConversationsPage({ data }: { data: ParentData }) {
                 <button type="button" className="convo-head" onClick={() => setOpen(isOpen ? null : i.id)} aria-expanded={isOpen}>
                   <TeacherPortrait id={i.teacherId as TeacherId} mood="happy" size={44} />
                   <div className="convo-summary">
-                    <strong>{t?.name ?? i.teacherId}</strong>
+                    <strong>{t?.name ?? 'Past teacher'}</strong>
                     <span className="muted small">
                       {formatDay(dayFromTimestamp(i.startedAt), 'weekday')} · {time(i.startedAt)} ·{' '}
                       {i.context.lessonId ? LESSON_TITLES[i.context.lessonId]?.childTitle : i.context.flow}
@@ -82,7 +83,7 @@ export function ConversationsPage({ data }: { data: ParentData }) {
                     <ol className="transcript">
                       {i.transcript.map((l, k) => (
                         <li key={k} className={`line line-${l.speaker}`}>
-                          <span className="who">{l.speaker === 'teacher' ? t?.name : l.speaker === 'child' ? child.name : '·'}</span>
+                          <span className="who">{l.speaker === 'teacher' ? (t?.name ?? 'Past teacher') : l.speaker === 'child' ? child.name : '·'}</span>
                           <span className="what">
                             {l.text}
                             {l.via === 'voice' && (
