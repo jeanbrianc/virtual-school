@@ -13,6 +13,7 @@
 import { SKILLS } from '../../src/domain/curriculum';
 import { INTERPRETATION_JSON_SCHEMA, INTERPRETATION_SYSTEM_PROMPT } from '../../src/domain/interpretation/remoteInterpreter';
 import { TEACHER_REPLY_TOOL, teacherSystemPrompt, type TeacherAiInput } from '../../src/domain/teachers/aiPrompt';
+import { isTeacherId } from '../../src/domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../src/domain/teachers/teachers';
 
 export const OPENAI_API = 'https://api.openai.com/v1';
@@ -93,7 +94,7 @@ export function parseSpeakInput(body: unknown): SpeakInput | null {
   if (typeof body !== 'object' || body === null) return null;
   const b = body as Record<string, unknown>;
   const teacherId = b.teacherId ?? 'hoot';
-  if (teacherId !== 'hoot' && teacherId !== 'digit' && teacherId !== 'nova') return null;
+  if (!isTeacherId(teacherId)) return null;
   if (typeof b.text !== 'string') return null;
   const text = clampText(b.text, MAX_SPEAK_CHARS).trim();
   return text ? { teacherId, text } : null;

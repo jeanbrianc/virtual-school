@@ -17,6 +17,7 @@
 import { BOOK_CATALOG, getCatalogBook } from '../reading/bookCatalog';
 import { findCatalogTitleInText, searchCatalogSync } from '../reading/bookMetadata';
 import type { BookStatus } from '../types';
+import { isTeacherId, TEACHER_REGISTRY } from './registry';
 import { personalize, pickLine, TEACHERS, type TeacherId } from './teachers';
 
 export type ChatIntent =
@@ -326,34 +327,11 @@ function localReply(req: TeacherChatRequest, u: Understanding, book: ChatBookRef
     case 'feeling':
       return FEELING_REPLIES[u.feeling ?? ''] ?? 'Thank you for telling me how you feel.';
     case 'question':
-      return pickLine(
-        t === 'nova'
-          ? [
-              'Ooh, what a great question! Scientists find out by testing. What do you think the answer is?',
-              'I wonder that too! Let’s be scientists and find out.',
-            ]
-          : t === 'digit'
-            ? ['Beep! Great question! My circuits say: let’s count and find out!', 'Ooh, a puzzle! Let’s figure it out together.']
-            : ['What a wonderful question! Books are full of answers — let’s find one about it.', 'Hoo! I love questions. What do you think?'],
-        seed,
-      );
+      return pickLine(TEACHER_REGISTRY[t].local.questions, seed);
     case 'share':
-      if (u.likes)
-        return `You love ${u.likes}? ${t === 'digit' ? 'Beep boop, so do I!' : t === 'nova' ? 'Me too! That’s so interesting.' : 'Hoo-hoo, so do I!'}`;
-      return pickLine(
-        t === 'digit'
-          ? ['Beep boop! Tell me more!', 'My sensors say that’s very interesting! Tell me more!']
-          : t === 'nova'
-            ? ['Ooh, interesting! Tell me more!', 'Really? What happened next?']
-            : ['Hoo-hoo! Tell me more!', 'How wonderful! What happened next?'],
-        seed,
-      );
+      return u.likes ? TEACHER_REGISTRY[t].local.likes.replace('{likes}', u.likes) : pickLine(TEACHER_REGISTRY[t].local.shares, seed);
     default:
-      return t === 'digit'
-        ? 'Beep? My sensors missed that. Can you say it again?'
-        : t === 'nova'
-          ? 'Hmm? Can you say that one more time?'
-          : 'Hoo? Could you say that again?';
+      return TEACHER_REGISTRY[t].local.unclear;
   }
 }
 
@@ -382,6 +360,13 @@ export function answerToFinishedQuestion(utterance: string, lastTeacherLine: str
 }
 
 export function localTeacherReply(req: TeacherChatRequest): TeacherChatReply {
+  if (!isTeacherId(req.teacherId))
+    return {
+      reply: 'This teacher is resting. Choose a teacher in the school, or ask a grown-up for help.',
+      intent: 'unclear',
+      finished: null,
+      source: 'local',
+    };
   const lastTeacher = [...req.history].reverse().find((h) => h.speaker === 'teacher')?.text ?? '';
   const answered = req.topic && req.teacherId === 'hoot' ? answerToFinishedQuestion(req.utterance, lastTeacher) : null;
   if (answered !== null && req.topic) {

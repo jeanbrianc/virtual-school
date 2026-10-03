@@ -258,8 +258,8 @@ function AiTeachersCard({
         <summary>What is sent, and how to set it up</summary>
         <p>
           <strong>Sent to {service} for each reply:</strong> {childName}’s first name, the words she said to the teacher (as text), the last few lines of that
-          conversation, and her book titles. The teachers’ instructions also say she’s a young child who reads well above her age. <strong>Never sent:</strong>{' '}
-          photos, birthdays, records or reports.{' '}
+          conversation, and her book titles. The teachers’ instructions also say she’s a young learner. <strong>Never sent:</strong> photos, birthdays, records
+          or reports.{' '}
           {helper?.provider === 'openai'
             ? 'OpenAI doesn’t train on API data by default, and keeps it up to 30 days for abuse checks unless your OpenAI organization has zero data retention — which OpenAI asks for before processing data of children under 13 (request it from OpenAI).'
             : helper?.provider === 'anthropic'

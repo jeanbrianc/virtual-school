@@ -1,7 +1,17 @@
 /** Hand-drawn vector portraits of the teachers for dialogue panels. */
+import { isTeacherId } from '../../domain/teachers/registry';
 import type { TeacherId } from '../../domain/teachers/teachers';
 
-export function TeacherPortrait({ id, mood = 'happy', size = 120 }: { id: TeacherId; mood?: 'happy' | 'thinking' | 'cheer'; size?: number }) {
+export function TeacherPortrait({ id, mood = 'happy', size = 120 }: { id: TeacherId | string; mood?: 'happy' | 'thinking' | 'cheer'; size?: number }) {
+  if (!isTeacherId(id))
+    return (
+      <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Past teacher">
+        <circle cx="60" cy="60" r="50" fill="#e2dbc9" />
+        <text x="60" y="75" textAnchor="middle" fontSize="45">
+          ★
+        </text>
+      </svg>
+    );
   const blinkClass = 'portrait-blink';
   if (id === 'hoot') {
     return (

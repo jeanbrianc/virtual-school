@@ -1,3 +1,5 @@
+import { isTeacherId } from '../domain/teachers/registry';
+import { TEACHERS } from '../domain/teachers/teachers';
 import { UnitOfWork } from '../data/repositories';
 import { chooseStartTier } from '../domain/adaptive/recommendations';
 import { getSkill } from '../domain/curriculum';
@@ -144,5 +146,5 @@ export async function markNotesSeen(ctx: ServiceContext, interactionId: string):
 }
 
 function teacherName(id: string): string {
-  return id === 'hoot' ? 'Professor Hoot' : id === 'digit' ? 'Digit' : id === 'nova' ? 'Nova' : id;
+  return isTeacherId(id) ? TEACHERS[id].name : 'Past teacher';
 }

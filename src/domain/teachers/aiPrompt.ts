@@ -7,6 +7,7 @@
 import { SKILLS } from '../curriculum';
 import { INTERPRETATION_JSON_SCHEMA, INTERPRETATION_SYSTEM_PROMPT } from '../interpretation/remoteInterpreter';
 import { CHAT_INTENTS, type ChatTurn } from './chat';
+import { isTeacherId, TEACHER_REGISTRY } from './registry';
 import { TEACHERS, type TeacherId } from './teachers';
 
 export const DEFAULT_AI_MODEL = 'claude-haiku-4-5-20251001';
@@ -20,12 +21,6 @@ export interface TeacherAiInput {
   bookTitles: string[];
 }
 
-const TEACHER_ROOMS: Record<TeacherId, string> = {
-  hoot: 'the library, where you help her talk about the books she reads so they can go on her bookshelf',
-  digit: 'the math corner, where you and she rescue moon rocks by counting, adding and sharing',
-  nova: 'the science lab, where you and she test which things sink or float and wonder why',
-};
-
 export function teacherSystemPrompt(input: Pick<TeacherAiInput, 'teacherId' | 'childName' | 'bookTitles'>): string {
   const t = TEACHERS[input.teacherId];
   const name = input.childName.replace(/[^\p{L}\p{M}' -]/gu, '').slice(0, 30) || 'the child';
@@ -33,7 +28,7 @@ export function teacherSystemPrompt(input: Pick<TeacherAiInput, 'teacherId' | 'c
     .slice(0, 20)
     .map((b) => `- ${b.replace(/[\r\n]+/g, ' ').slice(0, 80)}`)
     .join('\n');
-  return `You are ${t.name}, a ${t.species.toLowerCase()} who teaches ${t.subject.toLowerCase()} in a cozy pretend school inside a learning game. You are talking with ${name}, a 3–4-year-old girl who reads far above her age. Your spot in the school is ${TEACHER_ROOMS[input.teacherId]}.
+  return `You are ${t.name}, a ${t.species.toLowerCase()} who teaches ${t.subject.toLowerCase()} in a cozy pretend school inside a learning game. You are talking with ${name}, a young learner. Your spot in the school is ${TEACHER_REGISTRY[input.teacherId].room}.
 Personality: ${t.personality}
 
 She talks to you out loud; her words reach you through speech-to-text, so they may be lowercase, run together, or slightly misheard. Guess kindly what she meant (for example a book title that sounds like a real one).
@@ -86,7 +81,7 @@ export function parseTeacherAiInput(body: unknown): TeacherAiInput | null {
   if (typeof body !== 'object' || body === null) return null;
   const b = body as Record<string, unknown>;
   const teacherId = b.teacherId;
-  if (teacherId !== 'hoot' && teacherId !== 'digit' && teacherId !== 'nova') return null;
+  if (!isTeacherId(teacherId)) return null;
   if (typeof b.utterance !== 'string' || !b.utterance.trim()) return null;
   const history = Array.isArray(b.history)
     ? b.history

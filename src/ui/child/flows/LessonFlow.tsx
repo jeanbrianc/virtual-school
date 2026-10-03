@@ -4,6 +4,7 @@
  * touchable manipulatives, gentle scaffolds and a celebratory finish.
  */
 import { useEffect, useRef, useState } from 'react';
+import { TEACHER_REGISTRY, type TeacherId } from '../../../domain/teachers/registry';
 import { LessonRun } from '../../../domain/lessons/engine';
 import type { LessonDefinition } from '../../../domain/lessons/types';
 import { TEACHERS, personalize, pickLine, teacherOpening } from '../../../domain/teachers/teachers';
@@ -16,7 +17,7 @@ import { LessonStage } from '../lesson/Stages';
 type Phase = 'intro' | 'play' | 'complete';
 
 export interface LessonFlowProps {
-  teacher: 'digit' | 'nova';
+  teacher: TeacherId;
   lesson: LessonDefinition;
   startTier: number;
   visitsToday: number;
@@ -204,7 +205,7 @@ export function LessonFlow(props: LessonFlowProps) {
         <>
           <Choices
             items={[
-              { id: 'go', label: teacher === 'digit' ? 'Let’s rescue them!' : 'Let’s investigate!', icon: teacher === 'digit' ? '🚀' : '🔬', tone: 'primary' },
+              { id: 'go', label: TEACHER_REGISTRY[teacher].startLabel, icon: TEACHER_REGISTRY[teacher].celebration.icon, tone: 'primary' },
               { id: 'later', label: 'Maybe later', icon: '👋' },
             ]}
             onPick={(id) => {
@@ -234,7 +235,7 @@ export function LessonFlow(props: LessonFlowProps) {
           <div className="lesson-stars" aria-label={`${stars} solved`}>
             {Array.from({ length: Math.max(1, stars) }, (_, i) => (
               <span key={i} className="lesson-star" style={{ animationDelay: `${i * 0.12}s` }}>
-                {teacher === 'digit' ? '🪨' : '💧'}
+                {TEACHER_REGISTRY[teacher].completionIcon}
               </span>
             ))}
           </div>

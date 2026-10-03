@@ -11,7 +11,8 @@ import { getReward } from './rewards/catalog';
 import { ruleProgress } from './rewards/engine';
 import type { WorldState } from './world/worldState';
 
-export const TEACHER_DISCOVERIES = ['hoot', 'digit', 'nova'] as const;
+import { TEACHER_IDS } from './teachers/registry';
+export const TEACHER_DISCOVERIES = TEACHER_IDS;
 
 /** Everything a child can discover, in the order a guide would show them. */
 export const DISCOVERABLE_IDS = [

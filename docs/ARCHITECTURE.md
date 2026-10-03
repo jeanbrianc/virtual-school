@@ -194,3 +194,36 @@ Pure domain code is tested directly; services are tested over
 reload persistence; Playwright covers the two user journeys that matter most
 (child core loop, parent entry → report → museum) on desktop and phone.
 Automation hooks (`window.__izzy`) exist only in dev and e2e builds.
+
+## Adding a teacher
+
+Stable teacher IDs and routing live in `domain/teachers/registry.ts`. The registry
+contains subject domains, a working activity, placement/model, room description,
+local dialogue, start copy and celebration metadata. `TeacherId` derives from its
+keys; profiles are a complete typed map. The engine builds every registered scene
+and requires a factory for each model. UI launch and helper speech/chat allowlists
+use the same registry. Unknown stored IDs retain their records, receive a neutral
+Past teacher portrait, and are rejected by the helper and scene factory.
+
+For one new teacher:
+
+1. Register an original stable ID, domains, safe location and a complete local
+   activity. Never add a selectable placeholder or reuse a retired ID.
+2. Add the persona, introductions and built-in/natural voice fallbacks to the
+   typed profile map. Keep learner descriptions generic and optional AI consent
+   unchanged. Put bounded question/share replies in the registry; safety intents
+   retain the existing parent escalation.
+3. Add the original scene model factory and accessible portrait. Check the
+   chalkboard, dance stations, navigation and phone HUD for obstruction.
+4. Register the deterministic lesson and its parent/child title. Review each
+   curriculum link and evidence classification; free creation is an observation.
+   Use the atomic learning service, stable completion/evidence IDs and child scope.
+5. Test registry completeness, helper allowlists, unknown and old saved IDs,
+   offline dialogue, scaffold/cancel/replay/completion, parent records and
+   desktop/phone journeys. Run `npm run check` and affected browser regressions.
+
+Local Chrome can be selected with `PLAYWRIGHT_CHANNEL=chrome`. Set
+`PLAYWRIGHT_TRACE=off` if trace collection hangs in the installed browser; this
+changes diagnostics only. Defaults still use the normal Playwright runtime and
+retain failure traces. New branches remain draft and stacked; registry and lesson
+checks do not authorize merge, deployment or new account access.

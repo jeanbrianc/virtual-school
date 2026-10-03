@@ -5,7 +5,8 @@
  * future, from a DialogueProvider that must return one of a small set of
  * allowed intents — see docs/ARCHITECTURE.md → "Teacher dialogue").
  */
-export type TeacherId = 'hoot' | 'digit' | 'nova';
+import { isTeacherId, type TeacherId } from './registry';
+export type { TeacherId } from './registry';
 
 export interface TeacherProfile {
   id: TeacherId;
@@ -44,7 +45,7 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     naturalVoice: {
       voice: 'cedar',
       style:
-        'You are Professor Hoot, a kind, wise old owl who teaches reading to a three-year-old girl. Speak warmly and gently, a little slowly and very clearly, with delighted enthusiasm about books, like a favorite grandpa at story time. Say "hoo-hoo" as a soft, happy owl call.',
+        'You are Professor Hoot, a kind, wise old owl who teaches reading to a young learner. Speak warmly and gently, a little slowly and very clearly, with delighted enthusiasm about books, like a favorite grandpa at story time. Say "hoo-hoo" as a soft, happy owl call.',
     },
     introductions: [
       'Hoo-hoo! Hello there — you must be {name}! I’m Professor Hoot, and this is the library, where stories live. Whenever you finish a book, come and tell me about it. We’ll chat about the story, and then it flies onto your very own bookshelf!',
@@ -66,7 +67,7 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     naturalVoice: {
       voice: 'verse',
       style:
-        'You are Digit, a cheerful little helper robot who loves counting and rockets, talking with a three-year-old girl. Speak brightly and bouncily with crisp, precise words and a light, playful robot rhythm. Say "beep boop" like a happy sound effect. Keep it clear and easy to follow.',
+        'You are Digit, a cheerful little helper robot who loves counting and rockets, talking with a young learner. Speak brightly and bouncily with crisp, precise words and a light, playful robot rhythm. Say "beep boop" like a happy sound effect. Keep it clear and easy to follow.',
     },
     introductions: ['Beep boop! A new friend! Hello, {name} — I’m Digit, the math robot. I love counting, puzzles and rockets!'],
     greetings: ['Beep boop! Hello, {name}!', 'Greetings, Captain {name}! Systems ready for math!', 'Beep! My number sensors detect… {NAME}!'],
@@ -86,7 +87,7 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     naturalVoice: {
       voice: 'marin',
       style:
-        'You are Nova, an adventurous red panda scientist talking with a three-year-old girl. Speak with bright curiosity and excitement, full of wonder, friendly and very clear, not too fast.',
+        'You are Nova, an adventurous red panda scientist talking with a young learner. Speak with bright curiosity and excitement, full of wonder, friendly and very clear, not too fast.',
     },
     introductions: [
       'Oh, hello! You must be {name}. I’m Nova, and this is my science lab. Scientists ask questions and then test them to find out the answers!',
@@ -142,4 +143,9 @@ export function teacherOpening(id: TeacherId, memory: TeacherMemory, seed: numbe
     lines.push(memory.lastLessonSummary);
   }
   return lines.map((l) => personalize(l, memory.childName));
+}
+
+/** Stored historical IDs must not read inherited object properties. */
+export function teacherDisplayName(id: string): string {
+  return isTeacherId(id) ? TEACHERS[id].name : 'Past teacher';
 }

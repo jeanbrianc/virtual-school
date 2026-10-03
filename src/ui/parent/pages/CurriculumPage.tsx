@@ -5,7 +5,7 @@ import { prerequisitesMet, recommendNext } from '../../../domain/adaptive/recomm
 import { DOMAINS, SKILLS, STRANDS, difficultyLabel, getDomain, getSkill, getStrand, type Skill } from '../../../domain/curriculum';
 import type { SkillSuggestion } from '../../../domain/interpretation';
 import { LESSON_TITLES } from '../../../domain/lessons/registry';
-import { TEACHERS, type TeacherId } from '../../../domain/teachers/teachers';
+import { teacherDisplayName } from '../../../domain/teachers/teachers';
 import { MASTERY_LABELS, MASTERY_ORDER, MASTERY_RULES, effectiveLevel, masteryStatement } from '../../../domain/mastery/masteryEngine';
 import type { MasteryLevel, MasteryRecord } from '../../../domain/types';
 import { dayFromTimestamp, formatDay, toDay } from '../../../domain/util/time';
@@ -400,8 +400,7 @@ function SkillDetail({ data, skillId }: { data: ParentData; skillId: string }) {
             <p>💡 {skill.activityIdea}</p>
             {skill.lessonIds.map((l) => (
               <p key={l} className="small">
-                🎮 In the school: <strong>{LESSON_TITLES[l]?.childTitle ?? l}</strong> with{' '}
-                {TEACHERS[(LESSON_TITLES[l]?.teacherId ?? 'hoot') as TeacherId]?.name ?? 'a teacher'}
+                🎮 In the school: <strong>{LESSON_TITLES[l]?.childTitle ?? l}</strong> with {teacherDisplayName(LESSON_TITLES[l]?.teacherId ?? 'hoot')}
               </p>
             ))}
           </Card>
