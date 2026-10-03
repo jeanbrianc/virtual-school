@@ -595,6 +595,7 @@ export function ChildMode({ childId }: { childId: string }) {
     if (!FEATURE_FLAGS.automationHooks) return;
     (window as unknown as { __izzy?: unknown }).__izzy = {
       game: () => gameRef.current,
+      saveKeyboardTrail: (run: Parameters<typeof recordKeyboardTrail>[2]) => recordKeyboardTrail(ctx, childId, run),
       interact: (id: string) => void handleInteract(id),
       walkTo: (id: string) => gameRef.current?.interactById(id),
       teleportTo: (id: string) => gameRef.current?.teleportTo(id),

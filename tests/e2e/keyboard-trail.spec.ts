@@ -25,13 +25,22 @@ async function records(page: Page) {
 test('keyboard banner: shortcuts, repeat/modifiers/IME, blur, hints, exactly once and replay', async ({ page }) => {
   await enterSchool(page);
   await page.getByTestId('discover-ok').click();
-  await talkTo(page, 'alphabet');
+  await page.evaluate(() => window.__izzy!.teleportTo('alphabet'));
+  await page.keyboard.down('w');
+  await page.waitForTimeout(700);
+  await page.evaluate(() => {
+    const g = window.__izzy!.game() as unknown as { player: { position: { x: number; z: number }; settleAt(x: number, z: number): void } };
+    g.player.settleAt(g.player.position.x + 0.4, g.player.position.z + 0.4);
+    window.__izzy!.interact('alphabet');
+  });
   await expect(page.getByTestId('keyboard-trail')).toBeVisible();
   expect(await page.getByRole('button', { name: /^Touch letter/ }).count()).toBe(26);
   const before = await page.evaluate(() => {
     const g = window.__izzy!.game() as unknown as { player: { position: { x: number; z: number } }; rig: { yaw: number } };
     return { x: g.player.position.x, z: g.player.position.z, yaw: g.rig.yaw };
   });
+  await page.waitForTimeout(700);
+  await page.keyboard.up('w');
   for (const key of ['w', 'a', 's', 'd', 'e', 'q', 'r']) {
     await page.keyboard.down(key);
     await page.keyboard.up(key);
@@ -99,4 +108,45 @@ test('phone touch records recognition separately; skip/cancel saves no evidence'
   expect(saved).toHaveLength(1);
   expect(saved[0]!.summary).toContain('touch');
   expect(saved[0]!.summary).not.toContain('physical');
+});
+
+test('two live tabs race the same completion through the atomic learning service', async ({ page, context }) => {
+  await enterSchool(page);
+  await page.getByTestId('discover-ok').click();
+  const other = await context.newPage();
+  await enterSchool(other);
+  const run = {
+    id: 'synthetic-multi-tab-run',
+    startedAt: new Date().toISOString(),
+    letters: ['A', 'B', 'C', 'D', 'E'],
+    trials: ['A', 'B', 'C', 'D', 'E'].map((letter) => ({ letter, modality: 'physical' as const, outcome: 'independent' as const })),
+    hinted: false,
+    cancelled: false,
+  };
+  await Promise.all(
+    [page, other].map((tab) =>
+      tab.evaluate(async (input) => {
+        await window.__izzy!.saveKeyboardTrail(input);
+      }, run),
+    ),
+  );
+  expect(await records(page)).toHaveLength(1);
+  const count = await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve) => {
+      const r = indexedDB.open('izzys-classroom');
+      r.onsuccess = () => resolve(r.result);
+    });
+    try {
+      return await new Promise<number>((resolve) => {
+        const r = db.transaction('evidence').objectStore('evidence').count();
+        r.onsuccess = () => resolve(r.result);
+      });
+    } finally {
+      db.close();
+    }
+  });
+  expect(count).toBe(5);
+  await page.reload();
+  expect(await records(page)).toHaveLength(1);
+  await other.close();
 });
