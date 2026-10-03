@@ -4,6 +4,7 @@
  * (greet / cheer) on cue.
  */
 import * as THREE from 'three';
+import { isTeacherId, TEACHER_REGISTRY, type TeacherRegistration } from '../../domain/teachers/registry';
 import type { TeacherId } from '../../domain/teachers/teachers';
 import { dampAngle } from '../core/tween';
 import { capsule, cone, cyl, mat, rbox, sphere, torus, uniqueMat } from '../render/kit';
@@ -409,8 +410,12 @@ class Nova extends BaseTeacher {
   }
 }
 
+const MODEL_FACTORIES: Record<TeacherRegistration['scene']['model'], (yaw: number) => TeacherModel> = {
+  owl: (yaw) => new Hoot(yaw),
+  robot: (yaw) => new Digit(yaw),
+  panda: (yaw) => new Nova(yaw),
+};
 export function createTeacher(id: TeacherId, baseYaw: number): TeacherModel {
-  if (id === 'hoot') return new Hoot(baseYaw);
-  if (id === 'digit') return new Digit(baseYaw);
-  return new Nova(baseYaw);
+  if (!isTeacherId(id)) throw new Error('Unknown teacher model');
+  return MODEL_FACTORIES[TEACHER_REGISTRY[id].scene.model](baseYaw);
 }

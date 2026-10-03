@@ -36,6 +36,7 @@ import { speakableText } from '../../domain/pronounce';
 import { browserFamily, knownOnDevice, type OnDeviceAnswer } from '../../domain/talk';
 import { talkPhrases } from '../../domain/teachers/chat';
 import { isAllowedHelperUrl, naturalVoicesOn } from '../../domain/teachers/chatRemote';
+import { TEACHER_REGISTRY, teacherForInteraction } from '../../domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../domain/types';
 import { toDay } from '../../domain/util/time';
@@ -61,7 +62,7 @@ import type { TalkAvailability } from '../../voice/SpeechService';
 type Overlay =
   | { kind: 'keyboard' }
   | { kind: 'hoot' }
-  | { kind: 'lesson'; teacher: 'digit' | 'nova'; startTier: number }
+  | { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number }
   | { kind: 'shelf' }
   | { kind: 'treasures' }
   | { kind: 'gate' }
@@ -385,7 +386,7 @@ export function ChildMode({ childId }: { childId: string }) {
       if (!d || !game || overlayRef.current) return;
       setShowControls(false);
       const state = appStore.get().preview?.world ?? d.world;
-      if (appStore.get().preview && (id === 'hoot' || id === 'digit' || id === 'nova' || id === 'tank' || id === 'rocket')) {
+      if (appStore.get().preview && (teacherForInteraction(id) || id === 'alphabet')) {
         setHint({ icon: '✨', title: 'Preview mode', text: 'This is a peek at the future school. Lessons are paused in preview.' });
         return;
       }
@@ -411,16 +412,18 @@ export function ChildMode({ childId }: { childId: string }) {
         coachSays(CIRCUIT_START_LINE);
         return;
       }
-      if (id === 'hoot') {
+      const registeredTeacher = teacherForInteraction(id);
+      const activity = registeredTeacher ? TEACHER_REGISTRY[registeredTeacher].activity : undefined;
+      if (activity?.kind === 'reading') {
         teacherForSpeech.current = 'hoot';
         game.setInputEnabled(false);
         void game.focusTeacher('hoot');
         setOverlay({ kind: 'hoot' });
         return;
       }
-      if (id === 'digit' || id === 'nova' || id === 'tank' || id === 'rocket') {
-        const teacher = id === 'digit' || id === 'rocket' ? 'digit' : 'nova';
-        const lesson = getLesson(teacher === 'digit' ? 'moon-rocks' : 'sink-float');
+      if (registeredTeacher && activity?.kind === 'lesson') {
+        const teacher = registeredTeacher;
+        const lesson = getLesson(activity.lessonId);
         if (!lesson) return;
         if (id !== teacher) void discover(teacher);
         teacherForSpeech.current = teacher;
@@ -428,7 +431,7 @@ export function ChildMode({ childId }: { childId: string }) {
         const startTier = await startTierFor(ctx, childId, lesson);
         if (id !== teacher) game.interactById(teacher);
         void game.focusTeacher(teacher);
-        setOverlay({ kind: 'lesson', teacher, startTier });
+        setOverlay({ kind: 'lesson', teacher, lessonId: activity.lessonId, startTier });
         return;
       }
       if (id === 'bookshelf') {
@@ -717,7 +720,7 @@ export function ChildMode({ childId }: { childId: string }) {
   );
 
   const finishLesson = useCallback(
-    async (teacher: 'digit' | 'nova', run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[] = []) => {
+    async (teacher: TeacherId, run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[] = []) => {
       const game = gameRef.current;
       if (!game || busy) return;
       setBusy(true);
@@ -729,7 +732,7 @@ export function ChildMode({ childId }: { childId: string }) {
         await game.releaseCamera();
         game.cheer(teacher);
         const ids = res.outcome.newRewards.map((r) => r.id);
-        if (fresh) await game.revealUnlocks(ids, fresh.world, fresh.shelfBooks, teacher === 'digit' ? 'rocket' : 'aquarium');
+        if (fresh) await game.revealUnlocks(ids, fresh.world, fresh.shelfBooks, TEACHER_REGISTRY[teacher].celebration.anchor);
         if (res.outcome.newRewards.some((r) => r.celebration === 'grand')) game.confetti();
         const lesson = run.definition;
         setOverlay({
@@ -738,12 +741,12 @@ export function ChildMode({ childId }: { childId: string }) {
           items: [
             {
               key: 'lesson',
-              icon: teacher === 'digit' ? '🚀' : '🔬',
+              icon: TEACHER_REGISTRY[teacher].celebration.icon,
               title: lesson.completeTitle,
               message:
                 teacher === 'digit'
                   ? `You helped Digit on another moon mission. ${fresh && fresh.world.rocketStage >= 3 ? 'The rocket is almost ready!' : 'The rocket grew a little more!'}`
-                  : 'Nova added a new fish friend to the aquarium to thank you!',
+                  : TEACHER_REGISTRY[teacher].celebration.message,
             },
             ...res.outcome.newRewards.map(rewardToCelebration),
           ],
@@ -991,14 +994,12 @@ export function ChildMode({ childId }: { childId: string }) {
           {overlay?.kind === 'lesson' && (
             <LessonFlow
               teacher={overlay.teacher}
-              lesson={getLesson(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')!}
+              lesson={getLesson(overlay.lessonId)!}
               startTier={overlay.startTier}
               visitsToday={visitsToday(overlay.teacher)}
               firstMeeting={!metTeacher(overlay.teacher)}
               childName={data.child.name}
-              {...(lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')
-                ? { lastSummary: lastSummary(overlay.teacher === 'digit' ? 'moon-rocks' : 'sink-float')! }
-                : {})}
+              {...(lastSummary(overlay.lessonId) ? { lastSummary: lastSummary(overlay.lessonId)! } : {})}
               speech={speech}
               playSfx={(n) => audio.play(n)}
               onComplete={(run, t, s, notes) => void finishLesson(overlay.teacher, run, t, s, notes)}
