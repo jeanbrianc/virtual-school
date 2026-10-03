@@ -53,7 +53,7 @@ export async function recordLesson(
   const graded = records.filter((r) => run.problemIndex.get(r.problemId)?.kind === 'answer');
   const designs = records.filter((r) => run.problemIndex.get(r.problemId)?.kind === 'create' && !r.scaffolds.includes('skipped'));
   const skipped = records.filter((r) => r.scaffolds.includes('skipped')).length;
-  const summary = `${def.childTitle}: ${graded.filter((r) => r.outcome === 'independent').length} of ${graded.length} solved on the first try, ${graded.filter((r) => r.outcome === 'supported').length} with a hint; ${def.tiers[run.startTier]?.label ?? ''} → ${def.tiers[run.currentTier]?.label ?? ''}.${skipped ? ` Skipped ${skipped} round${skipped === 1 ? '' : 's'}; no performance evidence for skipped rounds.` : ''}${designs.length ? ` Created a four-shape design (observed, not graded): ${designs[0]?.responses.join(', ')}.` : ''}`;
+  const summary = `${def.childTitle}: ${graded.filter((r) => r.outcome === 'independent').length} of ${graded.length} solved on the first try, ${graded.filter((r) => r.outcome === 'supported').length} with a hint; ${def.tiers[run.startTier]?.label ?? ''} → ${def.tiers[run.currentTier]?.label ?? ''}.${skipped ? ` Skipped ${skipped} round${skipped === 1 ? '' : 's'}; no performance evidence for skipped rounds.` : ''}${designs.length ? ` Created a shape picture (observed, not graded): ${designs[0]?.responses.join(', ')}.` : ''}`;
 
   const attempt: LessonAttempt = {
     id: attemptId,
@@ -104,7 +104,7 @@ export async function recordLesson(
         kind: 'observation',
         trials: { independent: 0, supported: 0, notYet: 0 },
         independence: 'independent',
-        statement: `Created a four-shape design with Pippa: ${design.responses.join(', ')}. Observed creative choice; not scored for correctness or mastery.`,
+        statement: `Created a shape picture with Pippa: ${design.responses.join(', ')}. Observed creative choice; not scored for correctness or mastery.`,
         createdBy: 'system',
       }),
     );

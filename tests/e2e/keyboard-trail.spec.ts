@@ -2,7 +2,7 @@ import { expect, test, type Page } from 'playwright/test';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
 async function prompt(page: Page) {
   const line = await page.getByTestId('dialogue-line').locator('.sr-only').textContent();
-  return /Find the letter ([A-Z])/.exec(line!)![1]!;
+  return /Find ([A-Z])/.exec(line!)![1]!;
 }
 async function records(page: Page) {
   return page.evaluate(async () => {
@@ -34,7 +34,7 @@ test('keyboard banner: shortcuts, repeat/modifiers/IME, blur, hints, exactly onc
     window.__izzy!.interact('alphabet');
   });
   await expect(page.getByTestId('keyboard-trail')).toBeVisible();
-  expect(await page.getByRole('button', { name: /^Touch letter/ }).count()).toBe(26);
+  expect(await page.getByRole('button', { name: /^Touch letter/ }).count()).toBe(2);
   const before = await page.evaluate(() => {
     const g = window.__izzy!.game() as unknown as { player: { position: { x: number; z: number } }; rig: { yaw: number } };
     return { x: g.player.position.x, z: g.player.position.z, yaw: g.rig.yaw };
@@ -63,13 +63,13 @@ test('keyboard banner: shortcuts, repeat/modifiers/IME, blur, hints, exactly onc
   await page.keyboard.press(letter);
   await expect(page.getByRole('button', { name: 'Resume trail' })).toBeVisible();
   await page.getByRole('button', { name: 'Resume trail' }).click();
-  await page.getByRole('button', { name: 'Show a hint' }).click();
+  await page.getByRole('button', { name: /Help me/ }).click();
   await page.keyboard.press(letter.toLowerCase());
-  await expect(page.getByTestId('dialogue-line').locator('.sr-only')).not.toContainText(`Find the letter ${letter}.`);
+  await expect(page.getByTestId('dialogue-line').locator('.sr-only')).not.toContainText(`Find ${letter}`);
   for (let i = 0; i < 4; i++) {
     letter = await prompt(page);
     await page.keyboard.press(letter);
-    await expect(page.getByTestId('dialogue-line').locator('.sr-only')).not.toContainText(`Find the letter ${letter}.`);
+    await expect(page.getByTestId('dialogue-line').locator('.sr-only')).not.toContainText(`Find ${letter}`);
   }
   await page.getByRole('button', { name: 'Save trail', exact: true }).dblclick();
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
@@ -100,7 +100,7 @@ test('phone touch records recognition separately; skip/cancel saves no evidence'
   for (let i = 0; i < 5; i++) {
     const letter = await prompt(page);
     await page.getByRole('button', { name: `Touch letter ${letter}`, exact: true }).click();
-    await expect(page.getByTestId('dialogue-line').locator('.sr-only')).not.toContainText(`Find the letter ${letter}.`);
+    await expect(page.getByTestId('dialogue-line').locator('.sr-only')).not.toContainText(`Find ${letter}`);
   }
   await page.getByRole('button', { name: 'Save trail', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();

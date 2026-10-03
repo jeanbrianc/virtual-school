@@ -13,6 +13,7 @@ import type { Tweens } from '../core/tween';
 import type { Particles } from '../fx/particles';
 import { LAYOUT } from '../palette';
 import { Bookshelf, type ShelfBook } from './bookshelf';
+import type { AlphabetBanner } from './alphabetBanner';
 import { buildClassroom } from './classroom';
 import { DanceMat } from './danceMat';
 import { buildLibrary } from './library';
@@ -30,6 +31,7 @@ export class SchoolWorld {
   readonly interactables: InteractableDef[] = [];
   readonly anchors = new Map<string, THREE.Vector3>();
   /** The 1–10 dance & gym circuit on the classroom rug. */
+  readonly alphabet: AlphabetBanner;
   readonly danceMat: DanceMat;
   private readonly features: Feature[] = [];
   private state: WorldState | null = null;
@@ -79,7 +81,7 @@ export class SchoolWorld {
     });
 
     buildLibrary(ctx);
-    buildClassroom(ctx, today);
+    this.alphabet = buildClassroom(ctx, today);
     this.danceMat = new DanceMat(ctx);
     this.features.push(this.danceMat);
     buildScience(ctx);

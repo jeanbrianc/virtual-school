@@ -71,6 +71,11 @@ interface Marker {
 export class InteractionSystem {
   readonly root = new THREE.Group();
   private proxies: THREE.Mesh[] = [];
+  private hiddenMarkers = new Set<string>();
+  hideMarker(id: string, hidden: boolean) {
+    if (hidden) this.hiddenMarkers.add(id);
+    else this.hiddenMarkers.delete(id);
+  }
   private markers = new Map<string, Marker>();
   private ring: THREE.Mesh;
   private dest: THREE.Mesh;
@@ -197,7 +202,8 @@ export class InteractionSystem {
       const fresh = this.fresh.has(d.id);
       // Undiscovered things sparkle from across the room; teachers show a gentle
       // marker nearby; discovered objects only when close.
-      m.sprite.visible = d.enabled && (isFocus || (fresh ? dist < 22 : d.kind === 'teacher' ? near : near && dist < d.radius + 2.5));
+      m.sprite.visible =
+        !this.hiddenMarkers.has(d.id) && d.enabled && (isFocus || (fresh ? dist < 22 : d.kind === 'teacher' ? near : near && dist < d.radius + 2.5));
       const bob = Math.sin(this.time * (fresh ? 3.4 : 2.6) + m.phase) * (fresh ? 0.16 : 0.1);
       m.sprite.position.set(m.base.x, m.base.y + bob + (isFocus ? 0.15 : 0), m.base.z);
       const pulse = fresh ? 1 + Math.sin(this.time * 3 + m.phase) * 0.06 : 1;

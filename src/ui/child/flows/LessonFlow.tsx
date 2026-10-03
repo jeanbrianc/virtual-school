@@ -6,13 +6,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { TEACHER_REGISTRY, type TeacherId } from '../../../domain/teachers/registry';
 import { LessonRun } from '../../../domain/lessons/engine';
-import type { LessonDefinition } from '../../../domain/lessons/types';
+import type { LessonDefinition, Problem } from '../../../domain/lessons/types';
 import { TEACHERS, personalize, pickLine, teacherOpening } from '../../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../../domain/types';
 import { hashString } from '../../../domain/util/random';
 import { Choices, DialogueShell, type Speech } from '../DialogueShell';
 import { TalkBar, useTeacherTalk, type TalkKit } from '../Talk';
-import { LessonStage, PatternMaker } from '../lesson/Stages';
+import { ShapePicture } from '../lesson/ShapePicture';
+import { LessonStage } from '../lesson/Stages';
 
 type Phase = 'intro' | 'play' | 'complete';
 
@@ -27,6 +28,7 @@ export interface LessonFlowProps {
   lastSummary?: string;
   speech: Speech;
   playSfx: (name: 'correct' | 'tryAgain' | 'click' | 'sparkle' | 'splash' | 'plop') => void;
+  onSaveContinue?: (run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[]) => Promise<void>;
   onComplete: (run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[]) => void;
   onClose: (transcript: TranscriptLine[], startedAt: string, parentNotes: string[]) => void;
   /** Microphone and conversation service for chatting before the lesson. */
@@ -43,6 +45,8 @@ export function LessonFlow(props: LessonFlowProps) {
   const transcript = useRef<TranscriptLine[]>([]);
   const seed = useRef(hashString(startedAt.current + lesson.id));
   const runRef = useRef<LessonRun | null>(null);
+  const [shownProblem, setShownProblem] = useState<Problem | null>(null);
+  const [shownRound, setShownRound] = useState(0);
   const [phase, setPhase] = useState<Phase>('intro');
   const [line, setLine] = useState(() => {
     const open = teacherOpening(
@@ -61,7 +65,12 @@ export function LessonFlow(props: LessonFlowProps) {
   const [mood, setMood] = useState<'happy' | 'thinking' | 'cheer'>('happy');
   const [choiceState, setChoiceState] = useState<Record<string, 'right' | 'soft' | 'disabled'>>({});
   const [dropping, setDropping] = useState<{ floats: boolean } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusyState] = useState(false);
+  const busyRef = useRef(false);
+  const setBusy = (value: boolean) => {
+    busyRef.current = value;
+    setBusyState(value);
+  };
   const submitted = useRef(false);
   const [saving, setSaving] = useState(false);
   const timers = useRef<number[]>([]);
@@ -111,14 +120,19 @@ export function LessonFlow(props: LessonFlowProps) {
 
   const close = () => props.onClose(transcript.current, startedAt.current, talk.notes);
 
-  const start = () => {
-    runRef.current = new LessonRun(lesson, props.startTier, seed.current);
+  const start = (chosenTier?: number) => {
+    runRef.current = new LessonRun(lesson, lesson.id === 'patterns-shapes' ? (chosenTier ?? 0) : props.startTier, seed.current);
     setPhase('play');
     const p = runRef.current.currentProblem();
+    setShownProblem(p);
+    setShownRound(0);
+    setBusy(false);
     say(p?.prompt ?? '', 'thinking');
   };
 
   const advance = (run: LessonRun) => {
+    setShownProblem(run.currentProblem());
+    setShownRound(run.roundIndex);
     setChoiceState({});
     setDropping(null);
     if (run.isComplete) {
@@ -136,7 +150,7 @@ export function LessonFlow(props: LessonFlowProps) {
   const answer = (choiceId: string) => {
     const run = runRef.current;
     const p = run?.currentProblem();
-    if (!run || !p || busy) return;
+    if (!run || !p || busyRef.current) return;
     const label = p.choices.find((c) => c.id === choiceId)?.label ?? choiceId;
     log('child', label);
     const wasStone = run.isSteppingStone();
@@ -197,6 +211,7 @@ export function LessonFlow(props: LessonFlowProps) {
         setChoiceState((s) => ({ ...s, [choiceId]: 'disabled' }));
         say(fb.message, 'thinking');
       }
+      setShownProblem(run.currentProblem());
       force((n) => n + 1);
       return;
     }
@@ -208,7 +223,7 @@ export function LessonFlow(props: LessonFlowProps) {
   };
 
   const run = runRef.current;
-  const problem = run?.currentProblem();
+  const problem = shownProblem;
 
   return (
     <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} closeDisabled={saving} speech={speech} wide={phase === 'play'}>
@@ -231,16 +246,49 @@ export function LessonFlow(props: LessonFlowProps) {
       )}
       {phase === 'play' && problem && (
         <div className="lesson-play">
-          <div className="lesson-progress" aria-label={`Round ${(run?.roundIndex ?? 0) + 1} of ${lesson.rounds}`}>
+          <div className="lesson-progress" aria-label={`Round ${shownRound + 1} of ${lesson.rounds}`}>
             {Array.from({ length: lesson.rounds }, (_, i) => (
-              <span key={i} className={`pip ${i < (run?.roundIndex ?? 0) ? 'done' : i === (run?.roundIndex ?? 0) ? 'now' : ''}`} />
+              <span key={i} className={`pip ${i < shownRound ? 'done' : i === shownRound ? 'now' : ''}`} />
             ))}
           </div>
           <LessonStage visual={problem.visual} seed={hashString(problem.id)} dropping={dropping} />
-          {problem.kind === 'create' ? (
-            <PatternMaker key={problem.id} onFinish={answer} disabled={busy} />
+          {lesson.id === 'patterns-shapes' ? (
+            <div className="shape-choices">
+              {problem.choices.map((choice) => (
+                <button
+                  type="button"
+                  key={choice.id}
+                  data-testid={`choice-${choice.id}`}
+                  aria-label={`Choose ${choice.label}`}
+                  disabled={busy || choiceState[choice.id] === 'disabled'}
+                  className={`shape-choice ${choiceState[choice.id] === 'right' ? 'shape-chosen' : choiceState[choice.id] === 'soft' ? 'shape-hint' : ''}`}
+                  onClick={() => answer(choice.id)}
+                >
+                  {choice.shapes?.map((shape, i) => (
+                    <ShapePicture key={i} shape={shape} />
+                  ))}
+                  <span className="sr-only">{choice.label}</span>
+                </button>
+              ))}
+            </div>
           ) : (
             <Choices items={problem.choices} onPick={answer} state={choiceState} columns={problem.choices.length > 3 ? 2 : problem.choices.length} />
+          )}
+          {lesson.id === 'patterns-shapes' && problem.kind !== 'create' && (
+            <button
+              type="button"
+              className="pattern-skip"
+              disabled={busy}
+              onClick={() => {
+                if (run) {
+                  const fb = run.hint();
+                  say(fb.message, 'happy');
+                  setChoiceState({ [problem.answerId]: 'soft' });
+                }
+              }}
+            >
+              ✨ Show me
+            </button>
           )}
           {lesson.id === 'patterns-shapes' && (
             <button
@@ -272,15 +320,37 @@ export function LessonFlow(props: LessonFlowProps) {
           <Choices
             items={[
               { id: 'yay', label: 'Yay!', icon: '🎉', tone: 'primary' },
-              ...(lesson.id === 'patterns-shapes' ? [{ id: 'replay', label: 'Play again', icon: '🎨' }] : []),
+              ...(lesson.id === 'patterns-shapes'
+                ? [
+                    { id: 'replay', label: 'Play again', icon: '🎨' },
+                    ...(run?.startTier === 0 &&
+                    run.attempts.filter((a) => a.outcome === 'independent' && run.problemIndex.get(a.problemId)?.kind === 'answer').length === 2
+                      ? [{ id: 'pattern', label: 'Try a little pattern', icon: '⭐' }]
+                      : []),
+                  ]
+                : []),
             ]}
-            onPick={(id) => {
+            onPick={async (id) => {
               if (submitted.current) return;
-              if (id === 'replay') {
+              if (id === 'pattern' && run) {
+                if (!props.onSaveContinue) return;
+                submitted.current = true;
+                setSaving(true);
+                try {
+                  await props.onSaveContinue(run, transcript.current, startedAt.current, talk.notes);
+                } catch {
+                  say('Let’s try saving that again.');
+                  return;
+                } finally {
+                  submitted.current = false;
+                  setSaving(false);
+                }
+              }
+              if (id === 'replay' || id === 'pattern') {
                 startedAt.current = new Date().toISOString();
                 seed.current = hashString(startedAt.current + lesson.id);
                 transcript.current = [];
-                start();
+                start(id === 'pattern' ? 1 : run?.startTier);
                 return;
               }
               playSfx('click');

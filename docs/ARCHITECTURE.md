@@ -225,22 +225,33 @@ For one new teacher:
 Local Chrome can be selected with `PLAYWRIGHT_CHANNEL=chrome`. Set
 `PLAYWRIGHT_TRACE=off` if trace collection hangs in the installed browser; this
 changes diagnostics only. Defaults still use the normal Playwright runtime and
-retain failure traces. New branches remain draft and stacked; registry and lesson
+retain failure traces. New branches remain draft; registry and lesson
 checks do not authorize merge, deployment or new account access.
 
 ### Pippa's bounded Shape Studio
 
 Pippa is an original fox teacher registered under the stable `pippa` ID. The
-three-round `patterns-shapes` lesson copies an ABAB sequence, extends another
-ABAB sequence, then invites a four-shape design. Circle, triangle and square
-have text labels and distinct geometry, so color is not the sole cue. Native
-buttons support keyboard activation and touch; creation controls are at least
-64px tall. Hint, simpler pair, skip, close and replay paths remain local.
+three-round `patterns-shapes` lesson starts with two single-shape matches,
+each offering two large SVG choices, then invites a shape picture. Circle,
+triangle and square have distinct geometry and accessible labels, so color
+is not the sole cue. Native buttons support keyboard activation and touch.
+Show me marks the answer as supported; skip, close and replay remain local.
+After two independent matches, an optional AB pattern challenge becomes
+available. Starting it first saves the completed matching run, then creates
+a fresh run. Pippa's lesson never increases difficulty automatically.
 
-Pattern performance maps to the Family-aligned `reason.visual-patterns` skill.
+Matching maps to the Family-aligned `reason.shape-match` skill; only the
+explicit optional challenge maps to `reason.visual-patterns`.
 Free design maps to `art.shape-design` as a descriptive observation with zero
 correctness trials; it can introduce the skill but cannot earn performance
 mastery. It does not claim 3D art-making, invent learning standards, or call the
 AI helper. Every completed lesson run has a stable UUID, an atomic insert guard,
 and child-scoped evidence; cancelled runs and skipped rounds produce no new
 performance evidence. Replay discards the unsaved round and starts a fresh run.
+
+The five-letter keyboard lesson highlights individual colorful tiles on the
+actual classroom alphabet banner. The camera frames each target on portrait
+and landscape screens, and found letters gain stars. Two large touch choices
+provide a fallback; physical and touch evidence remain distinct. Resize and
+interruption restore the appropriate camera and interaction markers. Optional
+speech, help, skip, focus, repeat-key and composition guards remain available.

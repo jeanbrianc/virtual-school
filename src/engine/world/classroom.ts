@@ -2,6 +2,7 @@
  * Central classroom: alphabet rug, chalkboard greeting, low tables, globe,
  * paper lanterns, the art line (Izzy's artwork) and the planet mobile.
  */
+import { AlphabetBanner } from './alphabetBanner';
 import * as THREE from 'three';
 import { createRng } from '../../domain/util/random';
 import { box, contactShadow, cyl, group, mat, rbox, sphere, torus } from '../render/kit';
@@ -61,7 +62,7 @@ function roundTable(ctx: BuildContext, x: number, z: number, seed: number) {
 /** The alphabet rug in the middle of the classroom (its 1–10 numbers are the dance circuit). */
 export const CLASSROOM_RUG = { x: 0, z: -4.2, width: 7, depth: 5.25 } as const;
 
-export function buildClassroom(ctx: BuildContext, today: Date): void {
+export function buildClassroom(ctx: BuildContext, today: Date): AlphabetBanner {
   // Alphabet rug.
   const rug = new THREE.Mesh(
     new THREE.PlaneGeometry(CLASSROOM_RUG.width, CLASSROOM_RUG.depth),
@@ -93,8 +94,8 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
   ctx.mount('north', board);
 
   // Alphabet banner.
-  const banner = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.72), new THREE.MeshStandardMaterial({ map: posterTexture('alphabet'), roughness: 0.9 }));
-  banner.position.set(0, 3.95, -9.8);
+  const alphabet = new AlphabetBanner();
+  const banner = alphabet.root;
   ctx.mount('north', banner);
   ctx.interact({
     id: 'alphabet',
@@ -327,4 +328,5 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
       }
     }
   }
+  return alphabet;
 }

@@ -10,37 +10,35 @@ import { Repositories } from '../../src/data/repositories';
 import { IndexedDbDatabase } from '../../src/data/storage/indexedDb';
 import { SCHEMA_VERSION, TABLES } from '../../src/data/schema';
 
-it('bounded pattern generators have unique choices, correct repeats and deterministic variants', () => {
-  const variants = new Set<string>();
+it('novice shape matching has one model and two choices; pattern progression is explicit', () => {
   for (let seed = 0; seed < 30; seed++) {
-    const rounds = [0, 1, 2].map((i) => patternsLesson.generateRound(0, createRng(seed), i)[0]!);
-    assert.deepEqual(
-      rounds,
-      [0, 1, 2].map((i) => patternsLesson.generateRound(0, createRng(seed), i)[0]!),
-    );
-    for (const p of rounds.slice(0, 2)) {
-      assert.equal(new Set(p.choices.map((c) => c.label)).size, p.choices.length);
-      assert.equal(p.choices.filter((c) => c.id === p.answerId).length, 1);
-      assert.equal(p.visual.type, 'pattern');
-      if (p.visual.type === 'pattern') {
-        assert.equal(p.visual.shapes[0], p.visual.shapes[2]);
-        assert.equal(p.visual.shapes[1], p.visual.shapes[3]);
-        assert.notEqual(p.visual.shapes[0], p.visual.shapes[1]);
-        variants.add(p.visual.shapes.join(','));
-      }
-      const simple = patternsLesson.generateSimpler!(p, createRng(seed));
-      assert.equal(simple.choices.find((c) => c.id === simple.answerId)?.id, 'pair');
+    const basic = patternsLesson.generateRound(0, createRng(seed), 0)[0]!;
+    assert.deepEqual(basic, patternsLesson.generateRound(0, createRng(seed), 0)[0]);
+    assert.equal(basic.skillId, 'reason.shape-match');
+    assert.equal(basic.choices.length, 2);
+    assert.equal(new Set(basic.choices.map((c) => c.id)).size, 2);
+    assert.equal(basic.visual.type, 'pattern');
+    if (basic.visual.type === 'pattern') assert.deepEqual(basic.visual.shapes, [basic.answerId]);
+    const pattern = patternsLesson.generateRound(1, createRng(seed), 0)[0]!;
+    assert.equal(pattern.skillId, 'reason.visual-patterns');
+    assert.equal(pattern.choices.length, 2);
+    if (pattern.visual.type === 'pattern') {
+      assert.equal(pattern.visual.shapes.length, 3);
+      assert.equal(pattern.visual.shapes[0], pattern.visual.shapes[2]);
+      assert.equal(pattern.answerId, pattern.visual.shapes[1]);
     }
-    assert.equal(rounds[2]!.kind, 'create');
-    assert.deepEqual(rounds[2]!.choices, []);
   }
-  assert.ok(variants.size >= 4);
+  const run = new LessonRun(patternsLesson, 0, 42);
+  run.answer(run.currentProblem()!.answerId);
+  run.answer(run.currentProblem()!.answerId);
+  assert.equal(run.currentTier, 0);
+  assert.equal(run.currentProblem()?.kind, 'create');
 });
 function completed(hint = false) {
   const run = new LessonRun(patternsLesson, 0, 42);
   if (hint) run.answer('wrong');
   while (run.currentProblem()?.kind === 'answer') run.answer(run.currentProblem()!.answerId);
-  assert.throws(() => run.answer('circle'), /four shapes/);
+  assert.throws(() => run.answer('hexagon'), /one to four shapes/);
   run.answer('circle square triangle circle');
   return run;
 }
@@ -61,6 +59,8 @@ for (const adapter of ['memory', 'indexeddb'] as const)
       assert.notEqual(completed().id, run.id);
       const evidence = await ctx.repos.evidence.all();
       assert.equal(evidence.length, 3);
+      assert.equal(evidence.filter((e) => e.skillId === 'reason.visual-patterns').length, 0);
+      assert.equal(evidence.filter((e) => e.skillId === 'reason.shape-match').length, 1);
       const design = evidence.find((e) => e.skillId === 'art.shape-design')!;
       assert.equal(design.kind, 'observation');
       assert.deepEqual(design.trials, { independent: 0, supported: 0, notYet: 0 });
