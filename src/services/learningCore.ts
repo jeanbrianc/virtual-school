@@ -116,7 +116,7 @@ export async function finalizeLearning(ctx: ServiceContext, childId: string, uow
   // Guard: everything staged must belong to this child.
   for (const op of uow.ops) {
     const v = op.value as { childId?: string } | undefined;
-    if (op.type === 'put' && v && 'childId' in v && v.childId !== childId) {
+    if (op.type !== 'delete' && v && 'childId' in v && v.childId !== childId) {
       throw new Error(`Refusing to write ${op.table} for another child`);
     }
   }

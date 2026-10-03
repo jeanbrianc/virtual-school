@@ -153,6 +153,30 @@ function defineSkills(input: Record<string, SkillInput>): Skill[] {
 }
 
 export const SKILLS: Skill[] = defineSkills({
+  'reason.keyboard-match': {
+    strand: 'reason.logic',
+    name: 'Letter and keyboard matching',
+    can: 'match a prompted Latin letter to its physical keyboard key',
+    childName: 'Keyboard Explorer',
+    difficulty: 0,
+    standards: [
+      { framework: 'Family', code: 'keyboard-letter-matching', description: 'Practice letter/key familiarity without implying reading or typing mastery.' },
+    ],
+    lessons: ['keyboard-trail'],
+    idea: 'Find a prompted letter on a physical keyboard, without time pressure.',
+  },
+  'reason.letter-match': {
+    strand: 'reason.logic',
+    name: 'Letter recognition by touch',
+    can: 'choose a matching Latin letter from labeled touch choices',
+    childName: 'Letter Explorer',
+    difficulty: 0,
+    standards: [
+      { framework: 'Family', code: 'keyboard-letter-matching', description: 'Practice letter/key familiarity without implying reading or typing mastery.' },
+    ],
+    lessons: ['keyboard-trail'],
+    idea: 'Match a prompted letter by tapping a labeled letter choice.',
+  },
   // ── Reading: foundations ────────────────────────────────────────────────
   'read.print-concepts': {
     strand: 'reading.foundations',

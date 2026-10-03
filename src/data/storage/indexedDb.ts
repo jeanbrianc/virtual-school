@@ -97,7 +97,8 @@ export class IndexedDbDatabase implements Database {
     const tx = this.db.transaction(tables, 'readwrite');
     for (const op of ops) {
       const store = tx.objectStore(op.table);
-      if (op.type === 'put') store.put(op.value);
+      if (op.type === 'add') store.add(op.value);
+      else if (op.type === 'put') store.put(op.value);
       else if (op.key !== undefined) store.delete(op.key);
     }
     await done(tx);

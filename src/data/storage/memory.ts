@@ -90,11 +90,19 @@ export class MemoryDatabase implements Database {
     const staged = ops.map((op) => ({
       op,
       store: this.store(op.table),
-      key: op.type === 'put' ? this.keyOf(op.table, op.value) : op.key,
-      value: op.type === 'put' ? clone(op.value) : undefined,
+      key: op.type !== 'delete' ? this.keyOf(op.table, op.value) : op.key,
+      value: op.type !== 'delete' ? clone(op.value) : undefined,
     }));
+    const additions = new Set<string>();
+    for (const { op, store, key } of staged) {
+      if (op.type === 'add') {
+        const id = `${op.table}/${key}`;
+        if (store.has(key as Key) || additions.has(id)) throw new DOMException('Duplicate completion', 'ConstraintError');
+        additions.add(id);
+      }
+    }
     for (const { op, store, key, value } of staged) {
-      if (op.type === 'put') store.set(key as Key, value);
+      if (op.type !== 'delete') store.set(key as Key, value);
       else if (key) store.delete(key);
     }
     this.notify([...new Set(ops.map((o) => o.table))]);

@@ -96,6 +96,17 @@ export function buildClassroom(ctx: BuildContext, today: Date): void {
   const banner = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.72), new THREE.MeshStandardMaterial({ map: posterTexture('alphabet'), roughness: 0.9 }));
   banner.position.set(0, 3.95, -9.8);
   ctx.mount('north', banner);
+  ctx.interact({
+    id: 'alphabet',
+    kind: 'lesson',
+    label: 'Play the keyboard trail',
+    icon: '🔤',
+    position: new THREE.Vector3(0, 0, -8.3),
+    approach: new THREE.Vector3(0, 0, -7.2),
+    radius: 2,
+    object: banner,
+    markerHeight: 3.9,
+  });
 
   // Calendar easel.
   const easel = new THREE.Group();

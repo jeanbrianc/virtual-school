@@ -31,12 +31,25 @@ export class InputManager {
   private interactQueued = false;
   private backQueued = false;
   private padButtons: boolean[] = [];
-  enabled = true;
+  private active = true;
+  get enabled(): boolean {
+    return this.active;
+  }
+  set enabled(value: boolean) {
+    this.clear();
+    this.active = value;
+  }
+  clear(): void {
+    this.keys.clear();
+    this.interactQueued = false;
+    this.backQueued = false;
+    this.padButtons = [];
+  }
   /** Last device used — lets the UI show the right prompt (key vs. button). */
   lastDevice: 'keyboard' | 'pointer' | 'gamepad' = 'pointer';
 
   private onKeyDown = (e: KeyboardEvent) => {
-    if (isTypingTarget(e.target)) return;
+    if (!this.enabled || isTypingTarget(e.target)) return;
     if (e.code in MOVE_KEYS) {
       this.keys.add(e.code);
       this.lastDevice = 'keyboard';
@@ -57,7 +70,7 @@ export class InputManager {
     this.keys.delete(e.code);
   };
 
-  private onBlur = () => this.keys.clear();
+  private onBlur = () => this.clear();
 
   attach(): void {
     window.addEventListener('keydown', this.onKeyDown);
@@ -73,6 +86,7 @@ export class InputManager {
 
   /** Polls keyboard + gamepads once per frame. */
   poll(): InputIntents {
+    if (!this.enabled) return { moveX: 0, moveY: 0, cameraYaw: 0, cameraZoom: 0 };
     let mx = 0;
     let my = 0;
     for (const k of this.keys) {

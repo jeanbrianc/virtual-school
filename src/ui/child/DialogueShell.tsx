@@ -22,6 +22,7 @@ export function DialogueShell({
   onClose,
   speech,
   wide = false,
+  closeDisabled = false,
 }: {
   teacher: TeacherId;
   line: string;
@@ -30,6 +31,7 @@ export function DialogueShell({
   onClose: () => void;
   speech: Speech;
   wide?: boolean;
+  closeDisabled?: boolean;
 }) {
   const t = TEACHERS[teacher];
   const [shown, setShown] = useState('');
@@ -71,7 +73,7 @@ export function DialogueShell({
                 <Icon name="speaker" size={22} />
               </button>
             )}
-            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close" data-testid="dialogue-close">
+            <button type="button" className="icon-btn" onClick={onClose} disabled={closeDisabled} aria-label="Close" data-testid="dialogue-close">
               <Icon name="close" size={22} />
             </button>
           </div>
