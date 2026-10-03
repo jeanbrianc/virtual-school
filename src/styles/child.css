@@ -1513,11 +1513,32 @@ button.treasure {
 }
 
 @media (max-width: 720px) {
+  .hud {
+    flex-direction: column;
+    gap: 8px;
+    padding-inline: max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-right));
+  }
+  .hud-left {
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 100%;
+  }
+  .hud-left .name-badge,
+  .hud-left .hud-chip {
+    padding: 6px 10px;
+    font-size: 1rem;
+  }
+  .hud-right {
+    align-self: flex-end;
+    max-width: 100%;
+    gap: 4px;
+  }
   .hud-btn span {
     display: none;
   }
   .hud-btn {
-    min-width: 46px;
+    min-width: 44px;
+    min-height: 44px;
   }
   .dialogue {
     grid-template-columns: 1fr;

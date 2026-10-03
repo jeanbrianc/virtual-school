@@ -189,6 +189,14 @@ iPad starts empty. With it, every device you sign in on shares one school.
    devices change the same thing, the newer change wins. Each device still works
    offline and catches up later. *Stop syncing on this device* pauses one device.
 
+On a narrow phone, the school menu appears below the status badges; **Grown-ups**
+remains on screen with a minimum 44-pixel touch target. If other devices still
+start empty, check **Family sync** on the device holding the history. **Off** means
+signing in has not uploaded any progress. Turn it on there and wait for **Last
+synced** before reloading the other devices. Do not make an empty phone's school
+the family's school over an existing saved history. This layout change adds no
+AWS resources or charges and does not automatically upload local records.
+
 **Where it's kept:** in this stack — a DynamoDB table (`FamilyRecordsTable`, on-demand,
 point-in-time recovery for 35 days) for records, and a private, versioned S3 bucket
 (`FamilyMediaBucket`) for photos. Both are kept even if the stack is deleted. Only the AI

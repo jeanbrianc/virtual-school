@@ -20,6 +20,12 @@ hosted site, **family sync** (opt-in) keeps every signed-in device's school the 
 through the family's own AWS account. There are no accounts, ads, analytics,
 trackers, social features or child-facing external links.
 
+On phones, the school menu sits below the status badges so **Grown-ups** stays
+reachable. To share progress, open **Grown-ups → Settings & privacy → Family sync**
+on the device holding the history and turn sync on once. Sign-in alone does not
+upload a school. Wait for **Last synced**, then reload the other device; if it has
+its own records, review the school-choice prompt before replacing anything.
+
 ---
 
 ## Quick start
