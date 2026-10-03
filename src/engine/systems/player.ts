@@ -59,6 +59,7 @@ export class PlayerController {
   stop(): void {
     this.cancelPath();
     this.velocity.set(0, 0, 0);
+    this.settle = null;
   }
 
   /** Glides her onto (x, z) while she stands still — e.g. to the middle of a mat number. */

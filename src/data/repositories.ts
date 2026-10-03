@@ -75,6 +75,11 @@ export class UnitOfWork {
     return this;
   }
 
+  add<T>(table: TableName, value: T): this {
+    this.ops.push({ table, type: 'add', value });
+    return this;
+  }
+
   putAll<T>(table: TableName, values: T[]): this {
     for (const v of values) this.put(table, v);
     return this;
@@ -87,6 +92,6 @@ export class UnitOfWork {
 
   /** Values staged for a table (used to preview state before committing). */
   staged<T>(table: TableName): T[] {
-    return this.ops.filter((o) => o.table === table && o.type === 'put').map((o) => o.value as T);
+    return this.ops.filter((o) => o.table === table && o.type !== 'delete').map((o) => o.value as T);
   }
 }

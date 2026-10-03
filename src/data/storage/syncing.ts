@@ -102,10 +102,10 @@ export class SyncingDatabase implements Database {
         continue;
       }
       const mod = this.nextMod();
-      if (op.type === 'put') {
+      if (op.type !== 'delete') {
         const value = { ...(op.value as Stamped), _mod: mod };
         const id = idOf(op.table, value);
-        out.push({ table: op.table, type: 'put', value });
+        out.push({ table: op.table, type: op.type, value });
         out.push({ table: OUTBOX, type: 'put', value: { key: `${op.table}/${id}`, table: op.table, id, mod } satisfies OutboxEntry });
       } else if (op.key !== undefined) {
         out.push(op);

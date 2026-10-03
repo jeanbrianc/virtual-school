@@ -2031,3 +2031,31 @@ button.treasure {
   font-size: 1.15rem;
   color: var(--ink-soft);
 }
+
+.keyboard-letters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+  gap: 8px;
+}
+.keyboard-letters button {
+  min-height: 64px;
+  font-size: 1.4rem;
+  border-radius: 12px;
+}
+.keyboard-letters .key-target {
+  outline: 4px solid #734ba3;
+  font-weight: bold;
+}
+.keyboard-trail .dialogue {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.keyboard-trail {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.keyboard-trail .dialogue {
+  pointer-events: auto;
+}

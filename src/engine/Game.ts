@@ -614,7 +614,7 @@ export class Game {
 
   setInputEnabled(enabled: boolean): void {
     this.input.enabled = enabled;
-    if (!enabled) this.player.cancelPath();
+    if (!enabled) this.player.stop();
   }
 
   get inputDevice(): InputManager['lastDevice'] {

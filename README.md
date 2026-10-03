@@ -571,3 +571,20 @@ so `npm install` reproduces them from npm on a normal machine.
 4. Parent weekly planner that turns recommendations into a gentle schedule.
 5. Georgia's early-years track (board books, songs, sensory play) when she's ready.
 6. PWA install + offline service worker.
+
+### Keyboard trail
+
+The alphabet above the chalkboard starts a five-letter matching trail. It begins
+with A–E and expands toward Latin A–Z over completed rounds. All letters have
+labeled touch alternatives. Physical matching uses `KeyboardEvent.key`, following
+the device layout; upper/lowercase, Shift and Caps Lock work. Non-Latin input,
+IME composition, repeated keys and Control/Command/Alt shortcuts are ignored.
+There is no timer. Repeat, hint, skip, cancel and replay are available; switching
+focus pauses the trail until Resume. World movement and camera controls pause.
+
+Save explicitly after the five prompts. Cancelling or reloading an unfinished
+trail saves nothing. Saving twice commits one atomic lesson with stable evidence
+IDs; replay starts a separate run. Parent records list letters, hints, skipped
+prompts and physical versus touch input. These are family-defined letter/key
+familiarity skills, not reading mastery or typing speed. Touch recognition does
+not count as physical keyboard proficiency. No global key history is stored.

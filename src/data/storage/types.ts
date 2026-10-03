@@ -21,7 +21,7 @@ export interface TableSpec {
 
 export interface WriteOp {
   table: string;
-  type: 'put' | 'delete';
+  type: 'put' | 'add' | 'delete';
   value?: unknown;
   key?: Key;
 }

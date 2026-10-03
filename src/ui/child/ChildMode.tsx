@@ -49,6 +49,8 @@ import { appStore } from '../../state/appState';
 import { useStore } from '../../state/store';
 import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
+import { KeyboardFlow } from './flows/KeyboardFlow';
+import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
 import { LessonFlow } from './flows/LessonFlow';
 import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
@@ -57,6 +59,7 @@ import { useChildWorld, type ChildWorldData } from './useChildWorld';
 import type { TalkAvailability } from '../../voice/SpeechService';
 
 type Overlay =
+  | { kind: 'keyboard' }
   | { kind: 'hoot' }
   | { kind: 'lesson'; teacher: 'digit' | 'nova'; startTier: number }
   | { kind: 'shelf' }
@@ -395,6 +398,13 @@ export function ChildMode({ childId }: { childId: string }) {
           return;
         }
       }
+      if (id === 'alphabet') {
+        if (appStore.get().preview) return;
+        teacherForSpeech.current = 'hoot';
+        game.setInputEnabled(false);
+        setOverlay({ kind: 'keyboard' });
+        return;
+      }
       if (id === 'circuit') {
         setRun(freshRun());
         setCallout({ key: Date.now(), n: null, emoji: '🤸', label: 'Hop onto number 1!' });
@@ -509,7 +519,7 @@ export function ChildMode({ childId }: { childId: string }) {
         onStation: (n) => stationRef.current(n),
         onBack: () => {
           const o = overlayRef.current;
-          if (o && o.kind !== 'celebrate' && o.kind !== 'hoot' && o.kind !== 'lesson') setOverlay(null);
+          if (o && o.kind !== 'celebrate' && o.kind !== 'hoot' && o.kind !== 'lesson' && o.kind !== 'keyboard') setOverlay(null);
         },
       },
     }).then(async (game) => {
@@ -585,6 +595,7 @@ export function ChildMode({ childId }: { childId: string }) {
     if (!FEATURE_FLAGS.automationHooks) return;
     (window as unknown as { __izzy?: unknown }).__izzy = {
       game: () => gameRef.current,
+      saveKeyboardTrail: (run: Parameters<typeof recordKeyboardTrail>[2]) => recordKeyboardTrail(ctx, childId, run),
       interact: (id: string) => void handleInteract(id),
       walkTo: (id: string) => gameRef.current?.interactById(id),
       teleportTo: (id: string) => gameRef.current?.teleportTo(id),
@@ -950,6 +961,17 @@ export function ChildMode({ childId }: { childId: string }) {
 
           {hint && <HintCard {...hint} onClose={() => setHint(null)} />}
 
+          {overlay?.kind === 'keyboard' && (
+            <KeyboardFlow
+              speech={speech}
+              completed={data.records.lessons.filter((l) => l.lessonId === 'keyboard-trail').length}
+              onClose={closeSheet}
+              onSave={async (run) => {
+                await recordKeyboardTrail(ctx, childId, run);
+                await reload();
+              }}
+            />
+          )}
           {overlay?.kind === 'hoot' && (
             <HootFlow
               childName={data.child.name}

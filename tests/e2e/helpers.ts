@@ -3,6 +3,7 @@ import { expect, type Page } from 'playwright/test';
 declare global {
   interface Window {
     __izzy?: {
+      saveKeyboardTrail(run: import('../../src/domain/lessons/keyboardTrail').KeyboardTrail): Promise<unknown>;
       game(): { busy: boolean } | null;
       interact(id: string): void;
       teleportTo(id: string): void;
