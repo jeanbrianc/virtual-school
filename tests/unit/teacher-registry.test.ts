@@ -5,7 +5,7 @@ import { getLesson } from '../../src/domain/lessons/registry';
 import { parseTeacherAiInput, teacherSystemPrompt } from '../../src/domain/teachers/aiPrompt';
 import { localTeacherReply } from '../../src/domain/teachers/chat';
 import { TEACHER_IDS, TEACHER_REGISTRY, isTeacherId, teacherForInteraction, teacherRegistration, type TeacherId } from '../../src/domain/teachers/registry';
-import { TEACHERS, teacherOpening } from '../../src/domain/teachers/teachers';
+import { TEACHERS, teacherOpening, teacherDisplayName } from '../../src/domain/teachers/teachers';
 import { createTeacher } from '../../src/engine/characters/teachers';
 import { parseSpeakInput } from '../../scripts/ai-helper/openai';
 
@@ -41,6 +41,7 @@ it('every stable teacher has a complete profile, curriculum activity, local voic
 it('unknown, retired and prototype IDs are rejected or shown safely; existing saved IDs remain valid', () => {
   for (const id of ['retired_teacher', 'toString', 'constructor', '__proto__']) {
     assert.equal(isTeacherId(id), false);
+    assert.equal(teacherDisplayName(id), 'Past teacher');
     assert.equal(teacherRegistration(id), undefined);
     assert.equal(teacherForInteraction(id), undefined);
     assert.equal(parseSpeakInput({ teacherId: id, text: 'Hello' }), null);
@@ -48,5 +49,8 @@ it('unknown, retired and prototype IDs are rejected or shown safely; existing sa
     assert.throws(() => createTeacher(id as TeacherId, 0), /Unknown teacher/);
     assert.match(localTeacherReply({ teacherId: id as TeacherId, childName: 'Learner', utterance: 'Hello', history: [], books: [] }).reply, /grown-up/);
   }
-  for (const id of ['hoot', 'digit', 'nova']) assert.equal(isTeacherId(id), true);
+  for (const id of ['hoot', 'digit', 'nova']) {
+    assert.equal(isTeacherId(id), true);
+    assert.equal(teacherDisplayName(id), TEACHERS[id as TeacherId].name);
+  }
 });

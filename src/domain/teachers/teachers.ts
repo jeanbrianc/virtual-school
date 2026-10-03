@@ -5,7 +5,7 @@
  * future, from a DialogueProvider that must return one of a small set of
  * allowed intents — see docs/ARCHITECTURE.md → "Teacher dialogue").
  */
-import type { TeacherId } from './registry';
+import { isTeacherId, type TeacherId } from './registry';
 export type { TeacherId } from './registry';
 
 export interface TeacherProfile {
@@ -143,4 +143,9 @@ export function teacherOpening(id: TeacherId, memory: TeacherMemory, seed: numbe
     lines.push(memory.lastLessonSummary);
   }
   return lines.map((l) => personalize(l, memory.childName));
+}
+
+/** Stored historical IDs must not read inherited object properties. */
+export function teacherDisplayName(id: string): string {
+  return isTeacherId(id) ? TEACHERS[id].name : 'Past teacher';
 }

@@ -11,7 +11,7 @@ import { markNotesSeen } from '../../../services/lessonService';
 import { getSpeechProbe } from '../../../services/talkService';
 import { browserFamily, knownOnDevice } from '../../../domain/talk';
 import { snapshotFromRecords } from '../../../services/learningCore';
-import { TEACHERS, type TeacherId } from '../../../domain/teachers/teachers';
+import { teacherDisplayName } from '../../../domain/teachers/teachers';
 import { BookCover } from '../../shared/BookCover';
 import { Icon } from '../../shared/Icon';
 import { DEFAULT_SETTINGS } from '../../../domain/settings';
@@ -44,7 +44,7 @@ function TeacherNotes({ data }: { data: ParentData }) {
                 <p key={k}>{n}</p>
               ))}
               <span className="muted small">
-                To {TEACHERS[i.teacherId as TeacherId]?.name ?? i.teacherId} · {relativeDay(dayFromTimestamp(i.startedAt), toDay(new Date()))} ·{' '}
+                To {teacherDisplayName(i.teacherId)} · {relativeDay(dayFromTimestamp(i.startedAt), toDay(new Date()))} ·{' '}
                 <a href="#/parent/conversations">See the conversation</a>
               </span>
             </div>
