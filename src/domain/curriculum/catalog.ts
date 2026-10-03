@@ -840,6 +840,17 @@ export const SKILLS: Skill[] = defineSkills({
     standards: [dci('ESS2.A', 'Earth materials and systems: wind and water change the shape of the land.')],
     idea: 'Start a rock collection sorted by color, texture and size.',
   },
+  'reason.shape-match': {
+    strand: 'reason.logic',
+    name: 'Matching a shape',
+    childName: 'Shape twins',
+    can: 'match an identical simple 2D shape from two choices',
+    difficulty: 0,
+    topics: ['shapes', 'matching'],
+    standards: [family('Match a simple shape to an identical shape by its outline.')],
+    lessons: ['patterns-shapes'],
+    idea: 'Find two matching paper shapes together.',
+  },
   'reason.visual-patterns': {
     strand: 'reason.logic',
     name: 'Copying and extending visual patterns',

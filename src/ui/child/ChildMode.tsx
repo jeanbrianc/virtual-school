@@ -621,9 +621,9 @@ export function ChildMode({ childId }: { childId: string }) {
       await recordConversation(ctx, childId, teacher, talked ? 'talk' : flow, startedAt, transcript, hoot ?? outcome, parentNotes);
       await reload();
       const game = gameRef.current;
-      if (game) {
+      if (game && !overlayRef.current) {
         await game.releaseCamera();
-        game.setInputEnabled(true);
+        game.setInputEnabled(!overlayRef.current);
       }
       maybeCelebrateExplorer();
     },
@@ -968,6 +968,10 @@ export function ChildMode({ childId }: { childId: string }) {
             <KeyboardFlow
               speech={speech}
               completed={data.records.lessons.filter((l) => l.lessonId === 'keyboard-trail').length}
+              onScene={(letter, found) => {
+                void gameRef.current?.focusAlphabet(letter, found);
+              }}
+              onSceneEnd={() => gameRef.current?.endAlphabet()}
               onClose={closeSheet}
               onSave={async (run) => {
                 await recordKeyboardTrail(ctx, childId, run);
@@ -1002,6 +1006,10 @@ export function ChildMode({ childId }: { childId: string }) {
               {...(lastSummary(overlay.lessonId) ? { lastSummary: lastSummary(overlay.lessonId)! } : {})}
               speech={speech}
               playSfx={(n) => audio.play(n)}
+              onSaveContinue={async (run, t, s, notes) => {
+                await recordLesson(ctx, childId, run, s, t, notes);
+                await reload();
+              }}
               onComplete={(run, t, s, notes) => void finishLesson(overlay.teacher, run, t, s, notes)}
               onClose={(t, s, notes) => void endConversation(overlay.teacher, 'chat', t, s, `Visited ${TEACHERS[overlay.teacher].name}`, notes)}
               talk={talkKit}

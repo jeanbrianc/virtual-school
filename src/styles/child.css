@@ -2114,3 +2114,451 @@ button.treasure {
   display: block;
   margin: 12px auto;
 }
+
+/* The letter game belongs to the classroom, with a small coach below the strip. */
+.letter-coach {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(700px, calc(100% - 28px));
+  padding: 16px 20px;
+  border: 4px solid #fff5d5;
+  border-radius: 30px;
+  background: linear-gradient(120deg, #d5f6f2, #fff2b7);
+  color: #252c4b;
+  box-shadow: 0 8px 28px #23324940;
+}
+.letter-coach-main {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.letter-goal {
+  background: #ffce45;
+  line-height: 1;
+  color: #252c4b;
+  border: 5px solid white;
+  border-radius: 24px;
+  width: 110px;
+  height: 110px;
+  display: grid;
+  place-items: center;
+  font-size: 82px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.letter-instruction {
+  font-size: 32px;
+  font-weight: 800;
+  margin: 0;
+}
+.letter-stars {
+  color: #ad6719;
+  font-size: 30px;
+  letter-spacing: 8px;
+}
+.letter-earned {
+  color: #b14e05;
+}
+.letter-response {
+  margin: 2px 0;
+  font-size: 17px;
+}
+.letter-touch {
+  position: absolute;
+  right: 20px;
+  top: 22px;
+  display: flex;
+  gap: 12px;
+}
+.letter-touch button {
+  background: #c4b2ff;
+  border: 4px solid white;
+  color: #252c4b;
+  width: 76px;
+  height: 76px;
+  border-radius: 20px;
+  font-size: 48px;
+  font-weight: 800;
+}
+.letter-touch button:nth-child(2) {
+  background: #ff91aa;
+}
+.letter-touch .key-target {
+  outline: 4px solid #176b85;
+  outline-offset: 3px;
+}
+.letter-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.letter-tool {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 2px solid #4a6d76;
+  border-radius: 14px;
+  background: #ffffffd9;
+  color: #25344b;
+  font: inherit;
+  font-size: 15px;
+}
+.letter-coach > .letter-exit {
+  position: absolute;
+  right: 20px;
+  bottom: 16px;
+}
+.letter-tool:focus-visible,
+.letter-touch button:focus-visible {
+  outline: 4px solid #146ca1;
+  outline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .letter-coach {
+    bottom: 12px;
+    padding: 12px;
+    width: calc(100% - 20px);
+  }
+  .letter-goal {
+    width: 76px;
+    height: 76px;
+    font-size: 56px;
+  }
+  .letter-instruction {
+    font-size: 25px;
+  }
+  .letter-coach-main {
+    gap: 10px;
+  }
+  .letter-stars {
+    font-size: 23px;
+    letter-spacing: 3px;
+  }
+  .letter-response {
+    font-size: 14px;
+  }
+  .letter-touch {
+    position: static;
+    justify-content: center;
+    margin: 10px 0 0;
+  }
+  .letter-touch button {
+    width: 90px;
+    height: 76px;
+  }
+  .letter-tools {
+    justify-content: center;
+    gap: 6px;
+  }
+  .letter-coach > .letter-exit {
+    position: static;
+    margin-top: 8px;
+    width: 100%;
+  }
+}
+
+.letter-goal {
+  width: 150px;
+  height: 150px;
+  font-size: 120px;
+}
+@media (max-width: 720px) {
+  .letter-goal {
+    width: 118px;
+    height: 118px;
+    font-size: 96px;
+  }
+}
+
+.dialogue[data-teacher='pippa'] {
+  border-color: #ecc257;
+  background: linear-gradient(145deg, #fff8dc, #e8f8f4);
+}
+.dialogue[data-teacher='pippa'] .dialogue-line {
+  font-size: 28px;
+  font-weight: 700;
+}
+.shape-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px;
+  border-radius: 24px;
+  background: #d8eeef;
+  margin-bottom: 14px;
+}
+.shape-model .shape-picture {
+  display: block;
+  width: 220px;
+  height: 220px;
+}
+.shape-stage-pattern .shape-picture {
+  width: 112px;
+  height: 112px;
+}
+.shape-next {
+  font-size: 76px;
+  font-weight: 800;
+  color: #26304f;
+}
+.shape-choices {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+.shape-choice {
+  display: grid;
+  place-items: center;
+  min-width: 180px;
+  min-height: 160px;
+  background: #ffffff;
+  border: 4px solid #83bdc7;
+  border-radius: 26px;
+  box-shadow: 0 7px 0 #6095a0;
+}
+.shape-choice .shape-picture {
+  width: 132px;
+  height: 132px;
+}
+.shape-choice:focus-visible {
+  outline: 5px solid #175ac4;
+  outline-offset: 5px;
+}
+.shape-choice.shape-chosen {
+  border-color: #267d54;
+  background: #d1f7d9;
+}
+.shape-choice:disabled {
+  opacity: 0.65;
+}
+.shape-paper {
+  display: grid;
+  place-items: center;
+  width: 220px;
+  height: 160px;
+  background: white;
+  border: 4px dashed #c68b3c;
+  border-radius: 22px;
+  font-size: 80px;
+}
+.dialogue[data-teacher='pippa'] .pattern-skip {
+  min-height: 44px;
+  margin: 14px auto 0;
+  padding: 8px 14px;
+  font-size: 15px;
+}
+@media (max-width: 720px) {
+  .dialogue[data-teacher='pippa'] .dialogue-line {
+    font-size: 23px;
+  }
+  .shape-model .shape-picture {
+    width: 160px;
+    height: 160px;
+  }
+  .shape-stage-pattern .shape-picture {
+    width: 72px;
+    height: 72px;
+  }
+  .shape-stage-pattern {
+    gap: 2px;
+  }
+  .shape-next {
+    font-size: 48px;
+  }
+  .shape-choices {
+    gap: 16px;
+  }
+  .shape-choice {
+    min-width: 120px;
+    min-height: 120px;
+  }
+  .shape-choice .shape-picture {
+    width: 96px;
+    height: 96px;
+  }
+  .shape-paper {
+    height: 130px;
+    width: 160px;
+  }
+}
+.shape-choice.shape-hint {
+  outline: 5px dashed #175ac4;
+  outline-offset: 5px;
+}
+/* Keep the model and both choices visible together, without a scroll hunt. */
+.dialogue[data-teacher='pippa'] {
+  grid-template-columns: 1fr;
+  width: min(860px, calc(100vw - 24px));
+  padding: 16px;
+}
+.dialogue[data-teacher='pippa'] .dialogue-portrait {
+  display: none;
+}
+.dialogue[data-teacher='pippa'] .dialogue-line {
+  min-height: 0;
+  margin: 8px 0 12px;
+  line-height: 1.2;
+}
+.dialogue[data-teacher='pippa'] .lesson-play {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 12px 20px;
+  align-items: center;
+}
+.dialogue[data-teacher='pippa'] .lesson-progress {
+  grid-column: 1/-1;
+  margin: 0;
+}
+.dialogue[data-teacher='pippa'] .shape-stage {
+  margin: 0;
+  padding: 6px;
+}
+.dialogue[data-teacher='pippa'] .pattern-skip {
+  margin: 0;
+  justify-self: center;
+}
+.dialogue[data-teacher='pippa'] .shape-stage-pattern {
+  grid-column: 1/-1;
+}
+.dialogue[data-teacher='pippa'] .shape-stage-pattern + .shape-choices {
+  grid-column: 1/-1;
+}
+@media (max-width: 720px) {
+  .dialogue[data-teacher='pippa'] {
+    padding: 14px;
+  }
+  .dialogue[data-teacher='pippa'] .lesson-play {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 12px;
+  }
+  .dialogue[data-teacher='pippa'] .shape-stage,
+  .dialogue[data-teacher='pippa'] .shape-choices {
+    grid-column: 1/-1;
+  }
+  .dialogue[data-teacher='pippa'] .dialogue-line {
+    font-size: 23px;
+    min-height: 0;
+  }
+}
+.letter-coach {
+  width: min(820px, calc(100% - 28px));
+}
+.letter-goal {
+  width: 170px;
+  height: 170px;
+  font-size: 160px;
+}
+.letter-coach-main > div:nth-child(2) {
+  max-width: 280px;
+}
+.letter-touch button {
+  width: 120px;
+  height: 120px;
+  font-size: 78px;
+}
+@media (max-width: 720px) {
+  .letter-coach {
+    width: calc(100% - 20px);
+  }
+  .letter-goal {
+    width: 130px;
+    height: 130px;
+    font-size: 128px;
+  }
+  .letter-coach-main > div:nth-child(2) {
+    max-width: calc(100% - 140px);
+  }
+  .letter-touch button {
+    width: 120px;
+    height: 120px;
+    font-size: 78px;
+  }
+  .letter-tools {
+    flex-wrap: nowrap;
+  }
+  .letter-tools .letter-tool {
+    font-size: 14px;
+    padding: 8px 10px;
+    flex: 1;
+  }
+}
+.dialogue[data-teacher='pippa'] .lesson-play {
+  grid-template-columns: 260px 1fr;
+}
+.shape-model .shape-picture {
+  width: 240px;
+  height: 240px;
+}
+.shape-stage-pattern .shape-picture {
+  width: 112px;
+  height: 112px;
+}
+@media (max-width: 720px) {
+  .dialogue[data-teacher='pippa'] .lesson-play {
+    grid-template-columns: 1fr 1fr;
+  }
+  .shape-model .shape-picture {
+    width: 180px;
+    height: 180px;
+  }
+  .shape-stage-pattern .shape-picture {
+    width: 72px;
+    height: 72px;
+  }
+}
+@media (max-height: 500px) {
+  .letter-coach {
+    width: min(650px, calc(100% - 24px));
+    padding: 8px 12px;
+    bottom: 10px;
+  }
+  .letter-goal {
+    width: 76px;
+    height: 76px;
+    font-size: 70px;
+  }
+  .letter-instruction {
+    font-size: 24px;
+  }
+  .letter-stars {
+    font-size: 20px;
+    letter-spacing: 3px;
+  }
+  .letter-response {
+    font-size: 13px;
+  }
+  .letter-touch {
+    position: absolute;
+    right: 12px;
+    top: 10px;
+    margin: 0;
+  }
+  .letter-touch button {
+    width: 76px;
+    height: 76px;
+    font-size: 48px;
+  }
+  .letter-tools {
+    justify-content: flex-start;
+    max-width: 65%;
+    margin-top: 6px;
+  }
+  .letter-tools .letter-tool {
+    flex: initial;
+  }
+  .letter-coach > .letter-exit {
+    position: absolute;
+    right: 12px;
+    bottom: 8px;
+    width: auto;
+    margin: 0;
+  }
+  .letter-coach-main > div:nth-child(2) {
+    max-width: calc(100% - 270px);
+  }
+}

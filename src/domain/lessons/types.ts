@@ -6,6 +6,7 @@ export interface LessonChoice {
   label: string;
   /** Optional emoji/pictogram to support pre-readers and quick scanning. */
   icon?: string;
+  shapes?: readonly Shape[];
 }
 
 export type LessonVisual =
@@ -61,6 +62,8 @@ export interface LessonDefinition {
   intro: string[];
   outro: string;
   rounds: number;
+  /** Progression is explicitly chosen after success, rather than automatic. */
+  manualProgression?: boolean;
   tiers: LessonTier[];
   /** Scaffold ladder used after each not-yet answer. */
   ladder: ScaffoldType[];

@@ -624,6 +624,7 @@ export class Game {
 
   /** Frames a teacher and Izzy for a conversation. */
   async focusTeacher(id: TeacherId): Promise<void> {
+    this.interaction.hideMarker(id, true);
     const anchor = this.world.anchors.get(`teacher:${id}`);
     if (!anchor) return;
     const p = this.player.position;
@@ -637,10 +638,31 @@ export class Game {
       .add(new THREE.Vector3(0, 1.3, 0));
     this.player.faceToward(anchor);
     // Push the conversation toward the top of the screen (dialogue sits at the bottom).
-    await this.rig.shot(camPos, mid.clone().add(new THREE.Vector3(0, -0.35, 0)), 0.9);
+    await this.rig.shot(camPos, mid.clone().add(new THREE.Vector3(0, id === 'pippa' && window.innerWidth / window.innerHeight < 0.9 ? -0.95 : -0.35, 0)), 0.9);
+  }
+
+  async focusAlphabet(letter: string | null, found: string[] = []): Promise<void> {
+    this.interaction.hideMarker('alphabet', true);
+    this.world.alphabet.setState(letter, found);
+    const mobile = window.innerWidth < 760 || window.innerWidth / window.innerHeight < 0.9;
+    const landscape = window.innerHeight < 500;
+    const target = letter ? this.world.alphabet.targetPosition(letter) : new THREE.Vector3(0, 4.18, -9.72);
+    const x = mobile ? target.x : 0;
+    await this.rig.shot(
+      new THREE.Vector3(x, landscape ? target.y : 3.6, mobile ? -4.3 : -0.7),
+      new THREE.Vector3(x, landscape ? target.y - 0.15 : 3.0, -9.72),
+      this.reducedMotion ? 0 : 0.55,
+    );
+  }
+
+  endAlphabet(): void {
+    this.world.alphabet.setState(null, []);
+    void this.releaseCamera();
   }
 
   async releaseCamera(): Promise<void> {
+    this.interaction.hideMarker('alphabet', false);
+    for (const id of this.world.teachers.keys()) this.interaction.hideMarker(id, false);
     await this.rig.release(0.9);
   }
 

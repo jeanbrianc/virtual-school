@@ -125,7 +125,7 @@ export class LessonRun {
 
     // Predictions are never wrong — making one is the skill.
     if (problem.kind === 'create') {
-      if (!/^(circle|triangle|square)( (circle|triangle|square)){3}$/.test(choiceId)) throw new Error('Choose four shapes');
+      if (!/^(circle|triangle|square)( (circle|triangle|square)){0,3}$/.test(choiceId)) throw new Error('Choose one to four shapes');
       state.responses.push(choiceId);
       return this.finishProblem('independent', problem.success);
     }
@@ -173,6 +173,13 @@ export class LessonRun {
     return this.finishProblem('not_yet', problem.model, { type: 'model', text: problem.model, manipulatives: true });
   }
 
+  hint(): LessonFeedback {
+    if (!this.main || this.complete) throw new Error('Lesson is not active');
+    this.main.scaffolds.push('hint');
+    this.main.ladderStep = Math.max(1, this.main.ladderStep);
+    return this.retry(this.main.problem.hints[0] ?? 'Let’s look together.', { type: 'hint', text: this.main.problem.hints[0] ?? '', manipulatives: true });
+  }
+
   skip(): LessonFeedback {
     if (!this.main || this.complete) throw new Error('Lesson is not active');
     this.stepping = null;
@@ -199,7 +206,7 @@ export class LessonRun {
     });
 
     let tierChange: LessonFeedback['tierChange'] = null;
-    if (p.kind !== 'predict' && p.kind !== 'create') {
+    if (p.kind !== 'predict' && p.kind !== 'create' && !this.definition.manualProgression) {
       if (outcome === 'independent') {
         this.streak += 1;
         if (this.streak >= 2 && this.tier < this.definition.tiers.length - 1) {
