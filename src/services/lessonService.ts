@@ -7,7 +7,7 @@ import { persistenceTrials, tallyBySkill, type LessonRun } from '../domain/lesso
 import type { LessonDefinition } from '../domain/lessons/types';
 import type { Evidence, LessonAttempt, TeacherInteraction, TranscriptLine } from '../domain/types';
 import { nowIso, type ServiceContext } from './context';
-import { finalizeLearning, makeEvidence, type LearningOutcome } from './learningCore';
+import { finalizeLearning, makeEvidence, loadChildRecords, snapshotFromRecords, worldFromRecords, type LearningOutcome } from './learningCore';
 
 export async function startTierFor(ctx: ServiceContext, childId: string, lesson: LessonDefinition): Promise<number> {
   const mastery = await ctx.repos.forChild(ctx.repos.mastery, childId);
@@ -31,17 +31,32 @@ export async function recordLesson(
   transcript: TranscriptLine[],
   parentNotes: string[] = [],
 ): Promise<RecordLessonResult> {
+  if (!run.isComplete) throw new Error('Incomplete lesson');
   const def = run.definition;
+  const attemptId = `lesson:${childId}:${run.id}`;
+  const savedResult = async (): Promise<RecordLessonResult | null> => {
+    const attempt = await ctx.repos.lessonAttempts.get(attemptId);
+    if (!attempt) return null;
+    const records = await loadChildRecords(ctx, childId);
+    return {
+      attempt,
+      evidence: records.evidence.filter((e) => e.source.id === attemptId),
+      outcome: { newRewards: [], unlocks: [], masteryChanges: [], snapshot: snapshotFromRecords(records), world: worldFromRecords(records) },
+    };
+  };
+  const existing = await savedResult();
+  if (existing) return existing;
   const now = nowIso(ctx);
   const records = [...run.attempts];
   const tallies = tallyBySkill(records, run.problemIndex);
 
-  const independentCount = records.filter((r) => r.outcome === 'independent').length;
-  const graded = records.filter((r) => !r.problemId.includes('predict'));
-  const summary = `${def.childTitle}: ${graded.filter((r) => r.outcome === 'independent').length} of ${graded.length} solved on the first try, ${graded.filter((r) => r.outcome === 'supported').length} with a hint; ${def.tiers[run.startTier]?.label ?? ''} → ${def.tiers[run.currentTier]?.label ?? ''}.`;
+  const graded = records.filter((r) => run.problemIndex.get(r.problemId)?.kind === 'answer');
+  const designs = records.filter((r) => run.problemIndex.get(r.problemId)?.kind === 'create' && !r.scaffolds.includes('skipped'));
+  const skipped = records.filter((r) => r.scaffolds.includes('skipped')).length;
+  const summary = `${def.childTitle}: ${graded.filter((r) => r.outcome === 'independent').length} of ${graded.length} solved on the first try, ${graded.filter((r) => r.outcome === 'supported').length} with a hint; ${def.tiers[run.startTier]?.label ?? ''} → ${def.tiers[run.currentTier]?.label ?? ''}.${skipped ? ` Skipped ${skipped} round${skipped === 1 ? '' : 's'}; no performance evidence for skipped rounds.` : ''}${designs.length ? ` Created a four-shape design (observed, not graded): ${designs[0]?.responses.join(', ')}.` : ''}`;
 
   const attempt: LessonAttempt = {
-    id: ctx.ids('lesson'),
+    id: attemptId,
     childId,
     lessonId: def.id,
     teacherId: def.teacherId,
@@ -80,6 +95,22 @@ export async function recordLesson(
     });
   });
 
+  for (const design of designs)
+    evidence.push(
+      makeEvidence(ctx, {
+        childId,
+        skillId: design.skillId,
+        source,
+        kind: 'observation',
+        trials: { independent: 0, supported: 0, notYet: 0 },
+        independence: 'independent',
+        statement: `Created a four-shape design with Pippa: ${design.responses.join(', ')}. Observed creative choice; not scored for correctness or mastery.`,
+        createdBy: 'system',
+      }),
+    );
+  evidence.forEach((e, i) => {
+    e.id = `${attemptId}:evidence:${i}`;
+  });
   const persisted = persistenceTrials(records);
   if (persisted > 0) {
     evidence.push(
@@ -97,7 +128,7 @@ export async function recordLesson(
   }
 
   const interaction: TeacherInteraction = {
-    id: ctx.ids('talk'),
+    id: `${attemptId}:talk`,
     childId,
     teacherId: def.teacherId,
     startedAt,
@@ -109,10 +140,15 @@ export async function recordLesson(
   };
 
   const uow = new UnitOfWork();
-  uow.put('lessonAttempts', attempt).putAll('evidence', evidence).put('teacherInteractions', interaction);
-  if (independentCount === 0 && records.length === 0) throw new Error('Nothing to record');
-  const outcome = await finalizeLearning(ctx, childId, uow, `lesson:${def.id}`);
-  return { attempt, evidence, outcome };
+  uow.add('lessonAttempts', attempt).putAll('evidence', evidence).put('teacherInteractions', interaction);
+  try {
+    const outcome = await finalizeLearning(ctx, childId, uow, `lesson:${def.id}`);
+    return { attempt, evidence, outcome };
+  } catch (err) {
+    const saved = await savedResult();
+    if (saved) return saved;
+    throw err;
+  }
 }
 
 export async function recordConversation(

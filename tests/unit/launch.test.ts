@@ -120,7 +120,7 @@ describe('first-day discovery', () => {
         { childName: 'Izzy', firstMeeting: true, visitsToday: 0, booksCompleted: 0, lastLessonSummary: 'Thanks for last time!' },
         1,
       ).join(' ');
-      assert.match(first, /I’m (Professor Hoot|Digit|Nova)/);
+      assert.match(first, /I’m (Professor Hoot|Digit|Nova|Pippa)/);
       assert.doesNotMatch(first, /back|again|last time|favorite reader/i);
       assert.ok(first.includes('Izzy'));
     }

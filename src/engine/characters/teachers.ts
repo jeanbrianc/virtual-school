@@ -410,7 +410,45 @@ class Nova extends BaseTeacher {
   }
 }
 
+class Pippa extends BaseTeacher {
+  id = 'pippa' as const;
+  headHeight = 1.95;
+  constructor(yaw: number) {
+    super(yaw);
+    const orange = mat('#bc7044'),
+      cream = mat('#fff0d6'),
+      dark = mat('#33291f');
+    this.body.add(
+      sphere(0.44, orange, 0, 0.92, 0),
+      sphere(0.36, orange, 0, 1.65, 0),
+      cone(0.14, 0.34, orange, -0.23, 1.97, 0),
+      cone(0.14, 0.34, orange, 0.23, 1.97, 0),
+      sphere(0.19, cream, 0, 1.55, 0.28),
+      sphere(0.055, dark, 0, 1.57, 0.45),
+      sphere(0.045, dark, -0.14, 1.75, 0.3),
+      sphere(0.045, dark, 0.14, 1.75, 0.3),
+      rbox(0.55, 0.55, 0.1, 0.05, cream, 0, 1.0, 0.37),
+      sphere(0.14, dark, -0.22, 0.22, 0.09),
+      sphere(0.14, dark, 0.22, 0.22, 0.09),
+      sphere(0.15, orange, -0.47, 1.0, 0.06),
+      sphere(0.15, orange, 0.47, 1.0, 0.06),
+    );
+    const tail = cone(0.23, 0.8, orange, 0.55, 0.68, -0.25);
+    tail.rotation.z = -0.7;
+    this.body.add(tail);
+    this.body.add(sphere(0.14, cream, 0.78, 0.98, -0.25));
+  }
+  update(dt: number, lookAt: THREE.Vector3 | null): void {
+    this.time += dt;
+    this.greetT = Math.max(0, this.greetT - dt);
+    this.cheerT = Math.max(0, this.cheerT - dt);
+    this.turnToward(dt, lookAt);
+    this.body.position.y = Math.sin(this.time * 2) * 0.025 + Math.sin(this.cheerT * 10) * 0.03;
+  }
+}
+
 const MODEL_FACTORIES: Record<TeacherRegistration['scene']['model'], (yaw: number) => TeacherModel> = {
+  fox: (yaw) => new Pippa(yaw),
   owl: (yaw) => new Hoot(yaw),
   robot: (yaw) => new Digit(yaw),
   panda: (yaw) => new Nova(yaw),

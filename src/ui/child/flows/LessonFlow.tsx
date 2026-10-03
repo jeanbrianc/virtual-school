@@ -12,7 +12,7 @@ import type { TranscriptLine } from '../../../domain/types';
 import { hashString } from '../../../domain/util/random';
 import { Choices, DialogueShell, type Speech } from '../DialogueShell';
 import { TalkBar, useTeacherTalk, type TalkKit } from '../Talk';
-import { LessonStage } from '../lesson/Stages';
+import { LessonStage, PatternMaker } from '../lesson/Stages';
 
 type Phase = 'intro' | 'play' | 'complete';
 
@@ -62,6 +62,13 @@ export function LessonFlow(props: LessonFlowProps) {
   const [choiceState, setChoiceState] = useState<Record<string, 'right' | 'soft' | 'disabled'>>({});
   const [dropping, setDropping] = useState<{ floats: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const submitted = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const timers = useRef<number[]>([]);
+  const later = (fn: () => void, delay: number) => {
+    timers.current.push(window.setTimeout(fn, delay));
+  };
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
   const [, force] = useState(0);
   const [stars, setStars] = useState(0);
 
@@ -116,7 +123,7 @@ export function LessonFlow(props: LessonFlowProps) {
     setDropping(null);
     if (run.isComplete) {
       setPhase('complete');
-      const solved = run.attempts.filter((a) => a.outcome !== 'not_yet').length;
+      const solved = run.attempts.filter((a) => a.outcome !== 'not_yet' && run.problemIndex.get(a.problemId)?.kind !== 'create').length;
       setStars(solved);
       say(`${lesson.completeTitle} ${lesson.outro}`, 'cheer');
       playSfx('sparkle');
@@ -135,6 +142,10 @@ export function LessonFlow(props: LessonFlowProps) {
     const wasStone = run.isSteppingStone();
     const fb = run.answer(choiceId);
 
+    if (p.kind === 'create') {
+      advance(run);
+      return;
+    }
     if (p.kind === 'predict') {
       // Watch the test, then talk about what happened.
       const floats = p.meta?.floats === true;
@@ -142,11 +153,11 @@ export function LessonFlow(props: LessonFlowProps) {
       setChoiceState({ [choiceId]: 'right' });
       say(fb.message, 'happy');
       playSfx('click');
-      window.setTimeout(() => {
+      later(() => {
         setDropping({ floats });
         playSfx(floats ? 'plop' : 'splash');
       }, 700);
-      window.setTimeout(() => {
+      later(() => {
         const matched = (choiceId === 'float') === floats;
         say(
           matched
@@ -156,7 +167,7 @@ export function LessonFlow(props: LessonFlowProps) {
         );
         playSfx(matched ? 'correct' : 'sparkle');
       }, 2600);
-      window.setTimeout(() => {
+      later(() => {
         setBusy(false);
         advance(run);
       }, 4600);
@@ -190,7 +201,7 @@ export function LessonFlow(props: LessonFlowProps) {
       return;
     }
     setBusy(true);
-    window.setTimeout(() => {
+    later(() => {
       setBusy(false);
       advance(run);
     }, 2200);
@@ -200,7 +211,7 @@ export function LessonFlow(props: LessonFlowProps) {
   const problem = run?.currentProblem();
 
   return (
-    <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} speech={speech} wide={phase === 'play'}>
+    <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} closeDisabled={saving} speech={speech} wide={phase === 'play'}>
       {phase === 'intro' && (
         <>
           <Choices
@@ -226,7 +237,26 @@ export function LessonFlow(props: LessonFlowProps) {
             ))}
           </div>
           <LessonStage visual={problem.visual} seed={hashString(problem.id)} dropping={dropping} />
-          <Choices items={problem.choices} onPick={answer} state={choiceState} columns={problem.choices.length > 3 ? 2 : problem.choices.length} />
+          {problem.kind === 'create' ? (
+            <PatternMaker key={problem.id} onFinish={answer} disabled={busy} />
+          ) : (
+            <Choices items={problem.choices} onPick={answer} state={choiceState} columns={problem.choices.length > 3 ? 2 : problem.choices.length} />
+          )}
+          {lesson.id === 'patterns-shapes' && (
+            <button
+              type="button"
+              className="pattern-skip"
+              disabled={busy}
+              onClick={() => {
+                if (run) {
+                  run.skip();
+                  advance(run);
+                }
+              }}
+            >
+              Skip this round
+            </button>
+          )}
         </div>
       )}
       {phase === 'complete' && (
@@ -240,9 +270,22 @@ export function LessonFlow(props: LessonFlowProps) {
             ))}
           </div>
           <Choices
-            items={[{ id: 'yay', label: 'Yay!', icon: '🎉', tone: 'primary' }]}
-            onPick={() => {
+            items={[
+              { id: 'yay', label: 'Yay!', icon: '🎉', tone: 'primary' },
+              ...(lesson.id === 'patterns-shapes' ? [{ id: 'replay', label: 'Play again', icon: '🎨' }] : []),
+            ]}
+            onPick={(id) => {
+              if (submitted.current) return;
+              if (id === 'replay') {
+                startedAt.current = new Date().toISOString();
+                seed.current = hashString(startedAt.current + lesson.id);
+                transcript.current = [];
+                start();
+                return;
+              }
               playSfx('click');
+              submitted.current = true;
+              setSaving(true);
               if (run) props.onComplete(run, transcript.current, startedAt.current, talk.notes);
             }}
           />

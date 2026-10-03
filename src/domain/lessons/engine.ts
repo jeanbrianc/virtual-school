@@ -8,6 +8,7 @@
  *  • If the ladder is exhausted we model the answer together, record
  *    "not yet", and step difficulty down. No penalties, no lost points.
  */
+import { randomIds } from '../util/ids';
 import type { ProblemAttemptRecord } from '../types';
 import { createRng, type Rng } from '../util/random';
 import type { LessonDefinition, Problem, ScaffoldType } from './types';
@@ -42,6 +43,7 @@ interface MainState {
 export const ENCOURAGEMENTS_RETRY = ['Almost! Let’s try another way.', 'Good thinking — let’s look again together.', 'Ooh, close! Let’s use a clue.'] as const;
 
 export class LessonRun {
+  readonly id = randomIds('run');
   readonly definition: LessonDefinition;
   readonly startTier: number;
   private tier: number;
@@ -120,9 +122,14 @@ export class LessonRun {
 
     const state = this.main;
     const problem = state.problem;
-    state.responses.push(choiceId);
 
     // Predictions are never wrong — making one is the skill.
+    if (problem.kind === 'create') {
+      if (!/^(circle|triangle|square)( (circle|triangle|square)){3}$/.test(choiceId)) throw new Error('Choose four shapes');
+      state.responses.push(choiceId);
+      return this.finishProblem('independent', problem.success);
+    }
+    state.responses.push(choiceId);
     if (problem.kind === 'predict') {
       return this.finishProblem('independent', problem.success);
     }
@@ -166,6 +173,13 @@ export class LessonRun {
     return this.finishProblem('not_yet', problem.model, { type: 'model', text: problem.model, manipulatives: true });
   }
 
+  skip(): LessonFeedback {
+    if (!this.main || this.complete) throw new Error('Lesson is not active');
+    this.stepping = null;
+    this.main.scaffolds.push('skipped');
+    return this.finishProblem('not_yet', 'We can try that another time.');
+  }
+
   private retry(message: string, scaffold: ActiveScaffold): LessonFeedback {
     return { correct: false, message, scaffold, problemFinished: false, tierChange: null, lessonComplete: false };
   }
@@ -185,7 +199,7 @@ export class LessonRun {
     });
 
     let tierChange: LessonFeedback['tierChange'] = null;
-    if (p.kind !== 'predict') {
+    if (p.kind !== 'predict' && p.kind !== 'create') {
       if (outcome === 'independent') {
         this.streak += 1;
         if (this.streak >= 2 && this.tier < this.definition.tiers.length - 1) {
@@ -266,6 +280,7 @@ export function tallyBySkill(records: readonly ProblemAttemptRecord[], problems?
     map.set(skillId, t);
   };
   for (const r of records) {
+    if (problems?.get(r.problemId)?.kind === 'create' || r.scaffolds.includes('skipped')) continue;
     bump(r.skillId, r.outcome, r.tier);
     for (const extra of problems?.get(r.problemId)?.alsoSkills ?? []) bump(extra, r.outcome, r.tier);
   }

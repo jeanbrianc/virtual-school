@@ -10,7 +10,7 @@ import { createTeacher } from '../../src/engine/characters/teachers';
 import { parseSpeakInput } from '../../scripts/ai-helper/openai';
 
 it('every stable teacher has a complete profile, curriculum activity, local voice and scene', () => {
-  assert.deepEqual(TEACHER_IDS, ['hoot', 'digit', 'nova']);
+  assert.deepEqual(TEACHER_IDS, ['hoot', 'digit', 'pippa', 'nova']);
   assert.equal(new Set(TEACHER_IDS).size, TEACHER_IDS.length);
   for (const id of TEACHER_IDS) {
     const r = TEACHER_REGISTRY[id],
@@ -49,7 +49,7 @@ it('unknown, retired and prototype IDs are rejected or shown safely; existing sa
     assert.throws(() => createTeacher(id as TeacherId, 0), /Unknown teacher/);
     assert.match(localTeacherReply({ teacherId: id as TeacherId, childName: 'Learner', utterance: 'Hello', history: [], books: [] }).reply, /grown-up/);
   }
-  for (const id of ['hoot', 'digit', 'nova']) {
+  for (const id of ['hoot', 'digit', 'pippa', 'nova']) {
     assert.equal(isTeacherId(id), true);
     assert.equal(teacherDisplayName(id), TEACHERS[id as TeacherId].name);
   }

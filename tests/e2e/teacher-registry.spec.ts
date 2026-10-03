@@ -11,6 +11,7 @@ test('existing teachers keep their introductions and working offline activities'
   ).toEqual([
     ['hoot', 'hoot'],
     ['digit', 'digit'],
+    ['pippa', 'pippa'],
     ['nova', 'nova'],
   ]);
   for (const [id, name] of [
