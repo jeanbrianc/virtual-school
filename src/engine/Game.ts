@@ -66,6 +66,7 @@ const REWARD_SHOTS: Record<string, { pos: [number, number, number]; look: [numbe
   greenhouse: { pos: [9.5, 4.5, -1.5], look: [16.5, 1, -4] },
   museum: { pos: [-7.5, 3.6, 2.5], look: [-10.5, 1.2, 6.5] },
   science: { pos: [7.5, 3.4, -3.5], look: [9, 1.2, -8.2] },
+  pippa: { pos: [-1.3, 2.7, 6.8], look: [-3.6, 1.2, 4.4] },
   aquarium: { pos: [10.8, 2.3, -6.0], look: [13.4, 1.1, -7.9] },
   classroom: { pos: [0, 4.2, 9.5], look: [0, 1.8, 3.5] },
   mobile: { pos: [0, 2.2, 2.0], look: [0, 3.2, -4.4] },

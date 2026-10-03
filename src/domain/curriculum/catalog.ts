@@ -840,6 +840,26 @@ export const SKILLS: Skill[] = defineSkills({
     standards: [dci('ESS2.A', 'Earth materials and systems: wind and water change the shape of the land.')],
     idea: 'Start a rock collection sorted by color, texture and size.',
   },
+  'reason.visual-patterns': {
+    strand: 'reason.logic',
+    name: 'Copying and extending visual patterns',
+    can: 'copy and extend a repeating two-shape pattern',
+    childName: 'Pattern Explorer',
+    difficulty: 0,
+    standards: [family('Copy and extend a repeating two-element visual pattern.')],
+    lessons: ['patterns-shapes'],
+    idea: 'Make a circle-triangle pattern with paper shapes and choose what comes next.',
+  },
+  'art.shape-design': {
+    strand: 'create.art',
+    name: 'Original shape design',
+    can: 'choose and arrange shapes in an original design',
+    childName: 'Shape Designer',
+    difficulty: 0,
+    standards: [family('Explore an original arrangement of shapes without a right-or-wrong grade.')],
+    lessons: ['patterns-shapes'],
+    idea: 'Arrange paper shapes freely and describe the design together.',
+  },
   // ── Reasoning ───────────────────────────────────────────────────────────
   'reason.sequencing': {
     strand: 'reason.logic',

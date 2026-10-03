@@ -4,11 +4,11 @@ export interface TeacherRegistration {
   domains: readonly DomainId[];
   local: { questions: readonly string[]; shares: readonly string[]; likes: string; unclear: string };
   activity: { kind: 'reading' } | { kind: 'lesson'; lessonId: string };
-  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda'; icon: string };
+  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox'; icon: string };
   room: string;
   startLabel: string;
   completionIcon: string;
-  celebration: { icon: string; anchor: 'rocket' | 'aquarium'; message: string };
+  celebration: { icon: string; anchor: 'rocket' | 'aquarium' | 'pippa'; message: string };
 }
 
 /** Stable IDs are persisted. Profiles and scene factories must implement every entry. */
@@ -42,6 +42,21 @@ export const TEACHER_REGISTRY = {
     startLabel: 'Let’s rescue them!',
     completionIcon: '🪨',
     celebration: { icon: '🚀', anchor: 'rocket', message: 'You helped Digit on another moon mission.' },
+  },
+  pippa: {
+    domains: ['creativity', 'reasoning'],
+    activity: { kind: 'lesson', lessonId: 'patterns-shapes' },
+    scene: { x: -3.6, z: 4.4, model: 'fox', icon: '🎨' },
+    room: 'the shape studio, where you copy and extend patterns and make a design',
+    startLabel: 'Let’s make shapes!',
+    completionIcon: '🎨',
+    celebration: { icon: '🎨', anchor: 'pippa', message: 'Pippa enjoyed exploring shapes with you!' },
+    local: {
+      questions: ['A pattern repeats a little group of shapes. What shapes can you notice?', 'You can try a different shape and see how your design changes.'],
+      shares: ['Tell me about the shapes you chose!', 'You can make a design in your own way.'],
+      likes: 'You love {likes}? Let’s imagine a shape design about it!',
+      unclear: 'Shall we copy a shape pattern or make a design?',
+    },
   },
   nova: {
     local: {

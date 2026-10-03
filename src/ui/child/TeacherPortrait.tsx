@@ -12,6 +12,17 @@ export function TeacherPortrait({ id, mood = 'happy', size = 120 }: { id: Teache
         </text>
       </svg>
     );
+  if (id === 'pippa')
+    return (
+      <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Pippa the fox">
+        <circle cx="60" cy="60" r="58" fill="#b3cfbd" />
+        <path d="M25 52 24 14 49 33 71 33 96 14 95 52Q102 98 60 109Q18 98 25 52" fill="#bc7044" />
+        <path d="M28 66 60 82 92 66Q86 103 60 105Q34 103 28 66" fill="#fff0d6" />
+        <circle cx="43" cy="57" r="5" fill="#33291f" />
+        <circle cx="77" cy="57" r="5" fill="#33291f" />
+        <path d="M54 80h12l-6 8z" fill="#33291f" />
+      </svg>
+    );
   const blinkClass = 'portrait-blink';
   if (id === 'hoot') {
     return (

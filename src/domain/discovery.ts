@@ -22,6 +22,7 @@ export const DISCOVERABLE_IDS = [
   'digit',
   'rocket',
   'nova',
+  'pippa',
   'tank',
   'museum',
   'trophies',

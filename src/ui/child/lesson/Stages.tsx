@@ -3,6 +3,7 @@
  * craters to compare, rockets to share into, and Nova's sink-or-float tank.
  * Every stage is touchable — manipulatives are always available.
  */
+import { SHAPES, SHAPE_SYMBOLS, type Shape } from '../../../domain/lessons/patterns';
 import { useEffect, useMemo, useState } from 'react';
 import type { LessonVisual } from '../../../domain/lessons/types';
 import { getTestObject } from '../../../domain/lessons/sinkFloat';
@@ -118,6 +119,17 @@ function TankStage({ objectId, showResult, floats, dropping }: { objectId: strin
 
 export function LessonStage({ visual, seed, dropping }: { visual: LessonVisual; seed: number; dropping?: { floats: boolean } | null }) {
   switch (visual.type) {
+    case 'pattern':
+      return (
+        <div className="stage pattern-row" aria-label="Pattern to copy">
+          {visual.shapes.map((shape, i) => (
+            <span key={i} className="pattern-shape" data-shape={shape}>
+              <span aria-hidden="true">{SHAPE_SYMBOLS[shape]}</span>
+              <small>{shape}</small>
+            </span>
+          ))}
+        </div>
+      );
     case 'rocks':
       return (
         <div className="stage stage-rocks">
@@ -181,4 +193,37 @@ export function LessonStage({ visual, seed, dropping }: { visual: LessonVisual; 
     default:
       return null;
   }
+}
+
+export function PatternMaker({ onFinish, disabled = false }: { onFinish: (design: string) => void; disabled?: boolean }) {
+  const [shapes, setShapes] = useState<Shape[]>([]);
+  return (
+    <div className="pattern-maker">
+      <div className="pattern-row" aria-label="Your design" aria-live="polite">
+        {Array.from({ length: 4 }, (_, i) => (
+          <span className="pattern-shape" key={i}>
+            {shapes[i] ? `${SHAPE_SYMBOLS[shapes[i]!]} ${shapes[i]}` : `Shape ${i + 1}`}
+          </span>
+        ))}
+      </div>
+      <div className="pattern-controls">
+        {SHAPES.map((shape) => (
+          <button type="button" key={shape} disabled={disabled || shapes.length === 4} onClick={() => setShapes((s) => [...s, shape])}>
+            Add {shape}
+          </button>
+        ))}
+      </div>
+      <div className="pattern-controls">
+        <button type="button" disabled={disabled || !shapes.length} onClick={() => setShapes((s) => s.slice(0, -1))}>
+          Undo shape
+        </button>
+        <button type="button" disabled={disabled || !shapes.length} onClick={() => setShapes([])}>
+          Clear design
+        </button>
+        <button type="button" disabled={disabled || shapes.length !== 4} onClick={() => onFinish(shapes.join(' '))}>
+          Finish my design
+        </button>
+      </div>
+    </div>
+  );
 }

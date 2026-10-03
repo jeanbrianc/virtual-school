@@ -1,3 +1,4 @@
+import type { Shape } from './patterns';
 import type { Rng } from '../util/random';
 
 export interface LessonChoice {
@@ -8,6 +9,7 @@ export interface LessonChoice {
 }
 
 export type LessonVisual =
+  | { type: 'pattern'; shapes: readonly Shape[] }
   | { type: 'none' }
   | { type: 'rocks'; groups: number[]; removed?: number }
   | { type: 'compare'; left: number; right: number }
@@ -17,7 +19,7 @@ export type LessonVisual =
   | { type: 'objects'; objectIds: string[] }
   | { type: 'book'; bookId: string };
 
-export type ProblemKind = 'answer' | 'predict';
+export type ProblemKind = 'answer' | 'predict' | 'create';
 
 export interface Problem {
   id: string;
