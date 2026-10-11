@@ -57,6 +57,7 @@ export function buildSnapshot(input: SnapshotInputs, skillDomain: (skillId: stri
   for (const [topic, sources] of topicSources) snap.topicCounts[topic] = sources.size;
 
   for (const l of input.lessons) {
+    if (l.complete === false) continue;
     snap.lessonCompletions[l.lessonId] = (snap.lessonCompletions[l.lessonId] ?? 0) + 1;
     snap.totalLessons += 1;
   }

@@ -24,6 +24,7 @@ export const DISCOVERABLE_IDS = [
   'nova',
   'pippa',
   'tank',
+  'globe',
   'museum',
   'trophies',
   'nature',
@@ -66,6 +67,14 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 export function describeDiscovery(id: string, ctx: DiscoveryContext): Discovery | null {
   const { name, world, snapshot } = ctx;
   switch (id) {
+    case 'globe':
+      return {
+        id,
+        icon: '🌍',
+        title: 'Our globe',
+        text: 'A globe is a model of Earth. Explore a flat map with Nova: find five US states, or choose a harder country adventure. You can use the map or the list, ask for help, or skip a place.',
+        action: { label: 'Explore with Nova', target: 'globe', icon: '🌍' },
+      };
     case 'bookshelf':
       return {
         id,

@@ -2562,3 +2562,29 @@ button.treasure {
     max-width: calc(100% - 270px);
   }
 }
+
+/* Map scroll stays inside the sheet; every shape has a full-size list alternative. */
+.geography-map {
+  overflow: auto;
+  max-height: 32vh;
+  background: #e4f3fa;
+  border-radius: 18px;
+}
+.geography-map svg {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+}
+.geography-map path {
+  cursor: pointer;
+}
+.geography-map path:focus {
+  stroke: #172f29;
+  stroke-width: 3;
+  outline: none;
+}
+.dialogue-content > select {
+  width: 100%;
+  min-height: 48px;
+  font-size: 1rem;
+}

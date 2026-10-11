@@ -15,6 +15,8 @@ export const LESSON_TITLES: Record<string, { title: string; childTitle: string; 
   'keyboard-trail': { title: 'Keyboard trail (letter/key familiarity)', childTitle: 'Keyboard trail', teacherId: 'hoot' },
   'moon-rocks': { title: moonRocksLesson.title, childTitle: moonRocksLesson.childTitle, teacherId: 'digit' },
   'sink-float': { title: sinkFloatLesson.title, childTitle: sinkFloatLesson.childTitle, teacherId: 'nova' },
+  'globe-states': { title: 'US State Adventure', childTitle: 'US states', teacherId: 'nova' },
+  'globe-countries': { title: 'World Country Adventure', childTitle: 'World countries', teacherId: 'nova' },
   'story-chat': { title: 'Story Chat (book comprehension conversation)', childTitle: 'Story Chat', teacherId: 'hoot' },
 };
 

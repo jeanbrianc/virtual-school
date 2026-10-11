@@ -50,6 +50,8 @@ import { appStore } from '../../state/appState';
 import { useStore } from '../../state/store';
 import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
+import { GlobeFlow } from './flows/GlobeFlow';
+import { recordPractice } from '../../services/practiceService';
 import { KeyboardFlow } from './flows/KeyboardFlow';
 import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
@@ -60,6 +62,7 @@ import { useChildWorld, type ChildWorldData } from './useChildWorld';
 import type { TalkAvailability } from '../../voice/SpeechService';
 
 type Overlay =
+  | { kind: 'globe' }
   | { kind: 'keyboard' }
   | { kind: 'hoot' }
   | { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number }
@@ -386,7 +389,7 @@ export function ChildMode({ childId }: { childId: string }) {
       if (!d || !game || overlayRef.current) return;
       setShowControls(false);
       const state = appStore.get().preview?.world ?? d.world;
-      if (appStore.get().preview && (teacherForInteraction(id) || id === 'alphabet')) {
+      if (appStore.get().preview && (teacherForInteraction(id) || id === 'alphabet' || id === 'globe')) {
         setHint({ icon: '✨', title: 'Preview mode', text: 'This is a peek at the future school. Lessons are paused in preview.' });
         return;
       }
@@ -404,6 +407,13 @@ export function ChildMode({ childId }: { childId: string }) {
         teacherForSpeech.current = 'hoot';
         game.setInputEnabled(false);
         setOverlay({ kind: 'keyboard' });
+        return;
+      }
+      if (id === 'globe') {
+        if (appStore.get().preview) return;
+        teacherForSpeech.current = 'nova';
+        game.setInputEnabled(false);
+        setOverlay({ kind: 'globe' });
         return;
       }
       if (id === 'circuit') {
@@ -598,6 +608,7 @@ export function ChildMode({ childId }: { childId: string }) {
     if (!FEATURE_FLAGS.automationHooks) return;
     (window as unknown as { __izzy?: unknown }).__izzy = {
       game: () => gameRef.current,
+      savePractice: (run: Parameters<typeof recordPractice>[2]) => recordPractice(ctx, childId, run),
       saveKeyboardTrail: (run: Parameters<typeof recordKeyboardTrail>[2]) => recordKeyboardTrail(ctx, childId, run),
       interact: (id: string) => void handleInteract(id),
       walkTo: (id: string) => gameRef.current?.interactById(id),
@@ -975,6 +986,16 @@ export function ChildMode({ childId }: { childId: string }) {
               onClose={closeSheet}
               onSave={async (run) => {
                 await recordKeyboardTrail(ctx, childId, run);
+                await reload();
+              }}
+            />
+          )}
+          {overlay?.kind === 'globe' && (
+            <GlobeFlow
+              speech={speech}
+              onClose={closeSheet}
+              onRecord={async (progress) => {
+                await recordPractice(ctx, childId, progress);
                 await reload();
               }}
             />
