@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { it } from 'node:test';
 import { recordPractice, type PracticeProgress } from '../../src/services/practiceService';
 import type { ProblemAttemptRecord } from '../../src/domain/types';
-import { makeContext } from './helpers';
+import { generateReport } from '../../src/domain/reports/reportGenerator';
+import { makeContext, makeFamily } from './helpers';
 
 const round = (n: number): ProblemAttemptRecord => ({
   problemId: `r${n}`,
@@ -93,4 +94,42 @@ it('two IndexedDB connections cannot overwrite each other’s cumulative progres
     indexedDB.deleteDatabase(name);
     globalThis.indexedDB = previous;
   }
+});
+
+it('reports exclude cancelled partial adventures but retain completed and historical attempts', async () => {
+  const { ctx, repos, clock } = makeContext('2026-09-26T15:05:00.000Z');
+  const { children } = await makeFamily(ctx, ['Synthetic']);
+  const child = children[0]!;
+  const run = { ...progress(1), id: 'synthetic-partial', startedAt: '2026-09-26T15:00:00.000Z' };
+  await recordPractice(ctx, child.id, run);
+  const input = {
+    child,
+    books: [],
+    sessions: [],
+    activities: [],
+    evidence: [],
+    mastery: [],
+    lessons: await repos.lessonAttempts.all(),
+    unlocks: [],
+    portfolio: [],
+  };
+  const request = { audience: 'parent' as const, start: '2026-09-01', end: '2026-09-30', now: clock.now().toISOString() };
+  const partial = generateReport(input, request);
+  assert.equal(partial.stats.find((s) => s.label === 'Lessons')!.value, '0');
+  assert.equal(partial.stats.find((s) => s.label === 'Recorded time')!.value, '—');
+  assert.match(partial.narrative.join(' '), /0 in-app lessons/);
+  assert.equal(generateReport(input, { ...request, audience: 'family' }).stats.find((s) => s.label === 'Adventures')!.value, '0');
+
+  await recordPractice(ctx, child.id, { ...run, id: 'synthetic-completed', problems: progress(5).problems, complete: true });
+  const completed = (await repos.lessonAttempts.get('synthetic-completed'))!;
+  const { complete: _complete, ...historical } = completed;
+  await repos.lessonAttempts.put({ ...historical, id: 'synthetic-legacy', lessonId: 'retired-unknown' });
+  await repos.lessonAttempts.put({ ...completed, id: 'synthetic-outside', completedAt: '2026-08-26T15:05:00.000Z' });
+  input.lessons = await repos.lessonAttempts.all();
+  const report = generateReport(input, request);
+  assert.equal(report.stats.find((s) => s.label === 'Lessons')!.value, '2');
+  assert.match(report.narrative.join(' '), /2 in-app lessons/);
+  assert.equal(generateReport(input, { ...request, audience: 'family' }).stats.find((s) => s.label === 'Adventures')!.value, '2');
+  assert.equal(report.stats.find((s) => s.label === 'Recorded time')!.value, '10 minutes');
+  assert.equal((await repos.lessonAttempts.get(run.id))!.complete, false);
 });
