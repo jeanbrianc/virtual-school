@@ -88,7 +88,7 @@ export function generateReport(input: ReportInputs, req: ReportRequest): ReportC
   const booksReading = input.books.filter((b) => b.status === 'reading');
   const activities = input.activities.filter((a) => inPeriod(a.date)).sort((a, b) => a.date.localeCompare(b.date));
   const evidence = input.evidence.filter((e) => inPeriod(dayFromTimestamp(e.observedAt)));
-  const lessons = input.lessons.filter((l) => inPeriod(dayFromTimestamp(l.completedAt)));
+  const lessons = input.lessons.filter((l) => l.complete !== false && inPeriod(dayFromTimestamp(l.completedAt)));
   const unlocks = input.unlocks.filter((u) => inPeriod(dayFromTimestamp(u.unlockedAt)));
   const sessions = input.sessions.filter((s) => inPeriod(s.date));
   const portfolio = input.portfolio.filter((p) => inPeriod(p.date));

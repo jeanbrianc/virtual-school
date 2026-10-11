@@ -346,10 +346,12 @@ export interface ProblemAttemptRecord {
   prompt: string;
   responses: string[];
   scaffolds: string[];
-  outcome: 'independent' | 'supported' | 'not_yet';
+  outcome: 'independent' | 'supported' | 'not_yet' | 'skipped';
 }
 
 export interface LessonAttempt {
+  /** False for a saved, unfinished practice adventure; absent preserves historical completions. */
+  complete?: boolean;
   id: ID;
   childId: ID;
   lessonId: string;

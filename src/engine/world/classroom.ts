@@ -139,6 +139,17 @@ export function buildClassroom(ctx: BuildContext, today: Date): AlphabetBanner {
   globe.add(earth, meridian, cyl(0.03, 0.03, 0.85, mat(PALETTE.walnut), 0, 0.45, 0), cyl(0.22, 0.26, 0.06, mat(PALETTE.walnut), 0, 0.03, 0));
   globe.position.set(4.3, 0, -7.4);
   ctx.add(globe);
+  ctx.interact({
+    id: 'globe',
+    kind: 'object',
+    label: 'Explore the map',
+    icon: '🌍',
+    position: new THREE.Vector3(4.3, 1.25, -7.4),
+    approach: new THREE.Vector3(4.3, 0, -6.3),
+    radius: 2,
+    object: globe,
+    markerHeight: 1.9,
+  });
   ctx.collide(4.3, -7.4, 0.6, 0.6);
   ctx.features.push({ apply: () => undefined, update: (dt) => (earth.rotation.y += dt * 0.25) });
 
