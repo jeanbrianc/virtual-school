@@ -2588,3 +2588,57 @@ button.treasure {
   min-height: 48px;
   font-size: 1rem;
 }
+
+/* Hoot's feeling choices share a generous, text-free target. */
+.choices-emoji .choice {
+  min-width: 0;
+  min-height: 80px;
+  padding: 12px;
+  justify-content: center;
+}
+.choices-emoji .choice-icon {
+  font-size: 2.5rem;
+}
+.star-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+.star-row .star-btn {
+  width: 100%;
+  min-width: 0;
+  height: 72px;
+  border-radius: 16px;
+  font: inherit;
+  color: #876633;
+}
+.star-row .star-btn.on {
+  background: #fff1bb;
+  border-color: #a26c00;
+}
+.star-btn:focus-visible,
+.choices-emoji .choice:focus-visible {
+  outline: 3px solid var(--terracotta-deep);
+  outline-offset: 3px;
+}
+.choices-emoji .choice-check {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 22px;
+  height: 22px;
+}
+.choices-emoji .choice-check svg {
+  width: 16px;
+  height: 16px;
+}
+@media (max-width: 360px) {
+  .dialogue[data-teacher='hoot'] {
+    padding: 14px;
+  }
+  .dialogue[data-teacher='hoot'] .dialogue-name {
+    padding-inline: 8px;
+    font-size: 0.9rem;
+  }
+}

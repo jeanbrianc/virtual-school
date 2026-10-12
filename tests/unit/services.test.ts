@@ -61,6 +61,25 @@ describe('book completion', () => {
     assert.ok(rec.portfolio.some((p) => p.kind === 'book' && p.title.includes('Frog and Toad')));
   });
 
+  it('preserves each 1–5 rating and leaves a skipped rating absent', async () => {
+    const { ctx } = makeContext();
+    const { children } = await makeFamily(ctx);
+    const id = children[0]!.id;
+    for (const rating of [undefined, 1, 2, 3, 4, 5]) {
+      const result = await completeBook(ctx, id, {
+        newBook: { title: `Synthetic rating ${rating ?? 'skip'}` },
+        answers: [],
+        ...(rating ? { rating } : {}),
+        startedAt: ctx.clock.now().toISOString(),
+        transcript: [],
+        source: 'child',
+      });
+      const saved = await ctx.repos.books.get(result.book.id);
+      assert.equal(saved?.childRating, rating);
+      assert.equal(Object.hasOwn(saved!, 'childRating'), rating !== undefined);
+    }
+  });
+
   it('assigns sequential shelf slots and unlocks the second shelf at 10 books', async () => {
     const { ctx } = makeContext();
     const { children } = await makeFamily(ctx);

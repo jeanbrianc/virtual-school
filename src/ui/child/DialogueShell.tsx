@@ -101,25 +101,33 @@ export function Choices({
   onPick,
   state,
   columns,
+  emojiOnly = false,
 }: {
   items: ChoiceItem[];
   onPick: (id: string) => void;
   state?: Record<string, 'right' | 'soft' | 'disabled'>;
   columns?: number;
+  emojiOnly?: boolean;
 }) {
   return (
-    <div className="choices" style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}>
+    <div className={`choices ${emojiOnly ? 'choices-emoji' : ''}`} style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}>
       {items.map((c) => (
         <button
           key={c.id}
           type="button"
+          aria-label={emojiOnly ? c.label : undefined}
+          aria-pressed={emojiOnly ? state?.[c.id] === 'right' : undefined}
           className={`choice ${c.tone === 'primary' ? 'choice-primary' : ''} ${state?.[c.id] ? `choice-${state[c.id]}` : ''}`}
           onClick={() => onPick(c.id)}
           disabled={state?.[c.id] === 'disabled'}
           data-testid={`choice-${c.id}`}
         >
-          {c.icon && <span className="choice-icon">{c.icon}</span>}
-          <span className="choice-label">{c.label}</span>
+          {c.icon && (
+            <span className="choice-icon" aria-hidden="true">
+              {c.icon}
+            </span>
+          )}
+          <span className={emojiOnly ? 'sr-only' : 'choice-label'}>{c.label}</span>
           {c.hint && <span className="choice-hint">{c.hint}</span>}
           {state?.[c.id] === 'right' && (
             <span className="choice-check">

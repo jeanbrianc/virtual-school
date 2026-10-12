@@ -3,7 +3,7 @@
  * fallback, and a hook that runs a free conversation through the teacher
  * chat service (on-device, or an AI teacher when a parent turned it on).
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EMPTY_TOPIC, nextTopic, type ChatTopic, type ChatTurn, type TeacherChatReply, type TeacherChatService } from '../../domain/teachers/chat';
 import type { TeacherId } from '../../domain/teachers/teachers';
 import type { BookStatus, TranscriptLine } from '../../domain/types';
@@ -77,8 +77,34 @@ export function MicButton({
 }) {
   const [listening, setListening] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const active = useRef(true);
+  const requestGeneration = useRef(0);
+  const inFlight = useRef(false);
+  const statusCallbacks = useRef({ onPreparing, onInterim });
+  statusCallbacks.current = { onPreparing, onInterim };
+  useEffect(() => {
+    active.current = true;
+    // A refreshed mic is a new operation source. Release the previous UI status
+    // while its generation guard continues to suppress obsolete results.
+    setPreparing(false);
+    setListening(false);
+    statusCallbacks.current.onPreparing?.(false);
+    statusCallbacks.current.onInterim?.('');
+    return () => {
+      active.current = false;
+      requestGeneration.current++;
+      inFlight.current = false;
+      mic.stop();
+    };
+  }, [mic]);
   const toggle = async () => {
-    if (preparing) return;
+    if (!active.current || preparing) return;
+    const token = requestGeneration.current;
+    const current = () => active.current && requestGeneration.current === token;
+    if (inFlight.current) {
+      if (listening) mic.stop();
+      return;
+    }
     if (listening) {
       mic.stop();
       return;
@@ -87,25 +113,49 @@ export function MicButton({
       onTrouble?.(mic.blocked);
       return;
     }
-    if (mic.needsSetup) {
-      setPreparing(true);
-      onPreparing?.(true);
-      const setup = await mic.prepare();
-      setPreparing(false);
-      onPreparing?.(false);
-      if (setup !== 'ready') {
-        onTrouble?.(setup === 'downloading' ? 'My ears are still getting ready. Try again in a minute!' : MIC_NEEDS_GROWNUP);
-        return;
+    try {
+      if (mic.needsSetup) {
+        inFlight.current = true;
+        setPreparing(true);
+        onPreparing?.(true);
+        const setup = await mic.prepare();
+        if (!current()) return;
+        inFlight.current = false;
+        setPreparing(false);
+        onPreparing?.(false);
+        if (setup !== 'ready') {
+          onTrouble?.(setup === 'downloading' ? 'My ears are still getting ready. Try again in a minute!' : MIC_NEEDS_GROWNUP);
+          return;
+        }
       }
+      inFlight.current = true;
+      setListening(true);
+      onInterim?.('');
+      const out = await mic.listen({
+        ...(phrases ? { phrases } : {}),
+        ...(onInterim
+          ? {
+              onInterim: (text: string) => {
+                if (current()) onInterim(text);
+              },
+            }
+          : {}),
+      });
+      if (!current()) return;
+      inFlight.current = false;
+      setListening(false);
+      onInterim?.('');
+      const text = out.result?.transcript.trim();
+      if (text) onHeard(text);
+      else onTrouble?.(MIC_TROUBLE[out.error ?? 'no-speech']);
+    } catch {
+      if (!current()) return;
+      inFlight.current = false;
+      setPreparing(false);
+      setListening(false);
+      onPreparing?.(false);
+      onTrouble?.(MIC_TROUBLE.unavailable);
     }
-    setListening(true);
-    onInterim?.('');
-    const out = await mic.listen({ ...(phrases ? { phrases } : {}), ...(onInterim ? { onInterim } : {}) });
-    setListening(false);
-    onInterim?.('');
-    const text = out.result?.transcript.trim();
-    if (text) onHeard(text);
-    else onTrouble?.(MIC_TROUBLE[out.error ?? 'no-speech']);
   };
   return (
     <button
@@ -219,14 +269,35 @@ export function useTeacherTalk(opts: {
   /** The conversation so far (the flow's transcript). */
   transcript: () => TranscriptLine[];
   log: (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via']) => void;
+  /** A flow transition invalidates its outstanding chat replies. */
+  generation?: () => number;
 }) {
   const [topic, setTopic] = useState<ChatTopic>(EMPTY_TOPIC);
   const topicRef = useRef<ChatTopic>(EMPTY_TOPIC);
   const [thinking, setThinking] = useState(false);
   const [lastReply, setLastReply] = useState<TeacherChatReply | null>(null);
   const notes = useRef<string[]>([]);
+  const active = useRef(true);
+  const generation = useRef(0);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      generation.current++;
+    };
+  }, []);
+  const reset = () => {
+    generation.current++;
+    topicRef.current = EMPTY_TOPIC;
+    notes.current = [];
+    setTopic(EMPTY_TOPIC);
+    setThinking(false);
+    setLastReply(null);
+  };
 
   const send = async (text: string, via?: 'voice' | 'typed'): Promise<TeacherChatReply> => {
+    const token = generation.current;
+    const flowToken = opts.generation?.();
     const history: ChatTurn[] = opts
       .transcript()
       .filter((l) => l.speaker !== 'system')
@@ -234,14 +305,21 @@ export function useTeacherTalk(opts: {
       .map((l) => ({ speaker: l.speaker === 'teacher' ? 'teacher' : 'child', text: l.text }));
     opts.log('child', text, via);
     setThinking(true);
-    const reply = await opts.kit.chat.respond({
-      teacherId: opts.teacher,
-      childName: opts.childName,
-      utterance: text,
-      history,
-      books: opts.books,
-      ...(topicRef.current.book ? { topic: topicRef.current.book } : {}),
-    });
+    let reply: TeacherChatReply;
+    try {
+      reply = await opts.kit.chat.respond({
+        teacherId: opts.teacher,
+        childName: opts.childName,
+        utterance: text,
+        history,
+        books: opts.books,
+        ...(topicRef.current.book ? { topic: topicRef.current.book } : {}),
+      });
+    } catch (error) {
+      if (active.current && generation.current === token && opts.generation?.() === flowToken) setThinking(false);
+      throw error;
+    }
+    if (!active.current || generation.current !== token || opts.generation?.() !== flowToken) return reply;
     setThinking(false);
     topicRef.current = nextTopic(topicRef.current, reply);
     setTopic(topicRef.current);
@@ -258,5 +336,5 @@ export function useTeacherTalk(opts: {
     setTopic(topicRef.current);
   };
 
-  return { send, markFinished, topic, thinking, lastReply, notes: notes.current };
+  return { send, reset, markFinished, topic, thinking, lastReply, notes: notes.current };
 }
