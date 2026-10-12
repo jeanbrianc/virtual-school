@@ -38,8 +38,8 @@ Five fixed 84px targets plus gaps could overflow a narrow dialogue.
 
 ## Validation
 
-`npm run check` passed: TypeScript, repository lint/formatting, all **219 unit
- tests**, and production build. `git diff --check` passed. New unit coverage
+`npm run check` passed: TypeScript, repository lint/formatting, all **233 unit
+tests**, and production build. `git diff --check` passed. New unit coverage
 checks completed history versus unknown history and stored 1–5/omitted ratings.
 All testing used synthetic fixtures; no production learner writes or billable
 voice calls were made.
@@ -66,3 +66,45 @@ PLAYWRIGHT_CHANNEL=chrome npm run test:e2e -- --project=desktop tests/e2e/hoot-m
 UX choices for review: emoji-only treatment is scoped to feeling responses;
 book titles and book-specific comprehension/favorite replies retain necessary
 text. Feeling and rating now require Next to allow correction before continuing.
+
+
+## Independent-review cancellation correction
+
+The independent review of `2ca3fe13eba908446a15c43943462974e9413ba2`
+identified two real gaps in the original cancellation claim: deferred favorite
+microphone callbacks could resurrect a canceled draft, and deferred start/progress
+callbacks could replace the reset menu. Both were corrected in the follow-up.
+
+Every Hoot step transition invalidates the previous operation generation,
+clears scheduled work, and stops microphone listening. Back and Close also reset
+the conversational topic, notes, pending status, and live title/trouble state.
+Unmount invalidates all outstanding callbacks. Deferred chat, start, progress,
+and microphone callbacks check their generation before logging, speaking,
+changing the current UI, or preparing a completion. Microphone cleanup also
+blocks an obsolete preparation from starting a listener after its view is removed.
+Dispatched start/progress persistence cannot be rolled back by Back; Back cancels
+the presentation/draft and discards obsolete replies, while an already dispatched
+write may still complete. Transcripts passed to those writes are snapshots.
+
+`tests/unit/hoot-cancellation.test.ts` mounts the actual React components with
+`react-test-renderer`, synthetic deferred services/microphones, and mocked timers.
+The suite runs without a DOM/browser, network, or voice service; only cover canvas
+and reduced-motion environment surfaces are stubbed. All **14 regression checks**
+pass, including stale favorite callbacks after Back/Close/unmount, captured callbacks
+against a replacement draft, stale start/progress/chat replies, microphone
+preparation, scheduled saves, and legitimate current-session start/chat/favorite
+responses, plus retry after a current chat failure. Running the original 13 cancellation checks on an isolated copy of the previous commit
+produced **9 failures and 4 passes**, demonstrating the regressions are detected.
+
+Final aggregate checks pass with **233 tests**, TypeScript, repository lint,
+production build, and diff checks. The E2E bundle also builds. Browser cases remain
+unrun/blocked as recorded above; no new browser success or screenshots are claimed.
+The renderer is a pinned development-only dependency and emits its upstream
+React deprecation notice; tests use real hooks/lifecycles, not a custom hook driver.
+
+Reproduce the component checks with:
+
+```sh
+node --import tsx --test tests/unit/hoot-cancellation.test.ts
+npm run check
+```

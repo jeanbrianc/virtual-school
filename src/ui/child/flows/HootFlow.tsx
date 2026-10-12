@@ -70,7 +70,11 @@ export function HootFlow(props: HootFlowProps) {
   const startedAt = useRef(new Date().toISOString());
   const transcript = useRef<TranscriptLine[]>([]);
   const seed = useRef(hashString(startedAt.current));
-  const [step, setStep] = useState<Step>({ kind: 'menu' });
+  const [step, updateStep] = useState<Step>({ kind: 'menu' });
+  const generation = useRef(0);
+  const mounted = useRef(true);
+  const renderGeneration = generation.current;
+  const isCurrent = () => mounted.current && generation.current === renderGeneration;
   const [book, setBook] = useState<Book | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newBookInput, setNewBookInput] = useState<{ title: string; author?: string; catalogId?: string } | null>(null);
@@ -82,15 +86,35 @@ export function HootFlow(props: HootFlowProps) {
   const locked = useRef(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = (fn: () => void, ms: number) => {
-    timers.current.push(setTimeout(fn, ms));
+    const token = generation.current;
+    timers.current.push(
+      setTimeout(() => {
+        if (mounted.current && generation.current === token) fn();
+      }, ms),
+    );
   };
-  const cancelPending = () => {
+  const invalidate = () => {
+    generation.current++;
+    props.talk.mic?.stop();
     timers.current.forEach(clearTimeout);
     timers.current = [];
+  };
+  const setStep = (next: Step) => {
+    invalidate();
+    updateStep(next);
+  };
+  const cancelPending = () => {
+    invalidate();
     locked.current = false;
     setBusy(false);
   };
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      invalidate();
+    };
+  }, []);
   const [favoriteText, setFavoriteText] = useState('');
   const [feeling, setFeeling] = useState<string | undefined>();
   const [chapters, setChapters] = useState(1);
@@ -116,6 +140,7 @@ export function HootFlow(props: HootFlowProps) {
     kit: props.talk,
     transcript: () => transcript.current,
     log,
+    generation: () => generation.current,
   });
   const mic = props.talk.mic;
   const typeHint = mic ? 'Tap the microphone and say it — or type it.' : 'You can ask a grown-up to help you type it.';
@@ -159,10 +184,15 @@ export function HootFlow(props: HootFlowProps) {
 
   const close = () => {
     cancelPending();
-    props.onClose(transcript.current, startedAt.current, talk.notes);
+    const notes = [...talk.notes];
+    talk.reset();
+    props.onClose(transcript.current, startedAt.current, notes);
   };
   const back = () => {
     cancelPending();
+    talk.reset();
+    setTitleLive('');
+    setMicTrouble('');
     runRef.current = null;
     ratingRef.current = 0;
     setRating(0);
@@ -181,10 +211,23 @@ export function HootFlow(props: HootFlowProps) {
 
   /** She said something to Hoot (voice, typing, or a quick-answer button). */
   const tellHoot = async (text: string, via?: 'voice' | 'typed') => {
-    if (busy || talk.thinking) return;
+    if (!isCurrent() || locked.current || busy || talk.thinking) return false;
     if (step.kind !== 'talk') setStep({ kind: 'talk' });
     setMicTrouble('');
-    const reply: TeacherChatReply = await talk.send(text, via);
+    locked.current = true;
+    const token = generation.current;
+    let reply: TeacherChatReply;
+    try {
+      reply = await talk.send(text, via);
+    } catch {
+      if (mounted.current && generation.current === token) {
+        locked.current = false;
+        say('I couldn’t hear back just now. You can try again or use the library buttons.', 'happy');
+      }
+      return false;
+    }
+    if (!mounted.current || generation.current !== token) return false;
+    locked.current = false;
     let answer = reply.reply;
     const already = bookFor(reply.book?.existingBookId);
     if (already?.status === 'completed' && reply.intent !== 'safety' && reply.intent !== 'share' && reply.intent !== 'unclear') {
@@ -192,6 +235,7 @@ export function HootFlow(props: HootFlowProps) {
     }
     const m = reply.intent === 'finished_book' || reply.intent === 'read_to_someone' ? 'cheer' : reply.intent === 'question' ? 'thinking' : 'happy';
     say(answer, m, reply.source === 'ai' ? 'ai' : undefined);
+    return true;
   };
 
   /** "Put it on my shelf!" — the book she talked about goes into the usual story chat. */
@@ -253,6 +297,7 @@ export function HootFlow(props: HootFlowProps) {
 
   /** A title she typed or picked: finish it now, or start it as her current book. */
   const submitNewBook = async (mode: 'finish' | 'start', input: { title: string; author?: string; catalogId?: string }) => {
+    if (!isCurrent() || locked.current) return;
     log('child', input.title);
     if (mode === 'finish') {
       setNewBookInput(input);
@@ -260,8 +305,22 @@ export function HootFlow(props: HootFlowProps) {
       startQuestions(null, input.catalogId);
       return;
     }
+    locked.current = true;
     setBusy(true);
-    const reply = await props.onStartBook(input, transcript.current, startedAt.current);
+    const token = generation.current;
+    let reply: string;
+    try {
+      reply = await props.onStartBook(input, [...transcript.current], startedAt.current);
+    } catch {
+      if (mounted.current && generation.current === token) {
+        locked.current = false;
+        setBusy(false);
+        say('I couldn’t save that just now. Please try again.', 'happy');
+      }
+      return;
+    }
+    if (!mounted.current || generation.current !== token) return;
+    locked.current = false;
     setBusy(false);
     playSfx('sparkle');
     setStep({ kind: 'bye', line: reply });
@@ -320,7 +379,7 @@ export function HootFlow(props: HootFlowProps) {
   };
 
   const finish = (favoritePart?: string) => {
-    if (locked.current) return;
+    if (!isCurrent() || locked.current) return;
     locked.current = true;
     setBusy(true);
     setStep({ kind: 'bye', line: '' });
@@ -355,7 +414,15 @@ export function HootFlow(props: HootFlowProps) {
 
   // ── Render per step ──────────────────────────────────────────────────
   let content: React.ReactNode = null;
-  const talkBar = <TalkBar kit={props.talk} teacherName="Professor Hoot" busy={talk.thinking || busy} onSay={(t, via) => void tellHoot(t, via)} />;
+  const talkBar = (
+    <TalkBar
+      key={`${step.kind}-${generation.current}`}
+      kit={props.talk}
+      teacherName="Professor Hoot"
+      busy={talk.thinking || busy}
+      onSay={(t, via) => void tellHoot(t, via)}
+    />
+  );
   switch (step.kind) {
     case 'menu':
       content = (
@@ -373,6 +440,8 @@ export function HootFlow(props: HootFlowProps) {
                 close();
                 return;
               }
+              cancelPending();
+              talk.reset();
               log('child', id === 'finish' ? 'I finished a book!' : reading.length > 0 ? 'I read some more' : 'I’m reading a book');
               if (id === 'more' && reading.length + upNext.length === 0) {
                 setStep({ kind: 'newBook', mode: 'start' });
@@ -423,8 +492,14 @@ export function HootFlow(props: HootFlowProps) {
             items={items}
             onPick={(id) => {
               playSfx('click');
-              if (id === 'yes') void tellHoot('Yes, the whole book!').then(() => talk.markFinished(true));
-              else if (id === 'notyet') void tellHoot('Not yet').then(() => talk.markFinished(false));
+              if (id === 'yes')
+                void tellHoot('Yes, the whole book!').then((accepted) => {
+                  if (accepted && isCurrent()) talk.markFinished(true);
+                });
+              else if (id === 'notyet')
+                void tellHoot('Not yet').then((accepted) => {
+                  if (accepted && isCurrent()) talk.markFinished(false);
+                });
               else if (id === 'shelf') {
                 log('child', 'Put it on my shelf!');
                 finishFromTalk();
@@ -497,12 +572,16 @@ export function HootFlow(props: HootFlowProps) {
               phrases={props.talk.phrases}
               label="Say the book’s name"
               disabled={busy}
-              onInterim={(t) => setTitleLive(t)}
+              onInterim={(t) => {
+                if (isCurrent()) setTitleLive(t);
+              }}
               onTrouble={(m) => {
+                if (!isCurrent()) return;
                 setTitleLive('');
                 setMicTrouble(m);
               }}
               onHeard={(t) => {
+                if (!isCurrent()) return;
                 setTitleLive('');
                 setMicTrouble('');
                 log('child', t, 'voice');
@@ -643,18 +722,23 @@ export function HootFlow(props: HootFlowProps) {
             <MicButton
               mic={mic}
               label="Tell Professor Hoot"
-              onTrouble={() => say('Hoo? I didn’t quite hear that. You can tap one instead!', 'thinking')}
+              onTrouble={() => {
+                if (isCurrent()) say('Hoo? I didn’t quite hear that. You can tap one instead!', 'thinking');
+              }}
               onHeard={(heard) => {
+                if (!isCurrent()) return;
                 log('child', heard, 'voice');
                 finish(heard);
-                setStep({ kind: 'bye', line: '' });
               }}
             />
           )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (favoriteText.trim()) finish(favoriteText.trim());
+              if (favoriteText.trim()) {
+                log('child', favoriteText.trim(), 'typed');
+                finish(favoriteText.trim());
+              }
             }}
           >
             <input
@@ -675,7 +759,6 @@ export function HootFlow(props: HootFlowProps) {
               playSfx('click');
               log('child', m === '__skip' ? 'Skip favorite part' : m);
               finish(m === '__skip' ? undefined : m);
-              setStep({ kind: 'bye', line: '' });
             }}
           />
         </>
@@ -700,10 +783,24 @@ export function HootFlow(props: HootFlowProps) {
             className="btn btn-primary btn-big"
             disabled={busy}
             onClick={async () => {
-              if (!book) return;
+              if (!isCurrent() || !book || locked.current) return;
+              locked.current = true;
+              const token = generation.current;
               setBusy(true);
               log('child', `${chapters} ${book.totalChapters ? 'chapters' : 'pages'}`);
-              const reply = await props.onReadMore(book.id, chapters, transcript.current, startedAt.current);
+              let reply: string;
+              try {
+                reply = await props.onReadMore(book.id, chapters, [...transcript.current], startedAt.current);
+              } catch {
+                if (mounted.current && generation.current === token) {
+                  locked.current = false;
+                  setBusy(false);
+                  say('I couldn’t save that just now. Please try again.', 'happy');
+                }
+                return;
+              }
+              if (!mounted.current || generation.current !== token) return;
+              locked.current = false;
               setBusy(false);
               setStep({ kind: 'bye', line: reply });
               say(reply, 'cheer');
