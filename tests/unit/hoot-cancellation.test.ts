@@ -299,3 +299,176 @@ test('a current chat failure releases its lock so typing can retry', async (t) =
   assert.equal(h.tree.root.findByType(DialogueShell).props.line, 'CURRENT RETRY');
   assert.equal(calls, 2);
 });
+
+test('a ready mic prop refresh during preparation releases setup and can listen on the next tap', async (t) => {
+  const preparation = deferred<'ready'>();
+  const heard = deferred<ListenOutcome>();
+  let listens = 0;
+  let stops = 0;
+  const statuses: boolean[] = [];
+  const oldMic: Mic = {
+    onDevice: true,
+    needsSetup: true,
+    blocked: null,
+    prepare: () => preparation.promise,
+    listen: async () => {
+      assert.fail('obsolete microphone must not listen');
+    },
+    stop: () => {
+      stops++;
+    },
+  };
+  const readyMic: Mic = {
+    ...oldMic,
+    needsSetup: false,
+    listen: () => {
+      listens++;
+      return heard.promise;
+    },
+  };
+  const props = {
+    mic: oldMic,
+    label: 'Synthetic microphone',
+    onHeard() {},
+    onPreparing: (status: boolean) => {
+      statuses.push(status);
+    },
+  };
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(createElement(MicButton, props));
+  });
+  t.after(async () => {
+    await act(async () => tree.unmount());
+  });
+  await act(async () => tree.root.findByType('button').props.onClick());
+  assert.equal(tree.root.findByType('button').props['aria-busy'], true);
+  await act(async () => tree.update(createElement(MicButton, { ...props, mic: readyMic })));
+  await act(async () => preparation.resolve('ready'));
+  assert.equal(tree.root.findByType('button').props['aria-busy'], false);
+  assert.equal(statuses.at(-1), false);
+  assert.equal(listens, 0);
+  assert.ok(stops > 0);
+  await act(async () => tree.root.findByType('button').props.onClick());
+  assert.equal(listens, 1);
+  assert.equal(tree.root.findByType('button').props['aria-pressed'], true);
+  await act(async () => heard.resolve({ result: null, error: 'no-speech' }));
+  await act(async () => tree.root.findByType('button').props.onClick());
+  assert.equal(listens, 2, 'subsequent attempts remain available');
+});
+
+test('mic replacement while listening resets status and rejects old interim and final results', async (t) => {
+  const oldResult = deferred<ListenOutcome>();
+  const currentResult = deferred<ListenOutcome>();
+  const heard: string[] = [];
+  const interim: string[] = [];
+  let oldInterim: ((text: string) => void) | undefined;
+  let stops = 0;
+  let listens = 0;
+  const oldMic: Mic = {
+    onDevice: true,
+    needsSetup: false,
+    blocked: null,
+    prepare: async () => 'ready',
+    listen: (opts) => {
+      oldInterim = opts.onInterim;
+      return oldResult.promise;
+    },
+    stop: () => {
+      stops++;
+    },
+  };
+  const currentMic: Mic = {
+    ...oldMic,
+    listen: () => {
+      listens++;
+      return currentResult.promise;
+    },
+  };
+  const props = {
+    mic: oldMic,
+    label: 'Synthetic microphone',
+    onHeard: (text: string) => {
+      heard.push(text);
+    },
+    onInterim: (text: string) => {
+      interim.push(text);
+    },
+  };
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(createElement(MicButton, props));
+  });
+  t.after(async () => {
+    await act(async () => tree.unmount());
+  });
+  await act(async () => tree.root.findByType('button').props.onClick());
+  assert.equal(tree.root.findByType('button').props['aria-pressed'], true);
+  await act(async () => tree.update(createElement(MicButton, { ...props, mic: currentMic })));
+  assert.equal(tree.root.findByType('button').props['aria-pressed'], false);
+  await act(async () => tree.root.findByType('button').props.onClick());
+  await act(async () => {
+    oldInterim?.('OBSOLETE INTERIM');
+    oldResult.resolve({ result: { transcript: 'OBSOLETE RESULT', confidence: 1, onDevice: true } });
+  });
+  assert.equal(tree.root.findByType('button').props['aria-pressed'], true, 'old result must not clear a new listener');
+  assert.ok(!interim.includes('OBSOLETE INTERIM'));
+  assert.deepEqual(heard, []);
+  await act(async () => currentResult.resolve({ result: { transcript: 'CURRENT RESULT', confidence: 1, onDevice: true } }));
+  assert.deepEqual(heard, ['CURRENT RESULT']);
+  assert.equal(listens, 1);
+  assert.ok(stops > 0);
+});
+
+test('TalkBar clears its parent preparation indicator when the mic becomes ready', async (t) => {
+  const preparation = deferred<'ready'>();
+  let listens = 0;
+  const oldMic: Mic = {
+    onDevice: true,
+    needsSetup: true,
+    blocked: null,
+    prepare: () => preparation.promise,
+    listen: async () => ({ result: null }),
+    stop() {},
+  };
+  const kit: HootFlowProps['talk'] = {
+    mic: oldMic,
+    phrases: [],
+    autoSpeaks: false,
+    speakReply() {},
+    chat: { id: 'local', sendsDataOffDevice: false, respond: async () => reply('CURRENT') },
+  };
+  const props = { kit, teacherName: 'Professor Hoot', onSay() {} };
+  let tree!: ReactTestRenderer;
+  await act(async () => {
+    tree = create(createElement(TalkBar, props));
+  });
+  t.after(async () => {
+    await act(async () => tree.unmount());
+  });
+  await act(async () => tree.root.findByType(MicButton).findByType('button').props.onClick());
+  assert.equal(tree.root.findAllByProps({ className: 'talk-live' }).length, 1);
+  await act(async () =>
+    tree.update(
+      createElement(TalkBar, {
+        ...props,
+        kit: {
+          ...kit,
+          mic: {
+            ...oldMic,
+            needsSetup: false,
+            listen: async () => {
+              listens++;
+              return { result: null, error: 'no-speech' as const };
+            },
+          },
+        },
+      }),
+    ),
+  );
+  await act(async () => preparation.resolve('ready'));
+  assert.equal(tree.root.findAllByProps({ className: 'talk-live' }).length, 0);
+  assert.equal(tree.root.findByType(MicButton).findByType('button').props['aria-busy'], false);
+  await act(async () => tree.root.findByType(MicButton).findByType('button').props.onClick());
+  assert.equal(listens, 1);
+});

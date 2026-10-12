@@ -38,7 +38,7 @@ Five fixed 84px targets plus gaps could overflow a narrow dialogue.
 
 ## Validation
 
-`npm run check` passed: TypeScript, repository lint/formatting, all **233 unit
+`npm run check` passed: TypeScript, repository lint/formatting, all **236 unit
 tests**, and production build. `git diff --check` passed. New unit coverage
 checks completed history versus unknown history and stored 1–5/omitted ratings.
 All testing used synthetic fixtures; no production learner writes or billable
@@ -108,3 +108,31 @@ Reproduce the component checks with:
 node --import tsx --test tests/unit/hoot-cancellation.test.ts
 npm run check
 ```
+
+
+## Microphone identity refresh correction
+
+The re-review of `a0400761751d8417b20576080e6ee69981f260dc` identified a
+setup regression when ChildMode refreshes its microphone object while prepare
+or listen is pending. The old generation was invalidated correctly, but the
+button and TalkBar retained their preparing/listening status. The stale promise
+could no longer clear that state, leaving subsequent taps blocked.
+
+Microphone replacement now releases preparing/listening state and reports the
+cleared status to the latest parent callbacks. The old generation remains
+invalid, its microphone is stopped, and its interim/final results are suppressed.
+A ready replacement is available on the next tap; an obsolete preparation does
+not automatically start a canceled listener. Current listeners and subsequent
+attempts still work.
+
+Three actual React regressions cover the exact deferred-prepare → same-component
+ready-mic replacement → old promise resolution → next-tap reproduction; a
+replacement during listening with obsolete interim/final results; and TalkBar's
+parent preparation indicator. The full component suite passes **17/17**. Against
+an isolated copy of the reviewed commit it produced **14 passes and 3 failures**,
+all in the new refresh cases. Existing cancellation protections still pass.
+
+Final `npm run check` passes TypeScript, repository lint, **236/236 tests**, and
+production build. E2E bundle build and diff checks also pass. Browser checks and
+screenshots remain unrun/blocked; no production data or paid voice calls were
+used. Publication remains held for independent review and user approval.

@@ -80,8 +80,16 @@ export function MicButton({
   const active = useRef(true);
   const requestGeneration = useRef(0);
   const inFlight = useRef(false);
+  const statusCallbacks = useRef({ onPreparing, onInterim });
+  statusCallbacks.current = { onPreparing, onInterim };
   useEffect(() => {
     active.current = true;
+    // A refreshed mic is a new operation source. Release the previous UI status
+    // while its generation guard continues to suppress obsolete results.
+    setPreparing(false);
+    setListening(false);
+    statusCallbacks.current.onPreparing?.(false);
+    statusCallbacks.current.onInterim?.('');
     return () => {
       active.current = false;
       requestGeneration.current++;
