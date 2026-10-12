@@ -35,10 +35,12 @@ test('first day: discover the school and put the first book on the shelf', async
   for (let i = 0; i < 20 && !(await page.getByTestId('star-5').count()); i++) {
     const choice = page.locator('.choices .choice:not([disabled])').first();
     if (await choice.count()) await choice.click();
+    if (await page.locator('.choices-emoji').count()) await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page.waitForTimeout(1200);
   }
   await expect(page.getByTestId('dialogue-line')).not.toContainText(/wrong|incorrect/i);
   await page.getByTestId('star-5').click();
+  await page.getByTestId('rating-next').click();
   await page.locator('.choices .choice').first().click(); // favorite part
 
   // The book flies onto the empty shelf; the first book earns Pip the Bookworm.
