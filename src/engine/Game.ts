@@ -445,7 +445,7 @@ export class Game {
     for (const id of this.activePets) this.pets.get(id)?.update(dt, this.player.position, this.player.yaw, slot++);
     this.particles.update(dt);
     this.rig.update(dt, this.player.position);
-    this.world.structure.updateCutaways(this.rig.forward, dt);
+    this.world.structure.updateCutaways(this.rig.forward, dt, this.player.position);
 
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.rig.camera);

@@ -145,7 +145,7 @@ export class Structure {
       { from: 7.2, to: 11.8, bottom: WAINSCOT_H + 0.1, top: 3.6, kind: 'window' },
     ]);
     this.wall('south', minX, maxX, maxZ, height, [{ from: -1.3, to: 1.3, bottom: 0, top: 2.7, kind: 'door' }]);
-    this.wall('west', minZ, maxZ, minX, height, [{ from: -0.5, to: 4.5, bottom: 0, top: 3.1, kind: 'arch' }]);
+    this.wall('west', minZ, maxZ, minX, height, [{ from: LAYOUT.nook.minZ, to: LAYOUT.nook.maxZ, bottom: 0, top: 3.1, kind: 'arch' }]);
     this.wall('east', minZ, maxZ, maxX, height, [
       { from: -5.4, to: -2.6, bottom: 0, top: 3.0, kind: 'door' },
       { from: 4.8, to: 6.7, bottom: 0, top: 2.7, kind: 'door' },
@@ -246,12 +246,20 @@ export class Structure {
     place(a, b, height - 0.18, height - 0.02, this.trimMat, 0.1, inset + 0.02, upper);
     // Wall cap (visible from the dollhouse camera).
     place(a - t, b + t, height, height + 0.08, this.capMat, t + 0.12, 0, upper);
-    // Cap for the cut-away state (sits at wainscot height).
-    const lowCap = place(a - t, b + t, split, split + 0.06, this.capMat, t + 0.1, 0, lower);
-    if (lowCap) lowCap.name = `${side}-lowcap`;
-    // Exterior skin.
-    place(a - t, b + t, 0, split, this.exteriorMat, 0.02, -(t / 2 + 0.01), lower);
-    place(a - t, b + t, split, height, this.exteriorMat, 0.02, -(t / 2 + 0.01), upper);
+    // Finish each solid span, including opening heads/sills. A continuous
+    // exterior skin or low cap would visually seal an otherwise passable arch.
+    for (const [s0, s1] of doorSpans) {
+      place(s0, s1, split, split + 0.06, this.capMat, t + 0.1, 0, lower);
+    }
+    const exterior = (s0: number, s1: number, y0: number, y1: number) => {
+      place(s0, s1, y0, Math.min(y1, split), this.exteriorMat, 0.02, -(t / 2 + 0.01), lower);
+      place(s0, s1, Math.max(y0, split), y1, this.exteriorMat, 0.02, -(t / 2 + 0.01), upper);
+    };
+    for (const [s0, s1] of spans) exterior(s0, s1, 0, height);
+    for (const o of sorted) {
+      exterior(o.from, o.to, 0, o.bottom);
+      exterior(o.from, o.to, o.top, height);
+    }
 
     // Window frames & glass; door frames.
     for (const o of sorted) {
@@ -321,10 +329,15 @@ export class Structure {
   }
 
   /** Applies cut-away amounts from the camera's facing (0 = full wall, 1 = cut). */
-  updateCutaways(cameraForward: THREE.Vector3, dt: number): void {
+  updateCutaways(cameraForward: THREE.Vector3, dt: number, focus?: THREE.Vector3): void {
     const f = new THREE.Vector3(cameraForward.x, 0, cameraForward.z).normalize();
     for (const c of this.cutaways) {
-      const target = f.dot(c.outward) < -0.3 ? 1 : 0;
+      // The follow camera can remain in the hall after the learner crosses
+      // into the nook. Fold the shared wall from either side near its arch,
+      // so the elevated phone camera does not look through the arch header.
+      const nearNook =
+        c.upper.name === 'west-upper' && focus !== undefined && focus.x < LAYOUT.hall.minX + 2 && focus.z > LAYOUT.nook.minZ && focus.z < LAYOUT.nook.maxZ;
+      const target = nearNook || f.dot(c.outward) < -0.3 ? 1 : 0;
       c.amount += (target - c.amount) * Math.min(1, dt * 6);
       const s = 1 - c.amount;
       c.upper.visible = s > 0.02;

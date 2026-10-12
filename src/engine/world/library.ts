@@ -9,7 +9,7 @@ import { ease } from '../core/tween';
 import { box, contactShadow, cyl, group, mat, rbox, sphere, uniqueMat } from '../render/kit';
 import { rugTexture, signTexture } from '../render/textures';
 import { LAYOUT, PALETTE } from '../palette';
-import { popIn, toggleFeature, type BuildContext } from './types';
+import { toggleFeature, type BuildContext } from './types';
 
 /** A zone sign mounted flat on a wall (never blocks the camera). */
 export function wallSign(text: string, icon: string, bg: string = PALETTE.cream, fg: string = PALETTE.walnut, width = 1.9): THREE.Group {
@@ -269,31 +269,74 @@ function buildReadingNook(ctx: BuildContext) {
   floor.receiveShadow = true;
   nook.add(floor);
   const wallMat = mat('#f2d7cf', { roughness: 0.95 });
-  nook.add(box(0.25, 3.2, maxZ - minZ + 0.5, wallMat, minX - 0.125, 1.6, cz));
-  nook.add(box(maxX - minX, 3.2, 0.25, wallMat, cx, 1.6, minZ - 0.125));
-  nook.add(box(maxX - minX, 3.2, 0.25, wallMat, cx, 1.6, maxZ + 0.125));
-  ctx.collide(minX - 0.125, cz, 0.3, maxZ - minZ + 0.5);
-  ctx.collide(cx, minZ - 0.125, maxX - minX, 0.3);
-  ctx.collide(cx, maxZ + 0.125, maxX - minX, 0.3);
-  // Tent canopy.
-  const tent = new THREE.Mesh(new THREE.ConeGeometry(1.4, 2.4, 6, 1, true), mat('#fbf1e3', { side: THREE.DoubleSide, roughness: 0.95 }));
-  tent.position.set(minX + 1.4, 1.2, cz);
-  tent.castShadow = true;
-  nook.add(tent);
-  const flag = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.25, 3), mat(PALETTE.terracotta));
-  flag.position.set(minX + 1.4, 2.5, cz);
-  flag.rotation.z = Math.PI / 2;
-  nook.add(flag);
-  // Cushions and a beanbag.
-  const cushionColors = ['#e9a8a0', '#f2cc8f', '#9fbdd0', '#a7c4a0'];
-  cushionColors.forEach((c, i) => {
-    const p = rbox(0.6, 0.18, 0.6, 0.09, mat(c, { roughness: 1 }), minX + 1.0 + (i % 2) * 0.7, 0.09 + Math.floor(i / 2) * 0.16, cz - 0.4 + (i % 2) * 0.3);
-    p.rotation.y = i * 0.4;
-    nook.add(p);
+  // Fold the outer nook walls with the same camera policy as the school.
+  // Keep these dynamic groups outside static batching.
+  const nookWall = (side: 'west' | 'north' | 'south', x: number, z: number, w: number, d: number) => {
+    const split = 0.42;
+    nook.add(box(w, split, d, wallMat, x, split / 2, z));
+    const upper = group(box(w, 3.2 - split, d, wallMat, x, (3.2 + split) / 2, z));
+    ctx.add(upper);
+    ctx.structure.cutaways.push({
+      side,
+      upper,
+      split,
+      amount: 0,
+      outward: new THREE.Vector3(side === 'west' ? -1 : 0, 0, side === 'north' ? -1 : side === 'south' ? 1 : 0),
+    });
+    ctx.collide(x, z, w + 0.05, d + 0.05);
+  };
+  nookWall('west', minX - 0.125, cz, 0.25, maxZ - minZ + 0.5);
+  nookWall('north', cx, minZ - 0.125, maxX - minX, 0.25);
+  nookWall('south', cx, maxZ + 0.125, maxX - minX, 0.25);
+
+  // An open fabric canopy frames a child-sized reading bench. No opaque
+  // tent face hides the cushions, books or learner from the entrance.
+  const fabric = mat('#fbf1e3', { side: THREE.DoubleSide, roughness: 0.95 });
+  const wood = mat(PALETTE.oak, { roughness: 0.8 });
+  const benchX = minX + 0.75;
+  const canopy = group(
+    rbox(1.25, 0.1, 2.5, 0.04, fabric, benchX, 2.15, cz),
+    cyl(0.035, 0.035, 2.15, wood, benchX + 0.55, 1.075, cz - 1.2, 8),
+    cyl(0.035, 0.035, 2.15, wood, benchX + 0.55, 1.075, cz + 1.2, 8),
+    rbox(1.05, 0.3, 2.3, 0.08, wood, benchX, 0.25, cz),
+    rbox(1.0, 0.18, 2.2, 0.08, mat('#e9a8a0'), benchX, 0.49, cz),
+    rbox(0.18, 0.65, 2.3, 0.07, mat('#e9a8a0'), minX + 0.22, 0.72, cz),
+  );
+  for (const [i, color] of ['#f2cc8f', '#9fbdd0', '#a7c4a0'].entries()) {
+    const pillow = rbox(0.22, 0.4, 0.5, 0.08, mat(color), benchX - 0.25, 0.78, cz - 0.7 + i * 0.7);
+    pillow.rotation.z = -0.15;
+    canopy.add(pillow);
+  }
+  nook.add(canopy);
+  ctx.collide(benchX, cz, 1.25, 2.5);
+
+  // Low outward-facing books, a second seat, and a book left open to read.
+  const shelfX = cx + 0.25;
+  const shelfZ = minZ + 0.42;
+  nook.add(rbox(1.65, 0.72, 0.35, 0.04, wood, shelfX, 0.36, shelfZ));
+  const covers = ['#b5533c', '#2f6f73', '#e3b448', '#8a5a9e', '#4a6fa5', '#5f8f4e'];
+  covers.forEach((color, i) => {
+    nook.add(box(0.2, 0.3 + (i % 2) * 0.08, 0.055, mat(color), shelfX - 0.64 + i * 0.25, 0.83, shelfZ + 0.19));
   });
-  const bean = sphere(0.5, mat(PALETTE.teal, { roughness: 1 }), maxX - 1.1, 0.35, maxZ - 1.0, 20);
-  bean.scale.set(1, 0.7, 1);
+  ctx.collide(shelfX, shelfZ, 1.7, 0.5);
+  const bean = sphere(0.55, mat(PALETTE.teal, { roughness: 1 }), cx + 0.2, 0.32, maxZ - 0.85, 16);
+  bean.scale.set(1, 0.65, 1);
   nook.add(bean);
+  ctx.collide(cx + 0.2, maxZ - 0.85, 1.0, 1.0);
+  const tableX = cx + 0.45;
+  nook.add(cyl(0.36, 0.36, 0.08, wood, tableX, 0.5, cz + 0.65, 16), cyl(0.16, 0.2, 0.46, wood, tableX, 0.23, cz + 0.65, 12));
+  for (const sign of [-1, 1]) {
+    const page = box(0.19, 0.025, 0.28, mat('#fff6e6'), tableX + sign * 0.095, 0.56, cz + 0.65);
+    page.rotation.z = sign * 0.08;
+    nook.add(page);
+  }
+  ctx.collide(tableX, cz + 0.65, 0.72, 0.72);
+  // Warm shaded lamp uses the existing single nook light; no extra shadows.
+  nook.add(
+    cyl(0.14, 0.18, 0.03, wood, shelfX + 0.58, 0.745, shelfZ),
+    cyl(0.02, 0.02, 0.38, wood, shelfX + 0.58, 0.94, shelfZ),
+    cyl(0.14, 0.22, 0.25, mat('#ffe7b0', { emissive: '#ffcf8a', emissiveIntensity: 0.6 }), shelfX + 0.58, 1.15, shelfZ, 16),
+  );
   // Fairy lights along the walls.
   const bulbMat = mat('#fff1c1', { emissive: '#ffd36b', emissiveIntensity: 2 });
   for (let i = 0; i < 26; i++) {
@@ -380,5 +423,4 @@ function buildReadingNook(ctx: BuildContext) {
     object: curtain,
     markerHeight: 3.4,
   });
-  void popIn;
 }
