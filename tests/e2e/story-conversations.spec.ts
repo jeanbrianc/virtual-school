@@ -1,5 +1,6 @@
 import { expect, test, type Page } from 'playwright/test';
 import { APP, dismissCelebrations, enterSchool, talkTo, unlockParent } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
 import type { Book, Evidence, TeacherInteraction } from '../../src/domain/types';
 
 async function records(page: Page) {
@@ -27,6 +28,8 @@ async function records(page: Page) {
 
 test.use({ permissions: [] });
 
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+
 test('parent depth, source-checked questions, hint/skip/cancel and saved history work offline', async ({ page }, testInfo) => {
   const name = testInfo.project.name;
   if (name === 'phone') await page.setViewportSize({ width: 320, height: 740 });
@@ -39,13 +42,14 @@ test('parent depth, source-checked questions, hint/skip/cancel and saved history
   // Parent unlock is retained for the tab session; handle either permitted state.
   if (await page.getByTestId('pin-1').count()) await unlockParent(page);
   await expect(page.getByLabel('Conversation depth (household)')).toHaveValue('deeper');
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click();
   await page.getByTestId('choice-finish').click();
   await page.getByTestId('new-book-title').fill('Tom Kitten');
   await page.getByTestId('suggest-tom-kitten').click();
   await expect(page.getByTestId('dialogue-line')).toContainText('climbing difficult');
   await expect(page.getByTestId('story-source')).toHaveText('Source-checked story question');
+  await page.screenshot({ path: `test-results/hoot-source-${name}.png` });
   const firstPrompt = await page.getByTestId('dialogue-line').innerText();
   await page.getByTestId('story-hint').focus();
   await page.keyboard.press('Enter');
@@ -55,7 +59,8 @@ test('parent depth, source-checked questions, hint/skip/cancel and saved history
   await expect(page.getByTestId('rating-skip')).toBeVisible();
   await page.getByTestId('rating-skip').click();
   await page.getByTestId('choice-__skip').dblclick();
-  await expect(page.getByTestId('celebration')).toBeVisible();
+  // Same bounded wait as core-loop: software WebGL can delay the shelf cinematic.
+  await expect(page.getByTestId('celebration')).toBeVisible({ timeout: 180_000 });
   await dismissCelebrations(page);
   const saved = await records(page);
   expect(saved.books.filter((b) => b.catalogId === 'tom-kitten')).toHaveLength(1);
@@ -63,7 +68,7 @@ test('parent depth, source-checked questions, hint/skip/cancel and saved history
   expect(saved.evidence.some((e) => e.skillId === 'read.narration')).toBe(false);
   expect(saved.evidence.filter((e) => e.excerpt?.includes('[story-question:tom-kitten.'))).toHaveLength(2);
   await page.reload();
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await talkTo(page, 'hoot');
   await page.getByTestId('choice-finish').click();
   await page.getByTestId('new-book-title').fill('Tom Kitten');
@@ -95,11 +100,12 @@ test('custom title keeps narration and parent-authored response ungraded', async
   await page.getByLabel('Story question', { exact: true }).fill('Who brought the kite?');
   await page.getByLabel('Reference answer', { exact: true }).fill('Avery');
   await page.getByRole('button', { name: 'Save details', exact: true }).click();
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click();
   await page.getByTestId('choice-finish').click();
   await page.getByRole('listitem').filter({ hasText: 'Synthetic kite story' }).click();
   await expect(page.getByTestId('story-source')).toHaveText('Your own reflections · ungraded');
+  await page.screenshot({ path: `test-results/hoot-reflection-label-${name}.png` });
   await page.getByText('Tell me more (optional)', { exact: true }).click();
   await page.getByTestId('reflection-favorite').fill('The kite');
   await page.getByTestId('reflection-narration').fill('A noodle flew to the moon.');
@@ -112,7 +118,8 @@ test('custom title keeps narration and parent-authored response ungraded', async
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
   await page.getByRole('button', { name: 'Not sure', exact: true }).click();
   await page.getByTestId('rating-skip').dblclick();
-  await expect(page.getByTestId('celebration')).toBeVisible();
+  // Same bounded wait as core-loop: software WebGL can delay the shelf cinematic.
+  await expect(page.getByTestId('celebration')).toBeVisible({ timeout: 180_000 });
   await dismissCelebrations(page);
   const saved = await records(page);
   const book = saved.books.find((b) => b.title === 'Synthetic kite story')!;

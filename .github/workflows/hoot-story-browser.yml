@@ -10,6 +10,10 @@ on:
       - 'src/ui/parent/pages/SettingsPage.tsx'
       - 'tests/e2e/story-conversations.spec.ts'
       - 'tests/e2e/hoot-mobile.spec.ts'
+      - 'tests/e2e/core-loop.spec.ts'
+      - 'tests/e2e/synthetic-household.ts'
+      - 'tests/e2e/helpers.ts'
+      - 'playwright.config.ts'
       - '.github/workflows/hoot-story-browser.yml'
 permissions:
   contents: read
