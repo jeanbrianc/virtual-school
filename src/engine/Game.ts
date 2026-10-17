@@ -25,7 +25,7 @@ import { Particles } from './fx/particles';
 import { LAYOUT } from './palette';
 import { canvasTexture } from './render/textures';
 import { CameraRig } from './systems/cameraRig';
-import { bookArrivalPlan } from './systems/bookArrival';
+import { BookArrivalCutaway, bookArrivalPlan } from './systems/bookArrival';
 import { InputManager } from './systems/input';
 import { InteractionSystem } from './systems/interaction';
 import { PlayerController } from './systems/player';
@@ -131,7 +131,7 @@ export class Game {
   private cinematicDepth = 0;
   private bookArrival: { book: ShelfBook; controller: AbortController; plan: ReturnType<typeof bookArrivalPlan>; phase: 'pan' | 'flight' | 'landed' } | null =
     null;
-  private bookArrivalNear: number | null = null;
+  private bookArrivalCutaway: BookArrivalCutaway | null = null;
   // ── Dance circuit on the rug ──
   private circuitMoves: DanceMoveId[] = [...DEFAULT_CIRCUIT];
   /** The rug number she's standing on (null when off the numbers). */
@@ -570,11 +570,13 @@ export class Game {
     if (this.bookArrival) {
       const plan = this.bookArrivalShot(this.bookArrival.book);
       // Keep the same arrival promise/ID while adapting both camera and remaining flight.
+      this.bookArrival.plan.position.copy(plan.position);
+      this.bookArrival.plan.target.copy(plan.target);
       this.bookArrival.plan.from.copy(plan.from);
       this.bookArrival.plan.arcHeight = plan.arcHeight;
       this.bookArrival.plan.near = plan.near;
       this.bookArrival.plan.landNear = plan.landNear;
-      if (this.bookArrival.phase !== 'pan') this.clipBookArrival(this.bookArrival.phase === 'landed' ? plan.landNear : plan.near);
+      if (this.bookArrival.phase !== 'pan') this.clipBookArrival(this.bookArrival.phase === 'landed' ? plan.landNear : plan.near, plan);
       void this.rig.shot(plan.position, plan.target, 0);
     }
     if (this.composer) {
@@ -709,20 +711,16 @@ export class Game {
     });
   }
 
-  private clipBookArrival(near: number): void {
-    if (this.bookArrivalNear === null) this.bookArrivalNear = this.rig.camera.near;
-    this.rig.camera.near = near;
-    this.rig.camera.updateProjectionMatrix();
+  private clipBookArrival(depth: number, plan: ReturnType<typeof bookArrivalPlan>): void {
+    this.bookArrivalCutaway ??= new BookArrivalCutaway(this.scene, [this.world.structure.root, this.world.bookshelf.root], this.renderer);
+    this.bookArrivalCutaway.update(plan.position, plan.target, depth);
   }
 
   private cancelBookArrival(): void {
     this.bookArrival?.controller.abort();
     this.bookArrival = null;
-    if (this.bookArrivalNear !== null) {
-      this.rig.camera.near = this.bookArrivalNear;
-      this.rig.camera.updateProjectionMatrix();
-      this.bookArrivalNear = null;
-    }
+    this.bookArrivalCutaway?.dispose();
+    this.bookArrivalCutaway = null;
   }
 
   async celebrateBook(book: ShelfBook): Promise<void> {
@@ -737,7 +735,7 @@ export class Game {
       await this.rig.shot(plan.position, plan.target, this.reducedMotion ? 0 : 1.3);
       if (signal.aborted) return;
       arrival.phase = 'flight';
-      this.clipBookArrival(plan.near);
+      this.clipBookArrival(plan.near, plan);
       this.cheer('hoot');
       this.opts.audio.play('whoosh');
       this.opts.audio.play('pageFlip');
@@ -746,7 +744,7 @@ export class Game {
         plan.from,
         (at) => {
           arrival.phase = 'landed';
-          this.clipBookArrival(plan.landNear);
+          this.clipBookArrival(plan.landNear, plan);
           this.opts.audio.play('bookThunk');
           this.opts.audio.play('chime');
           this.particles.sparkle(at, { count: 70, speed: 2.4 });

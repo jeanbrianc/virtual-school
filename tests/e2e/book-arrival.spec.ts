@@ -101,7 +101,13 @@ async function inspectBook(page: Page, id: string) {
     const hits = ray.intersectObject(game.world.root, true).filter((hit) => {
       for (let node: import('three').Object3D | null = hit.object; node; node = node.parent) if (!node.visible) return false;
       const cameraDepth = -hit.point.clone().applyMatrix4(game.rig.camera.matrixWorldInverse).z;
-      return cameraDepth >= game.rig.camera.near && cameraDepth <= game.rig.camera.far;
+      const hitMesh = hit.object as import('three').Mesh;
+      const material = Array.isArray(hitMesh.material) ? hitMesh.material[hit.face?.materialIndex ?? 0] : hitMesh.material;
+      return (
+        cameraDepth >= game.rig.camera.near &&
+        cameraDepth <= game.rig.camera.far &&
+        !material?.clippingPlanes?.some((plane) => plane.distanceToPoint(hit.point) < 0)
+      );
     });
     ray.layers.mask = mask;
     return {
@@ -152,57 +158,6 @@ async function pausedImage(page: Page, info: TestInfo, label: string) {
   await page.evaluate(() => window.__arrivalCapture!.resume());
   return id;
 }
-
-test('destination book stays visible through third, grand and overflow arrivals across phone sizes', async ({ page, isMobile }, info) => {
-  await loadBookSample(page, 131);
-  await enterSchool(page, 'sample');
-  await ready(page);
-  // Real completions dismiss this hint when Hoot is opened. The direct engine
-  // fixture waits for its normal expiry instead of hiding any HUD element.
-  await expect(page.locator('.controls-hint')).toHaveCount(0);
-  const saved = await savedReading(page);
-  const books = saved.books as unknown as ShelfBook[];
-  const sizes = isMobile
-    ? [
-        { width: 320, height: 740 },
-        { width: 375, height: 812 },
-        { width: 412, height: 915 },
-        { width: 667, height: 375 },
-        { width: 740, height: 320 },
-      ]
-    : [{ width: 1100, height: 720 }];
-  for (const size of sizes) {
-    await page.setViewportSize(size);
-    // Full geometry scans cover every slot; pixels sample each reported obstruction
-    // at 320px and the third-case boundary at every other required phone shape.
-    const slots = isMobile && size.width !== 320 ? [25] : [25, 38, 48, 53, 63, 100, 130];
-    for (const slot of slots) {
-      const book = books.find((b) => b.shelfIndex === slot)!;
-      await page.evaluate(
-        ({ books, book }) => (window.__izzy!.game() as unknown as InspectGame).setShelfBooks(books.filter((b) => b.shelfIndex < book.shelfIndex)),
-        {
-          books,
-          book,
-        },
-      );
-      await captureNextArrival(page);
-      await page.evaluate((book) => {
-        void (window.__izzy!.game() as unknown as InspectGame).celebrateBook(book);
-      }, book);
-      // Desktop preserves the long journey from Hoot; only phone uses the compact pop shot.
-      if (isMobile) await pausedImage(page, info, `arrival-flight-slot-${slot}-${size.width}x${size.height}`);
-      else {
-        await page.waitForFunction(() => window.__arrivalCapture?.paused);
-        await page.evaluate(() => window.__arrivalCapture!.resume());
-      }
-      await ready(page);
-      await visibleBook(page, book.id);
-      await image(page, info, `arrival-landed-slot-${slot}-${size.width}x${size.height}`);
-      await page.evaluate(async () => (window.__izzy!.game() as unknown as InspectGame).releaseCamera());
-    }
-  }
-  expect(await savedReading(page)).toEqual(saved);
-});
 
 async function finishNewBook(page: Page, title: string) {
   await talkTo(page, 'hoot');
@@ -259,4 +214,55 @@ test('real 25-to-26 completion survives interruption, Back/Forward, reload and a
   await page.getByRole('button', { name: 'All my books', exact: true }).click();
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window.__izzy!.game() as unknown as InspectGame).input.enabled)).toBe(true);
+});
+
+test('destination book stays visible through third, grand and overflow arrivals across phone sizes', async ({ page, isMobile }, info) => {
+  await loadBookSample(page, 131);
+  await enterSchool(page, 'sample');
+  await ready(page);
+  // Real completions dismiss this hint when Hoot is opened. The direct engine
+  // fixture waits for its normal expiry instead of hiding any HUD element.
+  await expect(page.locator('.controls-hint')).toHaveCount(0);
+  const saved = await savedReading(page);
+  const books = saved.books as unknown as ShelfBook[];
+  const sizes = isMobile
+    ? [
+        { width: 320, height: 740 },
+        { width: 375, height: 812 },
+        { width: 412, height: 915 },
+        { width: 667, height: 375 },
+        { width: 740, height: 320 },
+      ]
+    : [{ width: 1100, height: 720 }];
+  for (const size of sizes) {
+    await page.setViewportSize(size);
+    // Full geometry scans cover every slot; pixels sample each reported obstruction
+    // at 320px and the third-case boundary at every other required phone shape.
+    const slots = isMobile && size.width !== 320 ? [25] : [25, 38, 48, 53, 63, 100, 130];
+    for (const slot of slots) {
+      const book = books.find((b) => b.shelfIndex === slot)!;
+      await page.evaluate(
+        ({ books, book }) => (window.__izzy!.game() as unknown as InspectGame).setShelfBooks(books.filter((b) => b.shelfIndex < book.shelfIndex)),
+        {
+          books,
+          book,
+        },
+      );
+      await captureNextArrival(page);
+      await page.evaluate((book) => {
+        void (window.__izzy!.game() as unknown as InspectGame).celebrateBook(book);
+      }, book);
+      // Desktop preserves the long journey from Hoot; only phone uses the compact pop shot.
+      if (isMobile) await pausedImage(page, info, `arrival-flight-slot-${slot}-${size.width}x${size.height}`);
+      else {
+        await page.waitForFunction(() => window.__arrivalCapture?.paused);
+        await page.evaluate(() => window.__arrivalCapture!.resume());
+      }
+      await ready(page);
+      await visibleBook(page, book.id);
+      await image(page, info, `arrival-landed-slot-${slot}-${size.width}x${size.height}`);
+      await page.evaluate(async () => (window.__izzy!.game() as unknown as InspectGame).releaseCamera());
+    }
+  }
+  expect(await savedReading(page)).toEqual(saved);
 });

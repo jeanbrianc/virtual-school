@@ -44,9 +44,54 @@ export function bookArrivalPlan(destination: THREE.Vector3, teacher: THREE.Vecto
     target,
     from,
     arcHeight,
-    // A temporary cinematic cutaway removes foreground teachers/furniture, while
+    // A temporary material cutaway removes foreground teachers/furniture, while
     // retaining the whole enlarged flight hull (front edge is at most 1.69m).
     near: distance - 1.8,
     landNear: distance - 0.4,
   };
+}
+
+/** A reversible foreground cutaway. Never clips the room, shelves or existing books. */
+export class BookArrivalCutaway {
+  private readonly plane = new THREE.Plane();
+  private readonly originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+  private readonly copies = new Map<THREE.Material, THREE.Material>();
+  private readonly previousEnabled: boolean;
+
+  constructor(
+    root: THREE.Object3D,
+    protectedRoots: THREE.Object3D[],
+    private readonly renderer: Pick<THREE.WebGLRenderer, 'localClippingEnabled'>,
+  ) {
+    this.previousEnabled = renderer.localClippingEnabled;
+    const copy = (material: THREE.Material) => {
+      let cloned = this.copies.get(material);
+      if (!cloned) {
+        cloned = material.clone();
+        cloned.clippingPlanes = [...(material.clippingPlanes ?? []), this.plane];
+        this.copies.set(material, cloned);
+      }
+      return cloned;
+    };
+    root.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      for (let parent: THREE.Object3D | null = node; parent; parent = parent.parent) if (protectedRoots.includes(parent)) return;
+      this.originals.set(node, node.material);
+      node.material = Array.isArray(node.material) ? node.material.map(copy) : copy(node.material);
+    });
+    renderer.localClippingEnabled = true;
+  }
+
+  update(position: THREE.Vector3, target: THREE.Vector3, depth: number): void {
+    const forward = target.clone().sub(position).normalize();
+    this.plane.setFromNormalAndCoplanarPoint(forward, position.clone().addScaledVector(forward, depth));
+  }
+
+  dispose(): void {
+    for (const [mesh, material] of this.originals) mesh.material = material;
+    for (const material of this.copies.values()) material.dispose();
+    this.originals.clear();
+    this.copies.clear();
+    this.renderer.localClippingEnabled = this.previousEnabled;
+  }
 }

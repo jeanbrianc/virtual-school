@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { CAMERA } from '../../src/config/gameConfig';
 import { Game } from '../../src/engine/Game';
 import { Tweens } from '../../src/engine/core/tween';
-import { bookArrivalPlan } from '../../src/engine/systems/bookArrival';
+import { BookArrivalCutaway, bookArrivalPlan } from '../../src/engine/systems/bookArrival';
 import { CameraRig } from '../../src/engine/systems/cameraRig';
 import { SchoolWorld } from '../../src/engine/world/SchoolWorld';
 import { Particles } from '../../src/engine/fx/particles';
@@ -187,10 +187,12 @@ it('newer arrival and camera release cannot be overwritten by an older awaited a
     disposed: false,
     cinematicDepth: 0,
     bookArrival: null,
-    bookArrivalNear: null,
+    bookArrivalCutaway: null,
+    scene: new THREE.Group().add(shelf.root),
     reducedMotion: false,
+    renderer: { localClippingEnabled: false },
     opts: { container: { clientWidth: 320, clientHeight: 740 }, audio: { play() {} } },
-    world: { bookshelf: shelf, anchors: new Map(), teachers: new Map() },
+    world: { bookshelf: shelf, structure: { root: new THREE.Group() }, anchors: new Map(), teachers: new Map() },
     interaction: { hideMarker() {} },
     particles: { sparkle() {} },
   }) as unknown as Game;
@@ -226,12 +228,13 @@ it('desktop-to-phone resize updates the current pan and flight without replacing
       disposed: false,
       cinematicDepth: 0,
       bookArrival: null,
-      bookArrivalNear: null,
+      bookArrivalCutaway: null,
+      scene: new THREE.Group().add(shelf.root),
       reducedMotion: false,
       composer: null,
-      renderer: { setSize() {}, domElement: { style: {} } },
+      renderer: { localClippingEnabled: false, setSize() {}, domElement: { style: {} } },
       opts: { container, audio: { play() {} } },
-      world: { bookshelf: shelf, anchors: new Map(), teachers: new Map() },
+      world: { bookshelf: shelf, structure: { root: new THREE.Group() }, anchors: new Map(), teachers: new Map() },
       interaction: { hideMarker() {} },
       particles: { sparkle() {} },
     }) as unknown as Game;
@@ -293,6 +296,8 @@ it('full-world landed books remain visible past Hoot, furniture and the grand la
     books,
     false,
   );
+  const renderer = { localClippingEnabled: false };
+  const cutaway = new BookArrivalCutaway(world.root, [world.structure.root, world.bookshelf.root], renderer);
   for (const viewport of [...viewports, { width: 1100, height: 720 }])
     for (const b of books) {
       world.bookshelf.setBooks(books.filter((prior) => prior.shelfIndex <= b.shelfIndex));
@@ -305,7 +310,8 @@ it('full-world landed books remain visible past Hoot, furniture and the grand la
       world.root.updateMatrixWorld(true);
       const fov = viewport.width / viewport.height < 1 ? 55 : CAMERA.fov;
       const plan = bookArrivalPlan(transform.position, teacher, { ...viewport, fov });
-      const camera = new THREE.PerspectiveCamera(fov, viewport.width / viewport.height, plan.landNear, 200);
+      cutaway.update(plan.position, plan.target, plan.landNear);
+      const camera = new THREE.PerspectiveCamera(fov, viewport.width / viewport.height, 0.1, 200);
       camera.position.copy(plan.position);
       camera.lookAt(plan.target);
       camera.updateMatrixWorld(true);
@@ -324,8 +330,54 @@ it('full-world landed books remain visible past Hoot, furniture and the grand la
         for (let node: THREE.Object3D | null = hit.object; node; node = node.parent) if (!node.visible) return false;
         // Perspective near clipping is an axial plane, not Raycaster's radial distance.
         const depth = -hit.point.clone().applyMatrix4(camera.matrixWorldInverse).z;
-        return depth >= camera.near && depth <= camera.far;
+        const mesh = hit.object as THREE.Mesh;
+        const material = Array.isArray(mesh.material) ? mesh.material[hit.face?.materialIndex ?? 0] : mesh.material;
+        return depth >= camera.near && depth <= camera.far && !material?.clippingPlanes?.some((plane) => plane.distanceToPoint(hit.point) < 0);
       });
       assert.equal(hits[0]?.object.name, mesh.name, `foreground obstruction at ${viewport.width}px slot ${b.shelfIndex}`);
     }
+  cutaway.dispose();
+  assert.equal(renderer.localClippingEnabled, false);
+});
+
+it('foreground cutaway preserves room/shelf materials, shares temporary copies and restores renderer state', () => {
+  const root = new THREE.Group();
+  const room = new THREE.Group();
+  const shelf = new THREE.Group();
+  const originalPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 100);
+  const shared = new THREE.MeshStandardMaterial({ clippingPlanes: [originalPlane] });
+  const other = new THREE.MeshBasicMaterial();
+  let originalDisposals = 0;
+  shared.addEventListener('dispose', () => originalDisposals++);
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(), shared);
+  const bookMaterials = [shared, other];
+  const bookMesh = new THREE.Mesh(new THREE.BoxGeometry(), bookMaterials);
+  room.add(floor);
+  shelf.add(bookMesh);
+  const teacherMesh = new THREE.Mesh(new THREE.BoxGeometry(), shared);
+  const furnitureMaterials = [shared, other];
+  const furniture = new THREE.Mesh(new THREE.BoxGeometry(), furnitureMaterials);
+  root.add(room, shelf, teacherMesh, furniture);
+  const renderer = { localClippingEnabled: true };
+  const cutaway = new BookArrivalCutaway(root, [room, shelf], renderer);
+  assert.equal(floor.material, shared);
+  assert.equal(bookMesh.material, bookMaterials);
+  assert.notEqual(teacherMesh.material, shared);
+  assert.equal(furniture.material[0], teacherMesh.material, 'shared source gets one temporary clone');
+  assert.equal(shared.clippingPlanes?.length, 1, 'original material remains unchanged');
+  const clone = teacherMesh.material;
+  let cloneDisposals = 0;
+  clone.addEventListener('dispose', () => cloneDisposals++);
+  cutaway.update(new THREE.Vector3(0, 0, 5), new THREE.Vector3(), 4);
+  const plane = clone.clippingPlanes![1];
+  assert.ok(plane);
+  assert.ok(plane.distanceToPoint(new THREE.Vector3(0, 0, 2)) < 0, 'foreground gets clipped');
+  assert.ok(plane.distanceToPoint(new THREE.Vector3()) > 0, 'destination stays visible');
+  cutaway.dispose();
+  cutaway.dispose();
+  assert.equal(teacherMesh.material, shared);
+  assert.equal(furniture.material, furnitureMaterials);
+  assert.equal(renderer.localClippingEnabled, true, 'restore an already-enabled renderer too');
+  assert.equal(cloneDisposals, 1);
+  assert.equal(originalDisposals, 0);
 });
