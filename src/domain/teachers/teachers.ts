@@ -33,6 +33,22 @@ export interface TeacherProfile {
 }
 
 export const TEACHERS: Record<TeacherId, TeacherProfile> = {
+  milo: {
+    id: 'milo',
+    name: 'Milo',
+    subject: 'Music & rhythm',
+    species: 'Otter percussion explorer',
+    personality: 'Patient, softly playful, and welcoming of every way to participate.',
+    color: '#74618c',
+    accent: '#f4cf75',
+    voice: { pitch: 1.0, rate: 0.85 },
+    naturalVoice: { voice: 'cedar', style: 'Milo is a gentle original otter music teacher. Speak slowly and warmly, without judging ability.' },
+    introductions: ['Hello, {name}! I’m Milo. We can explore beats and little pauses with pictures or taps.'],
+    greetings: ['Hello, {name}! Shall we explore a gentle rhythm?'],
+    returnGreetings: ['Welcome back to the music garden.'],
+    farewells: ['Keep noticing sounds and spaces, {name}.'],
+    praise: ['You explored a pattern in your own way.'],
+  },
   hoot: {
     id: 'hoot',
     name: 'Professor Hoot',

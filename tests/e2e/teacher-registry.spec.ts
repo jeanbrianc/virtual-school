@@ -13,6 +13,7 @@ test('existing teachers keep their introductions and working offline activities'
     ['digit', 'digit'],
     ['pippa', 'pippa'],
     ['nova', 'nova'],
+    ['milo', 'milo'],
   ]);
   for (const [id, name] of [
     ['hoot', 'Professor Hoot'],

@@ -16,6 +16,7 @@ import { Icon } from '../../shared/Icon';
 import { Card, PageHeader } from '../components';
 import { MicLevel, MicPicker, micInUse, useMicrophones } from './MicPicker';
 import { SyncCard, useSyncView } from './SyncCard';
+import { RhythmSettings } from './RhythmSettings';
 import { VoiceCard } from './VoiceCard';
 import type { ParentData } from '../ParentApp';
 
@@ -440,6 +441,8 @@ export function SettingsPage({ data }: { data: ParentData }) {
             </button>
             <p className="muted small">All sounds are synthesized in the browser — no music files or streaming.</p>
           </Card>
+
+          <RhythmSettings key={child.id} child={child} />
 
           <VoiceCard settings={s} child={child} patch={(p) => patch(p)} helper={helper} />
 

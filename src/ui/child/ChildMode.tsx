@@ -52,6 +52,8 @@ import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
 import { GlobeFlow } from './flows/GlobeFlow';
 import { recordPractice } from '../../services/practiceService';
+import { RhythmFlow } from './flows/RhythmFlow';
+import { recordRhythm } from '../../services/rhythmService';
 import { KeyboardFlow } from './flows/KeyboardFlow';
 import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
@@ -66,6 +68,7 @@ type Overlay =
   | { kind: 'activities'; teacher: TeacherId; returnTo: { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number } }
   | { kind: 'globe' }
   | { kind: 'keyboard' }
+  | { kind: 'rhythm' }
   | { kind: 'hoot' }
   | { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number }
   | { kind: 'shelf' }
@@ -117,6 +120,7 @@ export function ChildMode({ childId }: { childId: string }) {
   const preview = useStore(appStore, (s) => s.preview);
   const host = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game | null>(null);
+  const suspendRhythmBackground = useCallback(() => gameRef.current?.suspendRendering() ?? (() => {}), []);
   const dataRef = useRef<ChildWorldData | null>(null);
   dataRef.current = data;
   const [ready, setReady] = useState(false);
@@ -426,6 +430,13 @@ export function ChildMode({ childId }: { childId: string }) {
       }
       const registeredTeacher = teacherForInteraction(id);
       const activity = registeredTeacher ? TEACHER_REGISTRY[registeredTeacher].activity : undefined;
+      if (activity?.kind === 'rhythm' && registeredTeacher) {
+        game.setInputEnabled(false);
+        void game.focusTeacher(registeredTeacher);
+        services.speechOut.cancel();
+        setOverlay({ kind: 'rhythm' });
+        return;
+      }
       if (activity?.kind === 'reading') {
         teacherForSpeech.current = 'hoot';
         game.setInputEnabled(false);
@@ -1000,6 +1011,21 @@ export function ChildMode({ childId }: { childId: string }) {
 
           {overlay?.kind === 'activities' && (
             <TeacherActivityChooser teacher={overlay.teacher} speech={speech} onPick={chooseActivity} onClose={() => setOverlay(overlay.returnTo)} />
+          )}
+          {overlay?.kind === 'rhythm' && (
+            <RhythmFlow
+              key={childId}
+              childId={childId}
+              suspendBackground={suspendRhythmBackground}
+              {...(data.child.rhythmBeatCount ? { beats: data.child.rhythmBeatCount } : {})}
+              muted={muted}
+              volume={data.household.settings.audio.master * data.household.settings.audio.effects}
+              onClose={closeSheet}
+              onSave={async (run) => {
+                await recordRhythm(ctx, childId, run);
+                await reload();
+              }}
+            />
           )}
           {overlay?.kind === 'keyboard' && (
             <KeyboardFlow

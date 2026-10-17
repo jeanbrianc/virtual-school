@@ -1015,6 +1015,34 @@ export const SKILLS: Skill[] = defineSkills({
     standards: [arts('VA:Cr2.1.1', 'Explore uses of materials and tools to create works of art or design.')],
     idea: 'Build a cardboard-box castle and decorate it.',
   },
+  'art.rhythm-copy': {
+    strand: 'create.performing',
+    name: 'Copy a short beat-and-pause pattern',
+    can: 'copy two to four beat intervals at a comfortable pace',
+    childName: 'Beats and pauses',
+    difficulty: 0,
+    lessons: ['rhythm-garden'],
+    standards: [
+      family(
+        'Narrow music observation: copy a short original interval pattern with generous timing tolerance. Does not establish steady-beat, instrument, listening, or general music proficiency.',
+      ),
+    ],
+    idea: 'Take turns making gentle two-beat patterns with a comfortable short or long pause.',
+  },
+  'art.rhythm-recognize': {
+    strand: 'create.performing',
+    name: 'Match beat-and-pause pictures',
+    can: 'match a visual beat-and-pause pattern without timing',
+    childName: 'Pattern pictures',
+    difficulty: 0,
+    lessons: ['rhythm-garden'],
+    standards: [
+      family(
+        'Narrow visual recognition of beat-and-pause diagrams. Separate from timed rhythm reproduction, auditory discrimination, reading, and mathematics.',
+      ),
+    ],
+    idea: 'Arrange two large beat cards with a short or long gap, then choose the matching picture.',
+  },
   'art.music': {
     strand: 'create.performing',
     name: 'Music & rhythm',
