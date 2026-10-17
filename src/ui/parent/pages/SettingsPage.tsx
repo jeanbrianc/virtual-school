@@ -17,6 +17,7 @@ import { Card, PageHeader } from '../components';
 import { MicLevel, MicPicker, micInUse, useMicrophones } from './MicPicker';
 import { SyncCard, useSyncView } from './SyncCard';
 import { VoiceCard } from './VoiceCard';
+import { UsageCard } from './UsageCard';
 import type { ParentData } from '../ParentApp';
 
 function Slider({ label, value, onChange, disabled }: { label: string; value: number; onChange: (v: number) => void; disabled?: boolean }) {
@@ -279,7 +280,7 @@ function AiTeachersCard({
             </li>
             <li>
               This website’s helper is at <code>{DEFAULT_TEACHER_AI_ENDPOINT}</code> (a small AWS Lambda behind the family sign-in). The key never reaches the
-              browser. Usage is billed to your account — a fraction of a cent per reply.
+              browser. Provider usage is billed to your account. Costs depend on the configured model and billable units.
             </li>
           </ol>
         ) : (
@@ -498,6 +499,8 @@ export function SettingsPage({ data }: { data: ParentData }) {
             helper={helper}
             onCheck={checkEndpoint}
           />
+
+          <UsageCard warningAt={s.usageWarningRequests ?? 50} onWarning={(count) => void patch({ usageWarningRequests: count })} />
 
           <Card title="Activity interpretation" icon="sparkle">
             <p className="small">

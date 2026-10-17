@@ -1,0 +1,50 @@
+name: Reliability browser checks
+
+on:
+  pull_request:
+    paths:
+      - 'src/domain/usage.ts'
+      - 'src/domain/teachers/chatRemote.ts'
+      - 'src/domain/interpretation/remoteInterpreter.ts'
+      - 'src/voice/**'
+      - 'src/ui/parent/pages/UsageCard.tsx'
+      - 'src/ui/parent/pages/SettingsPage.tsx'
+      - 'scripts/ai-helper/**'
+      - 'tests/e2e/usage-parent.spec.ts'
+      - 'tests/e2e/helper-voice.spec.ts'
+      - '.github/workflows/reliability-browser.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reliability-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check synthetic usage and existing voice fallback
+        run: npm run test:e2e -- --project=${{ matrix.project }} tests/e2e/usage-parent.spec.ts tests/e2e/helper-voice.spec.ts
+      - name: Save synthetic screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reliability-${{ matrix.project }}-${{ github.sha }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: warn

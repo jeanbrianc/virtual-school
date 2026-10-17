@@ -32,6 +32,7 @@ import {
   transcriptFrom,
 } from './openai';
 import { syncRoutes, type SyncStore } from './sync';
+import { usageHeaders } from './usage';
 
 /** A key, or a function that fetches it (e.g. from AWS Secrets Manager) — called only when needed. */
 export type KeySource = string | undefined | (() => Promise<string | undefined>);
@@ -86,17 +87,17 @@ export const MAX_SYNC_BODY = 5_700_000;
 export const MAX_BODY = Math.max(MAX_LISTEN_BODY, MAX_SYNC_BODY);
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 
-type Result<T> = { ok: true; value: T } | { ok: false; status: number; error: string };
+type Result<T> = ({ ok: true; value: T } | { ok: false; status: number; error: string }) & { usage?: Record<string, string> };
 
-/** A sliding per-minute window plus a daily count. */
+/** Process-local throttle only. Resets on restart; never a deployment-wide budget cap. UTC days. */
 function limiter(perMinute: number, perDay: number, now: () => number) {
   const recent: number[] = [];
-  let day = new Date(now()).toDateString();
+  let day = new Date(now()).toISOString().slice(0, 10);
   let count = 0;
   return {
     take(): boolean {
       const t = now();
-      const today = new Date(t).toDateString();
+      const today = new Date(t).toISOString().slice(0, 10);
       if (today !== day) {
         day = today;
         count = 0;
@@ -202,8 +203,10 @@ export function createHelper(config: HelperConfig) {
       body: JSON.stringify(body),
     });
     if (!res.ok) return { ok: false, ...upstreamError(res.status) };
-    const input = toolInputFrom(await res.json(), toolName);
-    return input ? { ok: true, value: input } : { ok: false, status: 502, error: 'The AI service returned no reply.' };
+    const response = await res.json();
+    const usage = usageHeaders('anthropic', String(body.model), response);
+    const input = toolInputFrom(response, toolName);
+    return input ? { ok: true, value: input, usage } : { ok: false, usage, status: 502, error: 'The AI service returned no reply.' };
   }
 
   async function callOpenAiFunction(key: string, body: Record<string, unknown>, fnName: string): Promise<Result<unknown>> {
@@ -213,8 +216,10 @@ export function createHelper(config: HelperConfig) {
       body: JSON.stringify(body),
     });
     if (!res.ok) return { ok: false, ...upstreamError(res.status) };
-    const args = functionArgsFrom(await res.json(), fnName);
-    return args ? { ok: true, value: args } : { ok: false, status: 502, error: 'The AI service returned no reply.' };
+    const response = await res.json();
+    const usage = usageHeaders('openai', String(body.model), response);
+    const args = functionArgsFrom(response, fnName);
+    return args ? { ok: true, value: args, usage } : { ok: false, usage, status: 502, error: 'The AI service returned no reply.' };
   }
 
   async function health(origin?: string): Promise<HelperResponse> {
@@ -227,7 +232,8 @@ export function createHelper(config: HelperConfig) {
         keyConfigured: !!p,
         provider: p?.provider ?? null,
         model: p ? replyModel(p.provider) : null,
-        voices: openai,
+        voices: openai && !(config.voiceModel || DEFAULT_OPENAI_VOICE_MODEL).startsWith('gpt-realtime'),
+        ...(openai && (config.voiceModel || DEFAULT_OPENAI_VOICE_MODEL).startsWith('gpt-realtime') ? { voiceMigrationRequired: true } : {}),
         listening: openai,
         sync: !!sync,
         ...(openai ? { voiceModel: config.voiceModel || DEFAULT_OPENAI_VOICE_MODEL, listenModel: config.listenModel || DEFAULT_OPENAI_LISTEN_MODEL } : {}),
@@ -308,6 +314,16 @@ export function createHelper(config: HelperConfig) {
       // ── Natural voices ───────────────────────────────────────────────────
       if (req.path === '/v1/speak') {
         if (p.provider !== 'openai') return respond(501, { error: 'Natural voices need an OpenAI key.' }, origin);
+        if ((config.voiceModel || DEFAULT_OPENAI_VOICE_MODEL).startsWith('gpt-realtime'))
+          return respond(
+            503,
+            {
+              error: 'Realtime speech requires a reviewed transport migration. Built-in voices still work.',
+              category: 'voice_configuration',
+              retryAfterSeconds: 900,
+            },
+            origin,
+          );
         const input = parseSpeakInput(parsed);
         if (!input) return respond(400, { error: 'Invalid speak request.' }, origin);
         if (voiceCooldown && voiceCooldown.until > now()) {
@@ -335,10 +351,15 @@ export function createHelper(config: HelperConfig) {
           return respond(e.status, e, origin);
         }
         const audio = new Uint8Array(await res.arrayBuffer());
-        log(`voice (${input.teacherId}) ${input.text.length} chars — ${speaking.today} today`);
+        log('voice succeeded');
         return {
           status: 200,
-          headers: { 'Content-Type': 'audio/mpeg', 'Cache-Control': 'no-store', ...cors(origin) },
+          headers: {
+            'Content-Type': 'audio/mpeg',
+            'Cache-Control': 'no-store',
+            ...cors(origin),
+            ...usageHeaders('openai', config.voiceModel || DEFAULT_OPENAI_VOICE_MODEL),
+          },
           body: audio,
         };
       }
@@ -359,9 +380,12 @@ export function createHelper(config: HelperConfig) {
           log(`listening failed ${res.status}`);
           return respond(e.status, { error: e.error }, origin);
         }
-        const text = transcriptFrom(await res.json());
+        const response = await res.json();
+        const text = transcriptFrom(response);
         log(`listening ${text ? 'ok' : 'empty'} — ${listening.today} today`);
-        return respond(200, { text: text ?? '' }, origin);
+        const reply = respond(200, { text: text ?? '' }, origin);
+        reply.headers = { ...reply.headers, ...usageHeaders('openai', config.listenModel || DEFAULT_OPENAI_LISTEN_MODEL, response) };
+        return reply;
       }
 
       // ── Replies ──────────────────────────────────────────────────────────
@@ -374,8 +398,10 @@ export function createHelper(config: HelperConfig) {
           p.provider === 'openai'
             ? await callOpenAiFunction(p.key, buildOpenAiTeacherRequest(input, model), 'teacher_reply')
             : await callClaude(p.key, buildTeacherRequest(input, model), 'teacher_reply');
-        log(`teacher reply (${input.teacherId}, ${p.provider}) ${result.ok ? 'ok' : 'failed'} — ${replies.today} today`);
-        return result.ok ? respond(200, result.value, origin) : respond(result.status, { error: result.error }, origin);
+        log(`teacher reply ${result.ok ? 'ok' : 'failed'}`);
+        const reply = result.ok ? respond(200, result.value, origin) : respond(result.status, { error: result.error }, origin);
+        reply.headers = { ...reply.headers, ...result.usage };
+        return reply;
       }
       const b = parsed as { narrative?: unknown; childFirstName?: unknown; today?: unknown };
       if (typeof b.narrative !== 'string' || !b.narrative.trim()) return respond(400, { error: 'Missing narrative.' }, origin);
@@ -386,7 +412,9 @@ export function createHelper(config: HelperConfig) {
           ? await callOpenAiFunction(p.key, buildOpenAiInterpretRequest(b.narrative, name, today, model), 'record_learning')
           : await callClaude(p.key, buildInterpretRequest(b.narrative, name, today, model), 'record_learning');
       log(`activity interpretation (${p.provider}) ${result.ok ? 'ok' : 'failed'} — ${replies.today} today`);
-      return result.ok ? respond(200, result.value, origin) : respond(result.status, { error: result.error }, origin);
+      const reply = result.ok ? respond(200, result.value, origin) : respond(result.status, { error: result.error }, origin);
+      reply.headers = { ...reply.headers, ...result.usage };
+      return reply;
     } catch {
       return respond(502, { error: 'Could not reach the AI service.' }, origin);
     }

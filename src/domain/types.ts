@@ -71,6 +71,8 @@ export interface HouseholdSettings {
   teacherAi: TeacherAiSettings;
   /** Shows demo tooling (milestone previews, demo banners). */
   demoTools: boolean;
+  /** Advisory threshold for this tab’s observed requests; never a paid-use limit. */
+  usageWarningRequests?: number;
 }
 
 export interface Household {
