@@ -36,7 +36,7 @@ import { speakableText } from '../../domain/pronounce';
 import { browserFamily, knownOnDevice, type OnDeviceAnswer } from '../../domain/talk';
 import { talkPhrases } from '../../domain/teachers/chat';
 import { isAllowedHelperUrl, naturalVoicesOn } from '../../domain/teachers/chatRemote';
-import { TEACHER_REGISTRY, teacherForInteraction } from '../../domain/teachers/registry';
+import { TEACHER_REGISTRY, teacherActivities, teacherActivity, teacherForInteraction } from '../../domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../domain/types';
 import { toDay } from '../../domain/util/time';
@@ -56,12 +56,14 @@ import { KeyboardFlow } from './flows/KeyboardFlow';
 import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
 import { LessonFlow } from './flows/LessonFlow';
+import { TeacherActivityChooser } from './flows/TeacherActivityChooser';
 import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
 import { MIC_NEEDS_GROWNUP, MIC_NO_BROWSER_SUPPORT, type MicSetup, type TalkKit } from './Talk';
 import { useChildWorld, type ChildWorldData } from './useChildWorld';
 import type { TalkAvailability } from '../../voice/SpeechService';
 
 type Overlay =
+  | { kind: 'activities'; teacher: TeacherId; returnTo: { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number } }
   | { kind: 'globe' }
   | { kind: 'keyboard' }
   | { kind: 'hoot' }
@@ -786,6 +788,24 @@ export function ChildMode({ childId }: { childId: string }) {
     maybeCelebrateExplorer();
   }, [ctx, childId, maybeCelebrateExplorer]);
 
+  /** A choice can only launch its own teacher's reviewed route. Ignore stale async launches after dismissal. */
+  const chooseActivity = async (activityId: string) => {
+    const current = overlayRef.current;
+    if (current?.kind !== 'activities') return;
+    const choice = teacherActivity(current.teacher, activityId);
+    if (!choice) return;
+    const activity = choice.activity;
+    if (activity.kind === 'lesson') {
+      const lesson = getLesson(activity.lessonId);
+      if (!lesson || lesson.teacherId !== current.teacher) return;
+      const startTier = await startTierFor(ctx, childId, lesson);
+      if (overlayRef.current !== current) return;
+      setOverlay({ kind: 'lesson', teacher: current.teacher, lessonId: lesson.id, startTier });
+    } else {
+      setOverlay({ kind: activity.kind === 'reading' ? 'hoot' : activity.kind });
+    }
+  };
+
   // ── HUD actions ─────────────────────────────────────────────────────────
   const toggleSound = async () => {
     if (!household) return;
@@ -975,6 +995,9 @@ export function ChildMode({ childId }: { childId: string }) {
 
           {hint && <HintCard {...hint} onClose={() => setHint(null)} />}
 
+          {overlay?.kind === 'activities' && (
+            <TeacherActivityChooser teacher={overlay.teacher} speech={speech} onPick={chooseActivity} onClose={() => setOverlay(overlay.returnTo)} />
+          )}
           {overlay?.kind === 'keyboard' && (
             <KeyboardFlow
               speech={speech}
@@ -1018,6 +1041,10 @@ export function ChildMode({ childId }: { childId: string }) {
           )}
           {overlay?.kind === 'lesson' && (
             <LessonFlow
+              key={`${overlay.teacher}:${overlay.lessonId}`}
+              {...(teacherActivities(overlay.teacher).length > 1
+                ? { onChooseActivity: () => setOverlay({ kind: 'activities', teacher: overlay.teacher, returnTo: overlay }) }
+                : {})}
               teacher={overlay.teacher}
               lesson={getLesson(overlay.lessonId)!}
               startTier={overlay.startTier}

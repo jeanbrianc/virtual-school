@@ -26,6 +26,8 @@ export interface LessonFlowProps {
   /** True until she has had a conversation with this teacher. */
   firstMeeting: boolean;
   lastSummary?: string;
+  /** Available only before this run begins. */
+  onChooseActivity?: () => void;
   speech: Speech;
   playSfx: (name: 'correct' | 'tryAgain' | 'click' | 'sparkle' | 'splash' | 'plop') => void;
   onSaveContinue?: (run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[]) => Promise<void>;
@@ -241,6 +243,11 @@ export function LessonFlow(props: LessonFlowProps) {
               else close();
             }}
           />
+          {props.onChooseActivity && (
+            <button type="button" className="btn" onClick={props.onChooseActivity} data-testid="choose-teacher-activity">
+              Choose an activity
+            </button>
+          )}
           <TalkBar kit={props.talk} teacherName={TEACHERS[teacher].name} busy={talk.thinking} onSay={(t, via) => void tell(t, via)} />
         </>
       )}
