@@ -61,14 +61,25 @@ test('recognized safety stays local through repeated turns and Back; retained pa
       window.setTimeout(() => this.dispatchEvent(new Event('ended')), 0);
     };
   });
+  const selectSample = async (section: 'settings' | 'today') => {
+    if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await page.getByLabel('Viewing learner').selectOption({ label: 'Sample' });
+    if (isMobile) {
+      // The legacy sidebar covers the Menu toggle. Use real navigation to close it.
+      await page.getByTestId(`nav-${section === 'settings' ? 'today' : 'settings'}`).click();
+      await expect(page.locator('.p-side')).not.toHaveClass(/open/);
+      await page.getByRole('button', { name: 'Menu', exact: true }).click();
+      await page.getByTestId(`nav-${section}`).click();
+      await expect(page.locator('.p-side')).not.toHaveClass(/open/);
+    }
+    await expect(page.getByLabel('Viewing learner')).toHaveValue('child_izzy');
+  };
   await useSyntheticHousehold(page);
   expect(teacherRequests).toHaveLength(0);
   expect(voiceRequests).toHaveLength(0);
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
-  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByLabel('Viewing learner').selectOption({ label: 'Sample' });
-  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await selectSample('settings');
   await page.getByTestId('ai-endpoint').fill('/api');
   await page.getByTestId('ai-endpoint').blur();
   await page.getByTestId('ai-check').click();
@@ -82,7 +93,9 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   await page.getByLabel(/Teachers read their/).click();
   await expect(page.getByLabel(/Teachers read their/)).toBeChecked();
   await enterSchool(page, 'sample');
-  await page.getByTestId('discover-action').click();
+  await page.getByTestId('discover-ok').click();
+  await talkTo(page, 'hoot');
+  await expect(page.getByTestId('talk-input')).toBeVisible();
   const say = async (text: string) => {
     await page.getByTestId('talk-input').fill(text);
     await page.getByTestId('talk-send').click();
@@ -121,9 +134,7 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   await page.getByTestId('dialogue-close').click();
   await page.goto(`${APP}#/parent/today`);
   await unlockParent(page);
-  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
-  await page.getByLabel('Viewing learner').selectOption({ label: 'Sample' });
-  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await selectSample('today');
   await expect(page.getByTestId('teacher-notes')).toContainText('I am scared');
   await page.getByTestId('teacher-notes').screenshot({ path: `test-results/safety-parent-note-${info.project.name}.png` });
   if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
