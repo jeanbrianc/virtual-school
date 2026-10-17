@@ -5,7 +5,7 @@ parent studio for recordkeeping, curriculum tracking, portfolios and reports.
 
 - **Child mode** — an explorable, cozy 3D school. Izzy walks around (keyboard,
   tap-to-walk, or a game controller), talks to her teachers (Professor Hoot for
-  reading, Digit for math, Nova for science) — by tapping, typing, or just
+  reading, Digit for math, Nova for science and Pippa for shape play) — by tapping, typing, or just
   saying it out loud — finishes real books that fly onto her own bookshelf, and
   watches the school grow as she learns.
 - **Parent studio** — describe the day in plain English ("we baked bread and she
@@ -17,8 +17,8 @@ parent studio for recordkeeping, curriculum tracking, portfolios and reports.
 
 Everything is stored in the browser on your device (IndexedDB). On the family's own
 hosted site, **family sync** (opt-in) keeps every signed-in device's school the same
-through the family's own AWS account. There are no accounts, ads, analytics,
-trackers, social features or child-facing external links.
+through the family's own AWS account. The hosted sign-in protects one household; it is not a multi-family account system.
+There are no ads, analytics, trackers, social features or child-facing external links.
 
 On phones, the school menu sits below the status badges so **Grown-ups** stays
 reachable. To share progress, open **Grown-ups → Settings & privacy → Family sync**
@@ -79,9 +79,10 @@ npm run dev                    # also starts the AI helper on http://127.0.0.1:8
 Then *Settings & privacy → AI teachers*: **Check connection**, tick the consent
 box, and **Turn on AI teachers**. The key stays in `.env.local` on your computer
 (git-ignored) and never reaches the browser; the helper builds the teachers'
-instructions itself, only answers pages on this computer, and has a daily cap
-(`AI_DAILY_LIMIT`, default 300 replies ≈ well under a dollar a day with the
-default Claude Haiku 4.5 model). See [Privacy & safety](#privacy--safety) for
+instructions itself, only answers pages on this computer, and has a process-local request throttle
+(`AI_DAILY_LIMIT`, default 300 replies per warm helper). Parallel workers and
+cold starts have separate counters; this is not a deployment-wide usage total
+or a monetary spending cap. Provider billing and hosting costs are separate. See [Privacy & safety](#privacy--safety) for
 exactly what is sent.
 
 **Check connection** confirms provider configuration; it does not prove that
@@ -125,7 +126,7 @@ serve `dist/` from any static host).
 | `npm run build:lambda` | Bundle the AI helper for AWS Lambda → `dist-lambda/ai-helper.zip` |
 | `npm run typecheck` | `tsc --noEmit` (strict, `noUncheckedIndexedAccess`) |
 | `npm run lint` | Architecture boundaries + privacy/safety rules + Prettier check |
-| `npm test` | Unit tests (Node test runner + tsx), 117 tests |
+| `npm test` | Unit tests (Node test runner + tsx); the run reports the current count |
 | `npm run test:e2e` | Builds the e2e bundle and runs Playwright (desktop + phone) |
 | `npm run check` | typecheck + lint + unit tests + production build |
 | `npm run format` | Prettier write |
@@ -209,7 +210,7 @@ Digit's **Moon Rock Rescue** (counting → comparing → add/subtract within 10 
 ```
 src/
   domain/      Pure TypeScript. No React, no three.js, no storage.
-    curriculum/   8 domains, 21 strands, 78 skills with standards alignments
+    curriculum/   8 domains, 21 strands, 83 tracked skills with standards alignments
     mastery/      evidence → mastery level (deterministic, testable rules)
     adaptive/     per-domain capability profiles, recommendations, start tiers
     lessons/      LessonRun (adaptive runner + scaffold ladder), lesson content
@@ -304,7 +305,7 @@ is flagged for a gentle review.
 
 ## Curriculum
 
-78 skills across Reading, Math, Science (primary) and Writing, Vocabulary,
+83 tracked skills across Reading, Math, Science (primary) and Writing, Vocabulary,
 Reasoning, Life Skills and Creativity. Each skill has a parent-facing
 "can …" statement, a kid-facing name, an internal difficulty (Pre-K … Grade 4),
 prerequisites, topics that grow the world, an at-home activity idea and
@@ -322,7 +323,12 @@ prerequisites are met, plus review for anything slipping.
 The book catalog contains 15 real children's books with **original**
 comprehension questions and "favorite moment" choices (no copyrighted text is
 reproduced). Parents can add any book; unknown titles still work with generic
-questions.
+reflections; unknown book facts are not verified. The catalog is not a complete
+reading curriculum, and catalog entries are not all playable lessons.
+
+See [the source-verified capability matrix](docs/CAPABILITIES.md) for exact
+activities, content ceilings, rewards and backup limits. Recompute the inventory
+with `node --import tsx scripts/capabilities.ts`.
 
 ---
 
@@ -462,9 +468,10 @@ font CDN is contacted.
 
 - Parent is the administrator; the studio is behind a PIN (a speed bump for
   little hands, not a security boundary against adults).
-- Data never leaves the device unless the parent turns on and consents to an
-  AI service. No accounts, analytics, ads, trackers, social features, or public
-  profiles. The preview server sends a strict CSP (connections only to itself,
+- Data can leave the device through parent-enabled family sync, optional
+  AI/browser speech services, or parent exports. The hosted sign-in serves one
+  household; it does not authorize other households. No analytics, ads, trackers,
+  social features or public child profiles. The preview server sends a strict CSP (connections only to itself,
   the local helper, or a parent-configured https endpoint).
 - **Talking**: by default her voice is recognized on the computer and the audio
   is never recorded, stored or sent. Only if a parent picks *Also allow the
@@ -496,7 +503,7 @@ font CDN is contacted.
 
 ## Tests & quality checks
 
-- **Unit (117 tests)** — AWS hosting (the edge sign-in function: welcome page, session cookies, sign-out; stack wiring, the Lambda adapter refusing traffic that skipped CloudFront), talking to teachers (the user's own example sentence,
+- **Unit/component tests** — AWS hosting (the edge sign-in function: welcome page, session cookies, sign-out; stack wiring, the Lambda adapter refusing traffic that skipped CloudFront), talking to teachers (the user's own example sentence,
   catalog/own-book title matching, yes/not-yet follow-ups, worries → parent
   notes, reply sanitizing and AI output validation, the browser adapter's
   fallbacks and data minimization, prompt building, the helper's CORS/header/
@@ -556,21 +563,29 @@ so `npm install` reproduces them from npm on a normal machine.
   forgivingly.
 - Without AI teachers, the on-device teachers understand book talk and simple
   feelings/questions, and answer anything else with a friendly generic reply.
-- Data lives in one browser profile. Use *Export* for backups; there is no sync
-  between devices yet.
-- Only two adaptive lessons (math, science) plus book conversations exist today;
-  the curriculum and engine are ready for more.
+- Data is local-first, with optional single-household sync on the hosted site.
+  The child JSON export references media by ID and is not a whole-school media
+  backup; a supported complete restore/import workflow is not shipped. Sync can
+  propagate deletion and is not an independent versioned backup.
+- Four teachers, three directly registered lessons, book conversations, keyboard
+  trails and two globe modes are available. The 83-skill tracking catalog is much
+  broader than the playable content; see [the capability matrix](docs/CAPABILITIES.md).
 - The parent PIN is not encryption. Anyone with the device can read the data.
 
-## Next priorities
+## Current backlog and release evidence
 
-1. More lessons: phonics/decoding games with Hoot, place value with Digit,
-   life-cycle and weather labs with Nova; writing/drawing canvas.
-2. Encrypted backup/restore file (and optional family-owned sync).
-3. Blender-authored teacher and pet models with animation clips.
-4. Parent weekly planner that turns recommendations into a gentle schedule.
-5. Georgia's early-years track (board books, songs, sensory play) when she's ready.
-6. PWA install + offline service worker.
+The [development roadmap (#12)](https://github.com/jeanbrianc/virtual-school/issues/12)
+tracks bounded increments and remaining acceptance gates. Current priorities are
+accessible learning, the [phone book-arrival camera (#32)](https://github.com/jeanbrianc/virtual-school/issues/32),
+[honest usage/budgets (#25)](https://github.com/jeanbrianc/virtual-school/issues/25)
+and [voice migration (#26)](https://github.com/jeanbrianc/virtual-school/issues/26).
+Existing-teacher depth remains in #20–#24; music and life skills in #13–#14.
+External-family privacy, isolation and pilot gates #9–#11 are still open.
+
+A merged feature, a passing unit suite and a deployed release are separate facts.
+See [the release feature inventory](docs/RELEASE-INVENTORY.md) for exact commits,
+verified CI, preserved-source boundaries and the release checklist. New draft
+PRs remain unshipped until independently reviewed and owner-approved.
 
 ### Keyboard trail
 
