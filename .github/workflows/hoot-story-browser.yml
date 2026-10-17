@@ -15,6 +15,10 @@ on:
       - 'tests/e2e/helpers.ts'
       - 'playwright.config.ts'
       - '.github/workflows/hoot-story-browser.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
 permissions:
   contents: read
 concurrency:
@@ -39,8 +43,10 @@ jobs:
       - name: Hoot story desktop and narrow-touch journeys
         run: npm run test:e2e -- tests/e2e/story-conversations.spec.ts tests/e2e/hoot-mobile.spec.ts tests/e2e/core-loop.spec.ts --project=${{ matrix.project }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
         with:
           name: hoot-story-browser-evidence-${{ matrix.project }}
-          path: test-results/
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
           retention-days: 7

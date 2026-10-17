@@ -9,6 +9,7 @@ import { createServer, type Server } from 'node:http';
 import { createRequire } from 'node:module';
 import { extname, join, normalize } from 'node:path';
 import { expect, test } from 'playwright/test';
+import { captureSyntheticSuccess, sanitizeSyntheticHousehold } from './synthetic-household';
 
 const root = new URL('../..', import.meta.url).pathname;
 const dist = join(root, 'dist-e2e');
@@ -75,7 +76,7 @@ test.beforeAll(async () => {
 
 test.afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
-test('the welcome page signs the family in, and only then opens the school', async ({ page }) => {
+test('the welcome page signs the family in, and only then opens the school', async ({ page }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(`http://127.0.0.1:${PORT}/`);
@@ -94,6 +95,10 @@ test('the welcome page signs the family in, and only then opens the school', asy
   await page.getByLabel('Password').fill('open sesame');
   await page.getByRole('button', { name: /Open the school/ }).click();
   await expect(page.getByTestId('enter-izzy')).toBeVisible({ timeout: 60_000 });
+  await sanitizeSyntheticHousehold(page);
+  await page.reload();
+  await expect(page.getByTestId('enter-sample')).toBeVisible();
+  await captureSyntheticSuccess(page, info);
 
   // Signing out brings the welcome page back.
   await page.goto(`http://127.0.0.1:${PORT}/auth/logout`);

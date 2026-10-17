@@ -1,3 +1,4 @@
+import { PatternProgressionStage } from './PatternProgression';
 import { LifeCycleStage } from './LifeCyclePicture';
 import { BaseTenStage } from './BaseTenStage';
 import { ShapePicture } from './ShapePicture';
@@ -121,6 +122,8 @@ function TankStage({ objectId, showResult, floats, dropping }: { objectId: strin
 
 export function LessonStage({ visual, seed, dropping }: { visual: LessonVisual; seed: number; dropping?: { floats: boolean } | null }) {
   switch (visual.type) {
+    case 'pattern-progression':
+      return <PatternProgressionStage shapes={visual.shapes} unitLength={visual.unitLength} matching={visual.matching} />;
     case 'life-cycle':
       return <LifeCycleStage stage={visual.stage} next={visual.next} />;
     case 'base-ten':

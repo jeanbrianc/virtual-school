@@ -1,0 +1,44 @@
+name: Learning record deletion review
+on:
+  pull_request:
+    paths:
+      - 'src/services/householdService.ts'
+      - 'src/ui/parent/pages/SettingsPage.tsx'
+      - 'tests/unit/delete-learning-records.test.ts'
+      - 'tests/e2e/delete-learning-records.spec.ts'
+      - 'tests/e2e/synthetic-household.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/delete-learning-records.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
+permissions:
+  contents: read
+jobs:
+  reset-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- tests/e2e/delete-learning-records.spec.ts --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
+        with:
+          name: learning-record-reset-${{ matrix.project }}-${{ github.sha }}
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
+          retention-days: 7
+          if-no-files-found: warn

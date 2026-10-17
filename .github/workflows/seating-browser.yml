@@ -1,0 +1,52 @@
+name: Classroom seating browser acceptance
+on:
+  pull_request:
+    paths:
+      - 'src/engine/**'
+      - 'src/ui/child/ChildMode.tsx'
+      - 'src/app/App.tsx'
+      - 'src/styles/child.css'
+      - 'tests/**/seating*.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/seating-browser.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
+permissions:
+  contents: read
+concurrency:
+  group: seating-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.suite == 'seating' && 55 || 40 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+        suite: [seating, reading-nook]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - run: git rev-parse HEAD && git rev-parse HEAD^{tree}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- tests/e2e/${{ matrix.suite }}.spec.ts --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
+        with:
+          name: seating-${{ matrix.suite }}-${{ matrix.project }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
+          retention-days: 7
+          if-no-files-found: warn

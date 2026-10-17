@@ -1,10 +1,13 @@
 /**
  * The dance & gym circuit on the classroom rug: a grown-up matches the
- * stations to her classes, every number makes Izzy do its move, and hopping
+ * stations to her classes, every number makes the learner do her move, and hopping
  * 1 → 10 in order finishes the circuit (which the Parent Studio then shows).
  */
 import { expect, test, type Page } from 'playwright/test';
 import { APP, enterSchool, unlockParent } from './helpers';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
+
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
 
 /** Puts her on number n, checks the callout, and waits for the move to play out. */
 async function hop(page: Page, n: number, says?: string): Promise<void> {
@@ -36,7 +39,7 @@ test('dance circuit: stations from her classes, a move on every number, 1 → 10
   await expect(page.getByTestId('circuit-save')).toContainText('Saved');
   await expect(page.getByTestId('circuit-save')).toBeDisabled();
 
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
 
   // The start flag explains the game the first time, then starts the circuit.
@@ -72,3 +75,5 @@ test('dance circuit: stations from her classes, a move on every number, 1 → 10
 
   expect(errors).toEqual([]);
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

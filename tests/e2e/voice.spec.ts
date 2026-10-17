@@ -1,10 +1,11 @@
 /**
- * Read-aloud says her name the way the family does: a parent picks a spelling
- * that sounds right ("Izzee"), hears it, saves it, and the teachers use it when
- * they speak — while the words on screen still say "Izzy".
+ * Read-aloud pronunciation with a fictional synthetic profile: a parent picks
+ * a suggested respelling, hears it, saves it, and teachers use it for speech
+ * while the displayed profile name stays unchanged.
  */
 import { expect, test } from 'playwright/test';
 import { APP, enterSchool, unlockParent } from './helpers';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
 
 declare global {
   interface Window {
@@ -41,6 +42,7 @@ test.beforeEach(async ({ page }) => {
       window.setTimeout(() => u.onend?.(), 20);
     };
   });
+  await useSyntheticHousehold(page, 'Isla');
 });
 
 const lastSpoken = (page: import('playwright/test').Page) => page.evaluate(() => window.__spoken.at(-1) ?? null);
@@ -52,42 +54,44 @@ test('a parent fixes how the voices say her name', async ({ page }) => {
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
   const card = page.getByTestId('say-name');
-  await expect(card).toContainText('How the voices say “Izzy”');
+  await expect(card).toContainText('How the voices say “Isla”');
 
   // Automatic picks the clear built-in US voice, never a joke or network voice.
   await expect(page.getByTestId('voice-pick').locator('option').first()).toHaveText('Automatic — Samantha (US)');
   await expect(page.getByTestId('voice-pick').locator('option')).toHaveCount(4);
 
   // Try a suggestion: it plays right away.
-  await card.getByRole('button', { name: 'Izzee' }).click();
-  await expect.poll(() => lastSpoken(page)).toEqual({ text: 'Hoo-hoo! Hello, Izzee! Ready to read with me, Izzee?', voice: 'Samantha' });
-  await expect(page.getByTestId('say-name-input')).toHaveValue('Izzee');
+  await card.getByRole('button', { name: 'Eye-la' }).click();
+  await expect.poll(() => lastSpoken(page)).toEqual({ text: 'Hoo-hoo! Hello, Eye-la! Ready to read with me, Eye-la?', voice: 'Samantha' });
+  await expect(page.getByTestId('say-name-input')).toHaveValue('Eye-la');
 
   // A different voice, then save.
   await page.getByTestId('voice-pick').selectOption('Karen');
   await page.getByTestId('say-name-hear').click();
-  await expect.poll(() => lastSpoken(page)).toEqual({ text: 'Hoo-hoo! Hello, Izzee! Ready to read with me, Izzee?', voice: 'Karen' });
+  await expect.poll(() => lastSpoken(page)).toEqual({ text: 'Hoo-hoo! Hello, Eye-la! Ready to read with me, Eye-la?', voice: 'Karen' });
   await page.getByTestId('say-name-save').click();
-  await expect(card).toContainText('Voices now say “Izzee”.');
+  await expect(card).toContainText('Voices now say “Eye-la”.');
   await expect(page.getByTestId('say-name-save')).toBeDisabled();
 
-  // In the school the words still say "Izzy", but the voice says "Izzee".
-  await enterSchool(page);
+  // In the school the words still say "Isla", but the voice says "Eye-la".
+  await enterSchool(page, 'isla');
   await page.getByTestId('discover-action').click(); // "Meet Professor Hoot"
-  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Izzy', { timeout: 120_000 });
+  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Isla', { timeout: 120_000 });
   const before = await page.evaluate(() => window.__spoken.length);
   await page.locator('.dialogue-tools').getByRole('button', { name: 'Read it to me' }).click();
   await expect.poll(() => page.evaluate(() => window.__spoken.length)).toBeGreaterThan(before);
   const said = await lastSpoken(page);
   expect(said?.voice).toBe('Karen');
-  expect(said?.text).toContain('you must be Izzee');
-  expect(said?.text).not.toMatch(/\bIzzy\b/);
+  expect(said?.text).toContain('you must be Eye-la');
+  expect(said?.text).not.toMatch(/\bIsla\b/);
 
   // Back to her name as written.
   await page.goto(`${APP}#/parent/settings`); // still unlocked from before
-  await page.getByTestId('say-name').getByRole('button', { name: 'Use “Izzy” as written' }).click();
-  await expect(page.getByTestId('say-name')).toContainText('Voices read “Izzy” as written.');
+  await page.getByTestId('say-name').getByRole('button', { name: 'Use “Isla” as written' }).click();
+  await expect(page.getByTestId('say-name')).toContainText('Voices read “Isla” as written.');
   await expect(page.getByTestId('say-name-input')).toHaveValue('');
 
   expect(errors).toEqual([]);
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

@@ -194,6 +194,7 @@ it('newer arrival and camera release cannot be overwritten by an older awaited a
     opts: { container: { clientWidth: 320, clientHeight: 740 }, audio: { play() {} } },
     world: { bookshelf: shelf, structure: { root: new THREE.Group() }, anchors: new Map(), teachers: new Map() },
     interaction: { hideMarker() {} },
+    player: { stand() {}, stop() {} },
     particles: { sparkle() {} },
   }) as unknown as Game;
   const old = game.celebrateBook(book(24));
@@ -236,6 +237,7 @@ it('desktop-to-phone resize updates the current pan and flight without replacing
       opts: { container, audio: { play() {} } },
       world: { bookshelf: shelf, structure: { root: new THREE.Group() }, anchors: new Map(), teachers: new Map() },
       interaction: { hideMarker() {} },
+      player: { stand() {}, stop() {} },
       particles: { sparkle() {} },
     }) as unknown as Game;
     const b = book(25);

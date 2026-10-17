@@ -24,6 +24,7 @@ export function TeacherActivityChooser({
   return (
     <div
       ref={host}
+      className="teacher-activity-chooser"
       data-testid="teacher-activity-chooser"
       onKeyDown={(event) => {
         if (event.key === 'Escape') {

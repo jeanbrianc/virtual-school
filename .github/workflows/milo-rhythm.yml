@@ -1,0 +1,51 @@
+name: Milo rhythm review
+on:
+  pull_request:
+    paths:
+      - 'src/domain/music/**'
+      - 'src/domain/teachers/**'
+      - 'src/domain/curriculum/catalog.ts'
+      - 'src/domain/types.ts'
+      - 'src/audio/RhythmPlayer.ts'
+      - 'src/services/rhythmService.ts'
+      - 'src/ui/child/flows/RhythmFlow.tsx'
+      - 'src/ui/child/ChildMode.tsx'
+      - 'src/ui/parent/pages/RhythmSettings.tsx'
+      - 'src/styles/rhythm.css'
+      - 'tests/unit/rhythm*.test.ts'
+      - 'tests/e2e/milo-rhythm.spec.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/milo-rhythm.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
+permissions:
+  contents: read
+jobs:
+  rhythm-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- tests/e2e/milo-rhythm.spec.ts --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
+        with:
+          name: milo-rhythm-${{ matrix.project }}-${{ github.sha }}
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
+          retention-days: 7
+          if-no-files-found: warn

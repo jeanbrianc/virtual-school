@@ -1,7 +1,11 @@
 # Architecture
 
 This document explains how the pieces fit together and why. For setup and
-commands see the [README](../README.md).
+commands see the [README](../README.md). It describes the combined candidate;
+current live PR #42 and the candidate's source checkpoints/status are separated
+in [the release inventory](RELEASE-INVENTORY.md). Source inventory is 100 tracked
+skills, six teachers, eight direct lesson definitions and 14 activity-title
+entries; these are availability counts, not learner proficiency.
 
 ## Layers
 
@@ -48,22 +52,23 @@ Child taps "Finish a book" → HootFlow (LessonRun over storyChatLesson)
 Parent studio live-queries the same tables and re-renders.
 ```
 
-### Free talk ("I read Daddy the Goodnight Leelanau book")
+### Free talk (synthetic example: "I finished The Sample Kite")
 
 ```
 Mic tap → Mic.listen (ChildMode: talkMode + the on-device answer a parent's
           "Check this browser" saved in meta.speechProbe → SpeechInput.check;
-          on-device first, cancels teacher speech, phrases = her titles + catalog)
+          on-device first, cancels teacher speech, phrases = learner titles + catalog)
   → words → useTeacherTalk.send → TeacherChatService.respond({teacher, name,
-            utterance, history (flow transcript, last 8), books, topic})
+            utterance, history (available flow turns), books, topic, privacy})
        LocalTeacherChat: understand() → intent/title/readTo/finished
-                         → resolveBook() (her list → catalog → prefix → Title Case)
-       HttpTeacherChat:  safety cues → local (never sent) · else POST helper
-                         /v1/teacher → validateTeacherReply + sanitize → fallback
+                         → resolveBook() (learner list → catalog → prefix → Title Case)
+       HttpTeacherChat:  check retained context + monotonic containment boundary
+                         contained → local; otherwise send last 8 turns + bounded titles
+                         POST /v1/teacher → validateTeacherReply + sanitize → fallback
   → nextTopic() keeps {book, finished, readTo, readBy} across turns
   → HootFlow shows the reply + a big next-step button:
        finished → finishFromTalk → the usual story chat → completeBook
-                  (sessionNote "Izzy read it aloud to Daddy", readingMode,
+                  (synthetic sessionNote "Sample read with a grown-up", readingMode,
                    parentNotes) · not yet → bookmark (logReading / addBook)
   → transcript lines carry via: 'voice' | 'typed' | 'ai'; parentNotes land on the
     TeacherInteraction and surface on Today until a parent marks them read.
@@ -76,23 +81,40 @@ OpenAI Responses API (`openai.ts`: forced `teacher_reply` function call,
 the Anthropic Messages body (`buildTeacherRequest`: forced `teacher_reply` tool) —
 with the same system prompt (persona + safety rules), and returns only the
 structured reply. With OpenAI it also speaks teacher lines (`/v1/speak`,
-`gpt-4o-mini-tts`, per-teacher voice) and turns her recordings into words
+`gpt-4o-mini-tts`, per-teacher voice) and turns microphone clips into words
 (`/v1/listen`, `gpt-transcribe`); the browser side is `src/voice/helperVoice.ts`
-(consent-gated, falls back to the built-in voice / recognizer). `main.ts` wraps
+(consent-gated). Speech failure attempts browser output; listening failures do
+not silently switch recognition services. Text/typing remain available. `main.ts` wraps
 it in `node:http` on 127.0.0.1; `scripts/ai-helper.mjs` starts it from
 `dev`/`preview` when `.env.local` has a key; `lambda.ts` serves it on AWS and
 reads the OpenAI key from Secrets Manager (`awsSecret.ts`, SigV4, cached an hour).
 
+`TeacherInteraction` stores the supplied transcript turns and an outcome/summary,
+not a guaranteed verbatim recording of every interaction. Hoot and lesson flows
+retain their available text turns; place-value saves an activity summary with an
+empty transcript. Globe practice stores round observations in `lessonAttempts`.
+Speech-recognized text can be incomplete or misheard; no microphone audio is
+saved as a learning-record transcript.
+
+Ordinary browser output prefers listed English `localService` voices but can use
+the browser default if none is listed. Contained speech requires a local-service
+voice or stays silent with text visible. Recognition is bounded, and input audio
+can already have reached a parent-enabled service before its words are known.
+Existing sync/export permissions do not change. See
+[containment limits](SAFETY-CONTAINMENT.md) and
+[provider-data limits](DEPLOY.md#provider-data-handling-and-release-limits).
+
 A parent-logged activity follows the identical `finalizeLearning` path, so a
 "we planted beans" entry can open the greenhouse; the unlock stays
-`celebrated=false` until the child next enters her school, where it is
+`celebrated=false` until the learner next enters the school, where it is
 celebrated with a camera shot of the new room.
 
 ## Domain modules
 
 - **curriculum/** — `DOMAINS`, `STRANDS`, `SKILLS` with prerequisites (acyclic,
   validated by `validateCatalog()`), difficulty 0–5, topics, lesson links and
-  standards. The catalog is data; adding a skill is a one-entry change.
+  standards. The catalog is data; adding a skill still requires reviewing its
+  bounded evidence claim, prerequisites, mapping and record compatibility.
 - **mastery/** — `computeMastery(evidence)` expands evidence into an ordered
   trial sequence (exposure excluded), then applies the rules in the README.
   `updateMasteryRecord` preserves history and parent overrides.
@@ -102,11 +124,21 @@ celebrated with a camera shot of the new room.
   shown to parents only). `recommendNext` scores review / continue / ready /
   consolidate candidates; `chooseStartTier` starts lessons at the first tier
   that isn't yet proficient.
-- **lessons/** — `LessonRun` is deterministic given a seed: first-try success is
-  independent, two in a row raises the tier; a miss walks the ladder (`hint` →
-  `simpler` stepping-stone → `alternate`) and finally models the answer,
-  records `not_yet` and eases the tier. Lesson content (`moonRocks`,
-  `sinkFloat`, `storyChat`) is just generators that return `Problem`s.
+- **lessons/** — `LessonRun` is deterministic given a seed. Its adaptive path
+  can raise a tier after two independent successes and step down after a model;
+  `manualProgression` disables automatic tier changes for the explicit bounded
+  lessons. Models, hints, retries, skips and creative observations retain their
+  actual evidence meaning. The eight direct definitions are inventoried in
+  [CAPABILITIES.md](CAPABILITIES.md); shared registration does not mean each uses
+  an identical UI/service. Arithmetic has a parent goal/purpose choice, review
+  separation, model-only observations and a child-scoped revision guard.
+- **lessons/routine.ts** and **music/rhythm.ts** — separate deterministic Tavi and
+  Milo flows, rather than extra direct definitions in `LESSONS`. Routine grading
+  checks explicit precedence constraints and accepts multiple valid orders.
+  Rhythm copying and untimed visual recognition have separate narrow skills;
+  unreliable timing is exploration. Their services bind runs to a child and use
+  stable completion/evidence IDs and atomic saves. No microphone/recording or
+  remote teaching path is introduced by these activities.
 - **interpretation/** — `ActivityInterpretationService` interface.
   `LocalHeuristicInterpreter`: sentence split → context carry-over (reading /
   cooking / nature / art…) → clause-level independence cues → rule lexicon →
@@ -115,8 +147,11 @@ celebrated with a camera shot of the new room.
 - **teachers/** — personas and openers (`teachers.ts`); free conversation
   (`chat.ts`: `understand`, `resolveBook`, `localTeacherReply`, `nextTopic`,
   `sanitizeTeacherReply`, `validateTeacherReply`); the consent-gated AI adapter
-  (`chatRemote.ts`, the only other file allowed to use the network); and the
-  prompt/request builders the local helper uses (`aiPrompt.ts`).
+  (`chatRemote.ts`, one of the explicit network adapters alongside interpretation,
+  `voice/helperVoice.ts` and `sync/transport.ts`); and the
+  prompt/request builders the local helper uses (`aiPrompt.ts`). Six current
+  teachers are Hoot, Digit, Nova, Pippa, Tavi and Milo. Older stored IDs retain
+  historical records; the registration is not a promise of full subject coverage.
 - **settings.ts** — defaults (`talkMode: 'device'`, AI teachers off) and
   `normalizeSettings` for households saved by older versions.
 - **rewards/** — declarative rules (`books`, `topic`, `lesson`, `artworks`,
@@ -127,15 +162,15 @@ celebrated with a camera shot of the new room.
 - **reports/** — `generateReport(inputs, {audience, start, end})` produces an
   immutable `ReportContent` snapshot (parent record vs. family update).
 - **play/circuit.ts** — the rug's dance & gym circuit: the 17-move catalog,
-  `circuitFor(child)` (her family's 10 stations, defaults elsewhere),
+  `circuitFor(child)` (the profile's configured 10 stations, otherwise defaults),
   `stepOn(run, n)` (1 starts, the right next number advances, 10 after 9
   completes; any number still does its move) and the coach's lines. The
   engine side is `engine/characters/moves.ts` (pure pose functions over
   t = 0…1, eased so every move starts and ends standing; played by
-  `AvatarModel.perform`, which pivots flips around her middle and tips the
+  `AvatarModel.perform`, which pivots flips around the avatar's middle and tips the
   upper body at the hips) and `engine/world/danceMat.ts` (where the painted
-  numbers are, the next-number glow, the start flag). `Game` notices her
-  entering a number — only the one a tap was heading for — turns her a little
+  numbers are, the next-number glow, the start flag). `Game` notices the avatar
+  entering a number — only the one a tap was heading for — turns the avatar a little
   off the camera, leans the camera in, plays the move with its sounds and
   sparkles, and reports `onStation(n)`; `ChildMode` keeps the run, the HUD
   and the callouts, and saves `circuitsDone`.
@@ -150,6 +185,13 @@ fallback. `Repositories.forChild()` always queries through the `childId` index.
 `useLiveQuery(query, deps, tables)` re-runs a query when a relevant table
 changes, which keeps parent pages and the museum current without manual
 refreshes.
+
+The selected-learner record-deletion operation preserves the profile and avatar
+appearance while removing learning records and child-scoped media. It clears an
+avatar inspiration reference only when its referenced media is deleted. This
+operation is not account deletion or provider deletion. Avatar photos remain
+ordinary media in opt-in sync; no face analysis is performed. The per-learner
+JSON export references media IDs and is not an embedded-media whole-school backup.
 
 ## Engine
 
@@ -173,6 +215,15 @@ refreshes.
 - The dance start flag stands in the aisle beside the numbered rug. Its position
   leaves room for the pennant and interaction marker in the follow camera;
   station 1 continues to start the circuit automatically.
+- Milo's DOM-only modal owns a token-scoped rendering lease. `drawFrame` skips
+  background WebGL draws while any lease is held; world updates, camera tweens
+  and activity audio/DOM pulses continue. Each owner releases only its own token,
+  including repeated cleanup. This is not a universal latency guarantee.
+- Eleven seat registrations carry a pose, exit point and optional nook/reading
+  flags independently of static mesh batching. Standing cancels pending seating
+  and restores the camera; competing movement/activity transitions invalidate
+  stale seat intent. The garden-couch book pose is visual play. Seating calls no
+  learning service and adds no book, lesson, mastery, reward or progress credit.
 - The child's name is passed in (chalkboard greeting, shelf plaque, art
   signatures) — nothing in the engine is specific to one child.
 
@@ -248,6 +299,13 @@ mastery. It does not claim 3D art-making, invent learning standards, or call the
 AI helper. Every completed lesson run has a stable UUID, an atomic insert guard,
 and child-scoped evidence; cancelled runs and skipped rounds produce no new
 performance evidence. Replay discards the unsaved round and starts a fresh run.
+
+The optional four-round `pattern-progression` route adds explicit matching,
+AB, AAB, ABB and ABC choices without replacing Shape Studio. Continuation uses
+visible grouped models and new narrow IDs; old broad pattern evidence is not
+copied into them. It does not implement drawing, rule explanation or artwork
+portfolio/reward credit. Hints/models/retries mark support and no automatic
+promotion is inferred from reading level or age.
 
 The five-letter keyboard lesson highlights individual colorful tiles on the
 actual classroom alphabet banner. The camera frames each target on portrait

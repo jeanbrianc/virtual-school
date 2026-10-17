@@ -42,6 +42,9 @@ export class AvatarModel {
   private armR = new THREE.Group();
   private legL = new THREE.Group();
   private legR = new THREE.Group();
+  private knees: THREE.Group[] = [];
+  private readingBook = new THREE.Group();
+  private seatPose: 'sit' | 'read' | null = null;
   private eyes: THREE.Object3D[] = [];
   /** Per arm (L, R): the hand and sleeve puff, kept round while a raised arm stretches. */
   private armEnds: { hand: THREE.Object3D; puff: THREE.Object3D | null }[] = [];
@@ -63,6 +66,7 @@ export class AvatarModel {
   }
 
   setConfig(config: AvatarConfig): void {
+    this.setSeated(null);
     this.config = config;
     this.rig.clear();
     this.upper = new THREE.Group();
@@ -72,6 +76,8 @@ export class AvatarModel {
     this.armR = new THREE.Group();
     this.legL = new THREE.Group();
     this.legR = new THREE.Group();
+    this.knees = [];
+    this.readingBook = new THREE.Group();
     this.eyes = [];
     this.armEnds = [];
     this.build();
@@ -102,12 +108,21 @@ export class AvatarModel {
       // Swing front/back first, then out to the side (so "forward" means forward at any spread).
       leg.rotation.order = 'ZXY';
       const bareLeg = c.outfit === 'dress' || c.outfit === 'tee';
-      const upper = capsule(0.068, 0.2, bareLeg ? skin : pants, 0, -0.16, 0);
-      leg.add(upper);
-      if (c.outfit === 'dress') leg.add(cyl(0.07, 0.07, 0.07, mat('#fff8ee'), 0, -0.3, 0));
-      const foot = sphere(0.085, shoe, 0, -0.36, 0.035);
+      leg.name = side === -1 ? 'left-thigh' : 'right-thigh';
+      leg.add(capsule(0.066, 0.07, bareLeg ? skin : pants, 0, -0.075, 0));
+      const knee = new THREE.Group();
+      knee.name = side === -1 ? 'left-knee' : 'right-knee';
+      knee.position.y = -0.17;
+      const calf = capsule(0.061, 0.07, bareLeg ? skin : pants, 0, -0.075, 0);
+      calf.name = side === -1 ? 'left-calf' : 'right-calf';
+      knee.add(calf);
+      if (c.outfit === 'dress') knee.add(cyl(0.062, 0.062, 0.07, mat('#fff8ee'), 0, -0.13, 0));
+      const foot = sphere(0.085, shoe, 0, -0.19, 0.035);
+      foot.name = side === -1 ? 'left-shoe' : 'right-shoe';
       foot.scale.set(1, 0.62, 1.35);
-      leg.add(foot);
+      knee.add(foot);
+      leg.add(knee);
+      this.knees.push(knee);
       this.rig.add(leg);
     }
 
@@ -123,10 +138,12 @@ export class AvatarModel {
     this.torso.add(body);
     if (c.outfit === 'dress') {
       const skirt = cyl(0.15, 0.27, 0.3, outfit, 0, 0.02, 0, 28);
+      skirt.name = 'dress-skirt';
       this.torso.add(skirt);
       const hem = torus(0.265, 0.018, accent);
       hem.rotation.x = Math.PI / 2;
       hem.position.y = -0.12;
+      hem.name = 'dress-hem';
       this.torso.add(hem);
       const collar = torus(0.1, 0.02, mat('#fffaf0'));
       collar.rotation.x = Math.PI / 2;
@@ -160,6 +177,7 @@ export class AvatarModel {
     } else if (c.outfit === 'labcoat') {
       this.torso.add(cyl(0.175, 0.185, 0.12, pants, 0, 0.0, 0));
       const coat = cyl(0.19, 0.25, 0.46, mat('#fbfbf7', { roughness: 0.9 }), 0, 0.1, -0.01, 24);
+      coat.name = 'coat-hem';
       this.torso.add(coat);
       this.torso.add(rbox(0.07, 0.07, 0.02, 0.01, mat('#e8eef0'), 0.1, 0.1, 0.21));
       this.torso.add(rbox(0.012, 0.06, 0.012, 0.004, mat(c.accentColor), 0.1, 0.15, 0.225));
@@ -229,6 +247,21 @@ export class AvatarModel {
     this.buildHair(hair, c);
     this.buildAccessory(c);
     this.upper.add(this.head);
+    this.readingBook.name = 'seated-open-book';
+    const cover = mat(c.accentColor, { roughness: 0.8 });
+    for (const side of [-1, 1]) {
+      const page = new THREE.Group();
+      page.add(rbox(0.18, 0.018, 0.25, 0.008, cover, side * 0.09, 0, 0));
+      page.add(rbox(0.164, 0.022, 0.232, 0.006, mat('#fff6df'), side * 0.09, 0.018, 0));
+      // A few friendly printed lines, entirely procedural and local.
+      for (let line = 0; line < 4; line++) page.add(rbox(0.11, 0.003, 0.007, 0.002, mat('#b9a78b'), side * 0.09, 0.032, -0.07 + line * 0.04));
+      page.rotation.z = side * 0.13;
+      this.readingBook.add(page);
+    }
+    this.readingBook.position.set(0, 0.15, 0.27);
+    this.readingBook.rotation.x = 0.18;
+    this.readingBook.visible = false;
+    this.upper.add(this.readingBook);
   }
 
   private buildHair(hair: THREE.Material, c: AvatarConfig) {
@@ -390,6 +423,7 @@ export class AvatarModel {
 
   /** Does a dance or gym move; resolves when she's standing again. A new move replaces one in progress. */
   perform(move: DanceMoveId): Promise<void> {
+    this.setSeated(null);
     this.move?.done();
     return new Promise((resolve) => {
       this.move = { id: move, t: 0, nextCue: 0, done: resolve };
@@ -472,11 +506,53 @@ export class AvatarModel {
     }
   }
 
+  /** Temporary pose only. The learner's saved appearance is never replaced. */
+  setSeated(pose: 'sit' | 'read' | null): void {
+    this.move?.done();
+    this.move = null;
+    this.waveTime = 0;
+    this.hopTime = 0;
+    this.seatPose = pose;
+    this.resetPose();
+    this.readingBook.visible = pose === 'read';
+    if (pose) this.updateSeated();
+  }
+
+  get seatedPose(): 'sit' | 'read' | null {
+    return this.seatPose;
+  }
+
+  private updateSeated(): void {
+    this.legL.rotation.x = this.legR.rotation.x = -Math.PI / 2;
+    for (const knee of this.knees) knee.rotation.x = Math.PI / 2;
+    const coatReading = this.seatPose === 'read' && this.config.outfit === 'labcoat';
+    const armAngle = coatReading ? -1.25 : -0.95;
+    this.armL.rotation.set(armAngle, 0, -0.06);
+    this.armR.rotation.set(armAngle, 0, 0.06);
+    // Hold the book above and in front of the folded coat, with hands at its back edge.
+    if (coatReading) this.readingBook.position.set(0, 0.23, 0.44);
+    this.head.rotation.set(this.seatPose === 'read' ? 0.24 : 0, 0, 0);
+    this.torso.scale.y = 1;
+    // Fold long garments over the lap instead of pushing knees through a standing skirt.
+    this.torso.getObjectByName('dress-skirt')?.scale.set(1, 0.5, 1.5);
+    const hem = this.torso.getObjectByName('dress-hem');
+    if (hem) {
+      hem.scale.set(1, 1.5, 1);
+      hem.position.y = -0.055;
+    }
+    this.torso.getObjectByName('coat-hem')?.scale.set(1, 0.65, 1.5);
+  }
+
   private resetPose() {
+    this.readingBook.position.set(0, 0.15, 0.27);
+    for (const name of ['dress-skirt', 'dress-hem', 'coat-hem']) this.torso.getObjectByName(name)?.scale.set(1, 1, 1);
+    const hem = this.torso.getObjectByName('dress-hem');
+    if (hem) hem.position.y = -0.12;
     this.rig.rotation.set(0, 0, 0);
     this.rig.position.set(0, 0, 0);
     this.rig.scale.set(1, 1, 1);
     this.upper.rotation.set(0, 0, 0);
+    for (const knee of this.knees) knee.rotation.set(0, 0, 0);
     for (const limb of [this.armL, this.armR, this.legL, this.legR]) {
       limb.rotation.set(0, 0, 0);
       limb.scale.set(1, 1, 1);
@@ -493,6 +569,11 @@ export class AvatarModel {
   /** speed01: 0 idle … 1 full walk. */
   update(dt: number, speed01: number): void {
     this.time += dt;
+    if (this.seatPose) {
+      this.updateSeated();
+      this.blink(dt);
+      return;
+    }
     if (this.updateMove(dt)) {
       this.blink(dt);
       return;

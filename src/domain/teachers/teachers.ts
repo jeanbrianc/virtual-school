@@ -33,6 +33,22 @@ export interface TeacherProfile {
 }
 
 export const TEACHERS: Record<TeacherId, TeacherProfile> = {
+  milo: {
+    id: 'milo',
+    name: 'Milo',
+    subject: 'Music & rhythm',
+    species: 'Otter percussion explorer',
+    personality: 'Patient, softly playful, and welcoming of every way to participate.',
+    color: '#74618c',
+    accent: '#f4cf75',
+    voice: { pitch: 1.0, rate: 0.85 },
+    naturalVoice: { voice: 'cedar', style: 'Milo is a gentle original otter music teacher. Speak slowly and warmly, without judging ability.' },
+    introductions: ['Hello, {name}! I’m Milo. We can explore beats and little pauses with pictures or taps.'],
+    greetings: ['Hello, {name}! Shall we explore a gentle rhythm?'],
+    returnGreetings: ['Welcome back to the music garden.'],
+    farewells: ['Keep noticing sounds and spaces, {name}.'],
+    praise: ['You explored a pattern in your own way.'],
+  },
   hoot: {
     id: 'hoot',
     name: 'Professor Hoot',
@@ -93,6 +109,26 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     returnGreetings: ['Welcome back to the shape studio, {name}!'],
     farewells: ['Keep noticing shapes, {name}!'],
     praise: ['You noticed the repeating pair!', 'You tried your own idea!'],
+  },
+  tavi: {
+    id: 'tavi',
+    name: 'Tavi',
+    subject: 'Everyday picture steps',
+    species: 'Teal turtle',
+    personality: 'Patient, curious, and comfortable with more than one way to do things.',
+    color: '#356f6b',
+    accent: '#e9bb61',
+    voice: { pitch: 1.0, rate: 0.9 },
+    naturalVoice: {
+      voice: 'sage',
+      style:
+        'Speak gently and clearly as Tavi, an original patient turtle exploring fictional picture steps with a learner. Never assume a home routine or reading level.',
+    },
+    introductions: ['Hello, {name}! I’m Tavi. We can arrange pretend picture steps and see which orders work. We can take our time.'],
+    greetings: ['Hello, {name}! Shall we explore some picture steps?'],
+    returnGreetings: ['Welcome back! There can be more than one way.'],
+    farewells: ['Thanks for exploring with me!'],
+    praise: ['That order fits our pretend task.'],
   },
   nova: {
     id: 'nova',

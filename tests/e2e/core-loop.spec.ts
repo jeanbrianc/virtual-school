@@ -7,7 +7,7 @@
  */
 import { expect, test } from 'playwright/test';
 import { APP, dismissCelebrations, enterSchool, unlockParent } from './helpers';
-import { useSyntheticHousehold } from './synthetic-household';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
 
 test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
 
@@ -74,3 +74,5 @@ test('first day: discover the school and put the first book on the shelf', async
 
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

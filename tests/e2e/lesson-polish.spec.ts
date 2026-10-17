@@ -1,7 +1,11 @@
 import { expect, test } from 'playwright/test';
 import { enterSchool, talkTo } from './helpers';
-test('letter rainbow uses the actual classroom alphabet strip', async ({ page }) => {
-  await enterSchool(page);
+import { useSyntheticHousehold } from './synthetic-household';
+
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+
+test('letter rainbow uses the actual classroom alphabet strip', async ({ page }, info) => {
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await talkTo(page, 'alphabet');
   await expect(page.getByRole('dialog', { name: 'Letter rainbow' })).toBeVisible();
@@ -26,19 +30,19 @@ test('letter rainbow uses the actual classroom alphabet strip', async ({ page })
   await page.getByRole('button', { name: `Touch letter ${target}`, exact: true }).click();
   await page.keyboard.press(await page.evaluate(() => (window.__izzy!.game() as unknown as { world: { alphabet: { active: string } } }).world.alphabet.active));
   expect(await page.evaluate(() => (window.__izzy!.game() as unknown as { world: { alphabet: { found: string[] } } }).world.alphabet.found.length)).toBe(2);
-  await page.screenshot({ path: '../polish-keyboard-final-success-desktop.png' });
+  await page.screenshot({ path: info.outputPath('polish-keyboard-final-success-desktop.png') });
   await page.getByRole('button', { name: 'Back to school' }).click();
   await talkTo(page, 'alphabet');
   await page.waitForTimeout(800);
-  await page.screenshot({ path: '../polish-keyboard-final-desktop.png' });
+  await page.screenshot({ path: info.outputPath('polish-keyboard-final-desktop.png') });
   await page.setViewportSize({ width: 375, height: 812 });
   await page.waitForTimeout(800);
   await page.getByRole('button', { name: 'Help me', exact: false }).click();
   await page.waitForTimeout(800);
-  await page.screenshot({ path: '../polish-keyboard-final-phone.png' });
+  await page.screenshot({ path: info.outputPath('polish-keyboard-final-phone.png') });
 });
-test('novice shapes show one large model and only two visual choices', async ({ page }) => {
-  await enterSchool(page);
+test('novice shapes show one large model and only two visual choices', async ({ page }, info) => {
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await talkTo(page, 'pippa');
   await page.getByTestId('choice-go').click();
@@ -46,15 +50,15 @@ test('novice shapes show one large model and only two visual choices', async ({ 
   await expect(page.locator('.shape-choice')).toHaveCount(2);
   await expect(page.locator('.shape-model svg')).toBeVisible();
   await page.waitForTimeout(1000);
-  await page.screenshot({ path: '../polish-shapes-final-desktop.png' });
+  await page.screenshot({ path: info.outputPath('polish-shapes-final-desktop.png') });
   await page.getByRole('button', { name: 'Show me', exact: false }).click();
-  await page.screenshot({ path: '../polish-shapes-final-hint-desktop.png' });
+  await page.screenshot({ path: info.outputPath('polish-shapes-final-hint-desktop.png') });
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByTestId('dialogue-close').click();
   await talkTo(page, 'pippa');
   await page.getByTestId('choice-go').click();
   await page.waitForTimeout(1000);
-  await page.screenshot({ path: '../polish-shapes-final-phone.png' });
+  await page.screenshot({ path: info.outputPath('polish-shapes-final-phone.png') });
   for (const element of ['.shape-model svg', '.shape-choice', '.pattern-skip']) {
     for (const box of await page.locator(element).evaluateAll((els) =>
       els.map((el) => {
@@ -72,9 +76,9 @@ test('novice shapes show one large model and only two visual choices', async ({ 
   const choice = await page.locator('.shape-choice').first().boundingBox();
   expect(choice!.width).toBeGreaterThanOrEqual(120);
 });
-test('all banner targets stay framed through portrait and landscape, and interruption cleans up', async ({ page }) => {
+test('all banner targets stay framed through portrait and landscape, and interruption cleans up', async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await talkTo(page, 'alphabet');
   for (const size of [
@@ -118,7 +122,7 @@ test('all banner targets stay framed through portrait and landscape, and interru
       expect(b.y).toBeGreaterThanOrEqual(0);
       expect(b.bottom).toBeLessThanOrEqual(size.height);
     }
-    if (size.height === 375) await page.screenshot({ path: '../polish-keyboard-final-landscape.png' });
+    if (size.height === 375) await page.screenshot({ path: info.outputPath('polish-keyboard-final-landscape.png') });
   }
   await page.getByRole('button', { name: 'Grown-ups', exact: true }).click();
   await expect(page.getByTestId('keyboard-trail')).toHaveCount(0);

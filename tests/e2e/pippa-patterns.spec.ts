@@ -1,5 +1,9 @@
 import { expect, test, type Page } from 'playwright/test';
 import { enterSchool, talkTo, dismissCelebrations, unlockParent } from './helpers';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
+
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+
 async function records(page: Page) {
   return page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve) => {
@@ -38,7 +42,7 @@ async function complete(page: Page, pattern = false) {
   await expect(page.getByTestId('choice-yay')).toBeVisible();
 }
 test('novice shape match preserves baseline before optional pattern challenge and saves once', async ({ page }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await talkTo(page, 'pippa');
   await page.getByTestId('choice-go').click();
@@ -60,7 +64,7 @@ test('novice shape match preserves baseline before optional pattern challenge an
 });
 test('phone shapes support hints, skip, replay and cancel without recording unfinished play', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await talkTo(page, 'pippa');
   await page.getByTestId('choice-go').click();
@@ -86,3 +90,5 @@ test('phone shapes support hints, skip, replay and cancel without recording unfi
   await expect.poll(() => records(page)).toHaveLength(1);
   expect((await records(page))[0]!.summary).toContain('Skipped 2 rounds');
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

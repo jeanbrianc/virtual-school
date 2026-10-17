@@ -8,6 +8,10 @@ on:
       - 'playwright.config.ts'
       - 'package*.json'
       - '.github/workflows/globe-browser.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
 permissions:
   contents: read
 concurrency:
@@ -32,10 +36,12 @@ jobs:
       - name: Test beginner and full-map adventures
         run: npm run test:e2e -- tests/e2e/globe.spec.ts --project=${{ matrix.project }}
       - name: Save synthetic screenshots and failure traces
-        if: always()
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
         uses: actions/upload-artifact@v4
         with:
           name: globe-browser-${{ matrix.project }}-${{ github.sha }}
-          path: test-results/
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
           retention-days: 7
           if-no-files-found: warn

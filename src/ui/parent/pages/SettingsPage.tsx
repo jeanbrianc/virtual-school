@@ -16,6 +16,7 @@ import { Icon } from '../../shared/Icon';
 import { Card, PageHeader } from '../components';
 import { MicLevel, MicPicker, micInUse, useMicrophones } from './MicPicker';
 import { SyncCard, useSyncView } from './SyncCard';
+import { RhythmSettings } from './RhythmSettings';
 import { VoiceCard } from './VoiceCard';
 import { UsageCard } from './UsageCard';
 import type { ParentData } from '../ParentApp';
@@ -458,6 +459,7 @@ export function SettingsPage({ data }: { data: ParentData }) {
               ungraded. This is a small conversation bank, not a reading curriculum or fluency assessment.
             </p>
           </Card>
+          <RhythmSettings key={child.id} child={child} />
 
           <VoiceCard settings={s} child={child} patch={(p) => patch(p)} helper={helper} />
 
@@ -644,7 +646,8 @@ export function SettingsPage({ data }: { data: ParentData }) {
             </p>
             <div className="danger-zone">
               <label htmlFor="del-name" className="small">
-                Delete all of {child.name}’s records and photos — type <strong>{child.name}</strong> to confirm
+                Delete {child.name}’s learning records and photos, including the avatar inspiration photo. Keep the profile and avatar appearance. Type{' '}
+                <strong>{child.name}</strong> to confirm
               </label>
               <div className="inline-form">
                 <input id="del-name" value={deleteName} onChange={(e) => setDeleteName(e.target.value)} />
@@ -655,7 +658,7 @@ export function SettingsPage({ data }: { data: ParentData }) {
                   onClick={() => {
                     void deleteChildData(ctx, child.id).then(() => {
                       setDeleteName('');
-                      setMsg(`${child.name}’s learning records were deleted. Her profile and avatar remain.`);
+                      setMsg(`${child.name}’s learning records were deleted. Their profile and avatar appearance remain.`);
                     });
                   }}
                 >

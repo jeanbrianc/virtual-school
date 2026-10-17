@@ -9,6 +9,8 @@ import { defineConfig, devices } from 'playwright/test';
  * the app is opened with ?maxfps=3 and reduced motion. Real GPUs are unaffected.
  */
 const PORT = Number(process.env.E2E_PORT ?? 4180);
+// Hosted release artifacts are explicit captures made after synthetic fixture setup.
+const SAFE_ARTIFACTS = process.env.PLAYWRIGHT_SAFE_ARTIFACTS === 'true';
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -21,9 +23,9 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     contextOptions: { reducedMotion: 'reduce' },
-    trace: process.env.PLAYWRIGHT_TRACE === 'off' ? 'off' : 'retain-on-failure',
+    trace: SAFE_ARTIFACTS || process.env.PLAYWRIGHT_TRACE === 'off' ? 'off' : 'retain-on-failure',
     ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}),
-    screenshot: 'only-on-failure',
+    screenshot: SAFE_ARTIFACTS ? 'off' : 'only-on-failure',
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
   },
   projects: [
@@ -31,7 +33,6 @@ export default defineConfig({
     {
       name: 'phone',
       use: { ...devices['Pixel 7'] },
-      testMatch: /(parent|reading-nook|globe|book-arrival|story-conversations|nova-life-cycle|base-ten|safety-containment)\.spec\.ts/,
     },
   ],
   webServer: {

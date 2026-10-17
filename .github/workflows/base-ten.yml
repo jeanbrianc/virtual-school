@@ -9,6 +9,10 @@ on:
       - 'src/ui/child/ChildMode.tsx'
       - 'tests/**/base-ten*.ts'
       - '.github/workflows/base-ten.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
 permissions:
   contents: read
 jobs:
@@ -31,8 +35,10 @@ jobs:
       - run: node scripts/build.mjs --e2e
       - run: npx playwright test tests/e2e/base-ten.spec.ts tests/e2e/activity-chooser.spec.ts tests/e2e/teacher-registry.spec.ts --project=${{ matrix.project }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
         with:
           name: place-value-browser-results-${{ matrix.project }}
-          path: test-results/
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
           if-no-files-found: ignore

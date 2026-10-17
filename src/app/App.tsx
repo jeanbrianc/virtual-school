@@ -18,7 +18,7 @@ export function App() {
     <ErrorBoundary key={route.name}>
       <Suspense fallback={<div className="boot">Loading…</div>}>
         {route.name === 'home' && <HomeScreen />}
-        {route.name === 'school' && <ChildMode childId={route.childId} />}
+        {route.name === 'school' && <ChildMode key={route.childId} childId={route.childId} />}
         {route.name === 'parent' && <ParentApp section={route.section} {...(route.param ? { param: route.param } : {})} />}
         {route.name === 'museum' && <Showcase childId={route.childId} tour={route.tour} />}
       </Suspense>

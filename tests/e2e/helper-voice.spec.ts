@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'playwright/test';
 import { APP, enterSchool, unlockParent } from './helpers';
-import { useSyntheticHousehold } from './synthetic-household';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
 
 declare global {
   interface Window {
@@ -159,3 +159,5 @@ test('natural teacher voices and listening through the AI helper', async ({ page
   expect(await page.evaluate(() => window.__fallback)).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

@@ -630,6 +630,28 @@ kbd {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #ecd9b8;
 }
+/* Activity cards keep the description below the title, never beside it. */
+.teacher-activity-chooser .choices {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+}
+.teacher-activity-chooser .choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.teacher-activity-chooser .choice-label,
+.teacher-activity-chooser .choice-hint {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.teacher-activity-chooser .choice-hint {
+  grid-column: 1 / -1;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
 .choice-primary {
   border-color: var(--terracotta);
   box-shadow: 0 4px 0 var(--terracotta-deep);
@@ -2786,4 +2808,82 @@ button.treasure {
   display: block;
   width: 100%;
   min-height: 44px;
+}
+
+/* Two broad operand trays; nothing tiny must be tapped. Arithmetic answers stay hidden until feedback. */
+.arithmetic-stage {
+  margin: 12px 0;
+}
+.arithmetic-equation {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-weight: 800;
+  text-align: center;
+  margin: 6px 0 12px;
+}
+.arithmetic-operands {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.arithmetic-operands > section {
+  min-width: 0;
+  padding: 10px;
+  border: 2px solid #8faea6;
+  border-radius: 18px;
+  background: #f5fbf7;
+}
+.arithmetic-operands > section > h3 {
+  margin: 0;
+  text-align: center;
+}
+.arithmetic-operands .base-ten-parts {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.arithmetic-operands .base-ten-parts section {
+  padding: 8px;
+}
+.arithmetic-operands .base-ten-bundle {
+  min-width: 30px;
+}
+.arithmetic-operands .base-ten-one {
+  width: 25px;
+  height: 25px;
+}
+.arithmetic-result {
+  text-align: center;
+  font-weight: 800;
+}
+@media (max-width: 400px) {
+  .arithmetic-operands {
+    gap: 6px;
+  }
+  .arithmetic-operands > section {
+    padding: 5px;
+  }
+  .arithmetic-operands .base-ten-bundles,
+  .arithmetic-operands .base-ten-ones {
+    gap: 4px;
+  }
+}
+
+/* Seat labels and the always-reachable Stand up action fit small touch screens. */
+.interact-prompt.seat-prompt {
+  max-width: calc(100% - 24px);
+  min-height: 56px;
+  width: max-content;
+}
+.seat-prompt .interact-icon {
+  flex-shrink: 0;
+}
+@media (max-width: 600px), (max-height: 500px) {
+  .interact-prompt.seat-prompt {
+    font-size: 1.05rem;
+    gap: 8px;
+    bottom: 18px;
+  }
+  .seat-prompt .interact-icon {
+    width: 44px;
+    height: 44px;
+  }
 }

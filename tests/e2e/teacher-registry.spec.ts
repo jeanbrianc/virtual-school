@@ -1,11 +1,10 @@
 import { expect, test } from 'playwright/test';
-import { enterSchool, talkTo } from './helpers';
-import { useSyntheticHousehold } from './synthetic-household';
-
-test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+import { captureSyntheticSuccess } from './synthetic-household';
+import { talkTo } from './helpers';
+import { loadRoutineSample } from './fixtures/routineSample';
+test.use({ actionTimeout: 30_000 });
 test('existing teachers keep their introductions and working offline activities', async ({ page }) => {
-  await enterSchool(page, 'sample');
-  await page.getByTestId('discover-ok').click();
+  await loadRoutineSample(page);
   expect(
     await page.evaluate(() => {
       const g = window.__izzy!.game() as unknown as { world: { teachers: Map<string, { id: string }> } };
@@ -15,7 +14,9 @@ test('existing teachers keep their introductions and working offline activities'
     ['hoot', 'hoot'],
     ['digit', 'digit'],
     ['pippa', 'pippa'],
+    ['tavi', 'tavi'],
     ['nova', 'nova'],
+    ['milo', 'milo'],
   ]);
   for (const [id, name] of [
     ['hoot', 'Professor Hoot'],
@@ -32,3 +33,5 @@ test('existing teachers keep their introductions and working offline activities'
     await page.getByTestId('dialogue-close').click();
   }
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

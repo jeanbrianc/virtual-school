@@ -1,5 +1,9 @@
 import { expect, test, type Page } from 'playwright/test';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
+
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+
 async function prompt(page: Page) {
   const line = await page.getByTestId('dialogue-line').locator('.sr-only').textContent();
   return /Find ([A-Z])/.exec(line!)![1]!;
@@ -23,7 +27,7 @@ async function records(page: Page) {
   });
 }
 test('keyboard banner: shortcuts, repeat/modifiers/IME, blur, hints, exactly once and replay', async ({ page }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await page.evaluate(() => window.__izzy!.teleportTo('alphabet'));
   await page.keyboard.down('w');
@@ -90,7 +94,7 @@ test('keyboard banner: shortcuts, repeat/modifiers/IME, blur, hints, exactly onc
 });
 test('phone touch records recognition separately; skip/cancel saves no evidence', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await talkTo(page, 'alphabet');
   await page.getByRole('button', { name: 'Skip letter' }).click();
@@ -111,10 +115,10 @@ test('phone touch records recognition separately; skip/cancel saves no evidence'
 });
 
 test('two live tabs race the same completion through the atomic learning service', async ({ page, context }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   const other = await context.newPage();
-  await enterSchool(other);
+  await enterSchool(other, 'sample');
   const run = {
     id: 'synthetic-multi-tab-run',
     startedAt: new Date().toISOString(),
@@ -150,3 +154,5 @@ test('two live tabs race the same completion through the atomic learning service
   expect(await records(page)).toHaveLength(1);
   await other.close();
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));
