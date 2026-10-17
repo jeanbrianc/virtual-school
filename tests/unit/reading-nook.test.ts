@@ -85,3 +85,36 @@ it('the hall wall cuts away while approaching the nook from the hall on an eleva
   world.structure.updateCutaways(forward, 1, new THREE.Vector3(-10, 0, 2));
   assert.equal(west.upper.visible, true);
 });
+
+it('garden murals and flowers stay on the bounded cutaway walls and are batched for phones', () => {
+  const world = new SchoolWorld(new Tweens(), new Particles(), new Date('2026-10-17'), 'Sample');
+  const walls = world.structure.cutaways.filter((wall) => wall.upper.name.startsWith('nook-'));
+  assert.equal(walls.length, 3);
+  const murals: THREE.MeshStandardMaterial[] = [];
+  for (const wall of walls) {
+    const meshes: THREE.Mesh[] = [];
+    wall.upper.traverse((node) => {
+      if (!(node instanceof THREE.Mesh)) return;
+      meshes.push(node);
+      const material = node.material;
+      if (material instanceof THREE.MeshStandardMaterial && material.map) murals.push(material);
+    });
+    assert.ok(meshes.length <= 12, `${wall.side} decor must stay batched, got ${meshes.length} draw calls`);
+    const bounds = new THREE.Box3().setFromObject(wall.upper);
+    assert.ok(bounds.min.y >= 0.42 - 0.001 && bounds.max.y <= 3.21, 'decoration stays within the upper wall');
+    if (wall.side === 'west') assert.ok(bounds.max.x < -18.2, 'flowers stay flush to the back wall');
+    else if (wall.side === 'north') assert.ok(bounds.max.z < -0.25, 'flowers stay out of the entry corridor');
+    else assert.ok(bounds.min.z > 4.25, 'flowers stay out of the entry corridor');
+    world.structure.updateCutaways(wall.outward.clone().negate(), 1);
+    assert.equal(wall.upper.visible, false, 'all flowers and mural hide with their wall');
+  }
+  assert.equal(murals.length, 3);
+  assert.equal(new Set(murals).size, 1, 'one mural material shared within a world');
+  const reloaded = new SchoolWorld(new Tweens(), new Particles(), new Date('2026-10-17'), 'Sample');
+  const firstWall = reloaded.root.getObjectByName('nook-west-upper')!;
+  firstWall.traverse((node) => {
+    if (node instanceof THREE.Mesh && node.material instanceof THREE.MeshStandardMaterial && node.material.map) {
+      assert.notEqual(node.material, murals[0], 'per-world canvases are not retained by the global material cache');
+    }
+  });
+});

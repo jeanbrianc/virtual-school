@@ -33,6 +33,30 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+
+  reading-nook-browser:
+    # Synthetic fixtures only. No family data, deployment credentials or secrets.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Test garden nook on desktop and phone
+        run: npm run test:e2e -- tests/e2e/reading-nook.spec.ts
+      - name: Save synthetic screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-nook-browser-${{ github.sha }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
   deploy:
     needs: check
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true'

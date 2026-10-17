@@ -160,12 +160,12 @@ export function describeDiscovery(id: string, ctx: DiscoveryContext): Discovery 
           };
     case 'nook':
       return world.readingNookOpen
-        ? { id, icon: '🏕️', title: 'The Reading Nook', text: 'The coziest corner in the whole school — made for reading.' }
+        ? { id, icon: '🏕️', title: 'The Reading Nook', text: 'A sunny little garden with flowers on the walls and a cozy place to read.' }
         : {
             id,
             icon: '🏕️',
             title: 'The Secret Reading Nook',
-            text: 'Shh… a cozy reading nook is hiding behind this curtain. It opens when your bookshelf has 25 books!',
+            text: 'Shh… a sunny garden reading nook is hiding behind this curtain. It opens when your bookshelf has 25 books!',
             ...optionalProgress(lockProgress('room.reading-nook', snapshot)),
           };
     default:
