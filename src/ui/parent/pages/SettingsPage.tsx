@@ -441,6 +441,23 @@ export function SettingsPage({ data }: { data: ParentData }) {
             <p className="muted small">All sounds are synthesized in the browser — no music files or streaming.</p>
           </Card>
 
+          <Card title="Hoot’s story conversations" icon="book">
+            <label htmlFor="story-conversation-depth">Conversation depth (household)</label>
+            <select
+              id="story-conversation-depth"
+              value={s.storyConversationDepth ?? 'adaptive'}
+              onChange={(e) => void patch({ storyConversationDepth: e.target.value as HouseholdSettings['storyConversationDepth'] })}
+            >
+              <option value="adaptive">Suggested from practiced skills</option>
+              <option value="gentler">Gentler: details and sequence first</option>
+              <option value="deeper">Deeper: reasons and meaning first</option>
+            </select>
+            <p className="muted small">
+              Two questions per completion, rotated using saved question history. Any question can be skipped. Free reflections and parent-authored prompts are
+              ungraded. This is a small conversation bank, not a reading curriculum or fluency assessment.
+            </p>
+          </Card>
+
           <VoiceCard settings={s} child={child} patch={(p) => patch(p)} helper={helper} />
 
           <TalkCard

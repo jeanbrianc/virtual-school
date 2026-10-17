@@ -1005,6 +1005,8 @@ export function ChildMode({ childId }: { childId: string }) {
               childName={data.child.name}
               books={data.records.books}
               mastery={data.records.mastery}
+              storyEvidence={data.records.evidence}
+              conversationDepth={data.household.settings.storyConversationDepth ?? 'adaptive'}
               visitsToday={visitsToday('hoot')}
               firstMeeting={!metTeacher('hoot')}
               speech={speech}

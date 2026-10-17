@@ -472,3 +472,81 @@ test('TalkBar clears its parent preparation indicator when the mic becomes ready
   await act(async () => tree.root.findByType(MicButton).findByType('button').props.onClick());
   assert.equal(listens, 1);
 });
+
+test('parent-selected depth, hint and skip retain supported evidence without claiming narration', async (t) => {
+  const h = await harness(t, { conversationDepth: 'deeper' });
+  const cat = BOOK_CATALOG.find((b) => b.id === 'tom-kitten')!;
+  await h.pick('finish');
+  await h.title(cat.title);
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'suggest-tom-kitten' }).props.onClick());
+  assert.match(h.tree.root.findByType(DialogueShell).props.line, /climbing difficult/);
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'story-hint' }).props.onClick());
+  await h.pick('c0');
+  await h.tick(2300);
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'story-skip' }).props.onClick());
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'rating-skip' }).props.onClick());
+  await h.pick('__skip');
+  await h.tick(900);
+  assert.equal(h.saves.length, 1);
+  assert.equal(h.saves[0]!.answers[0]!.outcome, 'supported');
+  assert.ok(h.saves[0]!.answers[1]!.scaffolds.includes('skipped'));
+  assert.equal(h.saves[0]!.narration, undefined);
+});
+
+test('custom-book reflections and parent-authored answers save without automatic grading and reset on Back', async (t) => {
+  const book: Book = {
+    id: 'synthetic',
+    childId: 'synthetic-child',
+    dateAdded: '2026-10-12',
+    title: 'Synthetic kite story',
+    author: '',
+    status: 'reading',
+    readingMode: 'shared',
+    tags: [],
+    cover: { background: '#fff', accent: '#000', motif: 'moon' },
+    storyPrompt: { prompt: 'Who brought the kite?', answer: 'Avery' },
+  };
+  const h = await harness(t, { books: [book] });
+  const choose = async () => {
+    await h.pick('finish');
+    await act(async () => h.tree.root.findByProps({ 'data-testid': 'pick-book-synthetic' }).props.onClick());
+  };
+  await choose();
+  assert.match(h.tree.root.findByType(DialogueShell).props.line, /don’t have checked/);
+  assert.equal(h.tree.root.findByProps({ 'data-testid': 'parent-story-prompt' }).props.children, 'Who brought the kite?');
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'reflection-narration' }).props.onChange({ target: { value: 'Abandoned draft' } }));
+  await h.back();
+  await choose();
+  assert.equal(h.tree.root.findByProps({ 'data-testid': 'reflection-narration' }).props.value, '');
+  assert.equal(h.tree.root.findByProps({ 'data-testid': 'parent-story-response' }).props.value, '');
+  await act(async () => {
+    h.tree.root.findByProps({ 'data-testid': 'reflection-favorite' }).props.onChange({ target: { value: 'The kite' } });
+    h.tree.root.findByProps({ 'data-testid': 'reflection-narration' }).props.onChange({ target: { value: 'Synthetic narration with unknown accuracy' } });
+    h.tree.root.findByProps({ 'data-testid': 'parent-story-response' }).props.onChange({ target: { value: 'A completely different answer' } });
+  });
+  await act(async () => h.button('Not sure').props.onClick());
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'rating-skip' }).props.onClick());
+  await h.tick(900);
+  assert.equal(h.saves.length, 1);
+  assert.deepEqual(h.saves[0]!.answers, []);
+  assert.equal(h.saves[0]!.favoritePart, 'The kite');
+  assert.equal(h.saves[0]!.narration, 'Synthetic narration with unknown accuracy');
+  assert.ok(h.saves[0]!.transcript.some((line) => /Parent-authored.*ungraded/.test(line.text)));
+});
+
+test('AI replies are visibly unverified and do not create story attempts', async (t) => {
+  const h = await harness(t, {
+    talk: {
+      mic: null,
+      phrases: [],
+      autoSpeaks: false,
+      speakReply() {},
+      chat: { id: 'synthetic-ai', sendsDataOffDevice: false, respond: async () => ({ ...reply('Synthetic AI reply'), source: 'ai' }) },
+    },
+  });
+  await act(async () => h.tree.root.findByType(TalkBar).props.onSay('Tell me about an unknown book', 'typed'));
+  assert.match(h.tree.root.findByProps({ 'data-testid': 'ai-story-source' }).props.children, /unverified/);
+  assert.equal(h.saves.length, 0);
+  await h.back();
+  assert.equal(h.tree.root.findAllByProps({ 'data-testid': 'ai-story-source' }).length, 0);
+});

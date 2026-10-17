@@ -2642,3 +2642,27 @@ button.treasure {
     font-size: 0.9rem;
   }
 }
+
+/* Optional story reflection stays keyboard/touch accessible on narrow screens. */
+.story-reflections {
+  width: 100%;
+  text-align: left;
+}
+.story-reflections summary {
+  cursor: pointer;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+}
+.story-reflections label {
+  display: block;
+  margin: 12px 0;
+}
+.story-reflections .big-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.talk-source {
+  font-size: 0.9rem;
+}

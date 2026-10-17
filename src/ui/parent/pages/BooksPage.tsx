@@ -229,6 +229,16 @@ function BookDetail({ data, book }: { data: ParentData; book: Book }) {
               In the story-question library: {cat.questions.length} questions for Professor Hoot · {cat.band}
             </p>
           )}
+          {cat?.provenance && (
+            <p className="small muted">
+              Source-checked story questions ·{' '}
+              <a href={cat.provenance.sourceUrl} target="_blank" rel="noreferrer">
+                Primary text
+              </a>
+              {' · '}
+              {cat.provenance.contentNote}
+            </p>
+          )}
           <div className="row-actions">
             {book.status !== 'completed' && (
               <button
@@ -354,6 +364,34 @@ function BookDetail({ data, book }: { data: ParentData; book: Book }) {
                 placeholder="What did she understand? Inferences, predictions, vocabulary…"
               />
             </label>
+            {!cat && (
+              <fieldset className="span-2">
+                <legend>Optional parent-authored story prompt</legend>
+                <p className="muted small">
+                  Use your copy of the book to write a factual question and reference answer. Hoot labels these as parent-authored and saves the response
+                  without grading it.
+                </p>
+                <label>
+                  Story question
+                  <textarea
+                    rows={2}
+                    maxLength={500}
+                    value={draft.storyPrompt?.prompt ?? ''}
+                    onChange={(e) => set({ storyPrompt: { prompt: e.target.value, answer: draft.storyPrompt?.answer ?? '' } })}
+                  />
+                </label>
+                <label>
+                  Reference answer
+                  <textarea
+                    rows={2}
+                    maxLength={1000}
+                    value={draft.storyPrompt?.answer ?? ''}
+                    onChange={(e) => set({ storyPrompt: { prompt: draft.storyPrompt?.prompt ?? '', answer: e.target.value } })}
+                  />
+                </label>
+                <p className="muted small">Both fields are needed. Clear them to remove the prompt, then Save changes.</p>
+              </fieldset>
+            )}
             <label className="span-2">
               Parent notes
               <textarea rows={2} value={draft.parentNotes ?? ''} onChange={(e) => set({ parentNotes: e.target.value })} />

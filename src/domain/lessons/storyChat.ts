@@ -22,7 +22,6 @@ export function questionToProblem(q: ComprehensionQuestion, order: number[]): Pr
   return {
     id: q.id,
     skillId: q.skillId,
-    ...(q.type === 'sequence' ? { alsoSkills: ['read.narration'] } : {}),
     tier: 0,
     kind: 'answer',
     prompt: q.prompt,
@@ -33,7 +32,7 @@ export function questionToProblem(q: ComprehensionQuestion, order: number[]): Pr
     model: q.explain,
     success: `Hoo-hoo, yes! ${q.explain}`,
     difficulty: DIFFICULTY[q.type],
-    meta: { questionType: q.type },
+    meta: { questionType: q.type, questionSource: 'catalog' },
   };
 }
 
