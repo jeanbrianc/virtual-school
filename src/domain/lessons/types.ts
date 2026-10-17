@@ -13,6 +13,7 @@ export interface LessonChoice {
 
 export type LessonVisual =
   | { type: 'pattern'; shapes: readonly Shape[] }
+  | { type: 'pattern-progression'; shapes: readonly Shape[]; unitLength: number; matching: boolean }
   | { type: 'none' }
   | { type: 'life-cycle'; cycle: LifeCycle; stage: LifeStage; next: boolean }
   | { type: 'rocks'; groups: number[]; removed?: number }
