@@ -1,0 +1,38 @@
+name: Place value review
+on:
+  pull_request:
+    paths:
+      - 'src/domain/lessons/baseTen.ts'
+      - 'src/services/baseTenService.ts'
+      - 'src/ui/child/flows/BaseTenFlow.tsx'
+      - 'src/ui/child/lesson/BaseTenStage.tsx'
+      - 'src/ui/child/ChildMode.tsx'
+      - 'tests/**/base-ten*.ts'
+      - '.github/workflows/base-ten.yml'
+permissions:
+  contents: read
+jobs:
+  place-value-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/build.mjs --e2e
+      - run: npx playwright test tests/e2e/base-ten.spec.ts tests/e2e/activity-chooser.spec.ts tests/e2e/teacher-registry.spec.ts --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: place-value-browser-results-${{ matrix.project }}
+          path: test-results/
+          if-no-files-found: ignore
