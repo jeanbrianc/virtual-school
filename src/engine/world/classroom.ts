@@ -53,9 +53,12 @@ function roundTable(ctx: BuildContext, x: number, z: number, seed: number) {
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2 + seed;
     const c = kidChair(CHAIR_COLORS[(i + seed) % CHAIR_COLORS.length] ?? '#e07a5f');
-    c.position.set(x + Math.cos(a) * 0.85, 0, z + Math.sin(a) * 0.85);
+    // Leave room for bent knees and a folded dress/coat without intersecting the tabletop.
+    c.position.set(x + Math.cos(a) * 1.1, 0, z + Math.sin(a) * 1.1);
     c.rotation.y = -a - Math.PI / 2;
     ctx.addStatic(c);
+    // The pulled-out chair now has its own walking collision, not just the table's.
+    ctx.collide(c.position.x, c.position.z, 0.5, 0.5);
     addSeat(ctx, c, {
       id: `seat-table-${seed}-${i + 1}`,
       label: `Sit on ${seed === 1 ? 'left' : 'right'} table chair ${i + 1}`,
@@ -63,8 +66,8 @@ function roundTable(ctx: BuildContext, x: number, z: number, seed: number) {
       z: c.position.z,
       top: 0.325,
       yaw: c.rotation.y,
-      forward: 0.02,
-      exit: [x + Math.cos(a) * 1.5, z + Math.sin(a) * 1.5],
+      forward: 0.07,
+      exit: [x + Math.cos(a) * 1.8, z + Math.sin(a) * 1.8],
     });
   }
   ctx.collide(x, z, 1.5, 1.5);
@@ -175,8 +178,8 @@ export function buildClassroom(ctx: BuildContext, today: Date): AlphabetBanner {
   bb2.scale.set(1, 0.65, 1);
   ctx.addStatic(bb1);
   ctx.addStatic(bb2);
-  addSeat(ctx, bb1, { id: 'seat-classroom-coral', label: 'Sit on the coral beanbag', x: -3.1, z: -2.3, top: 0.59, yaw: 0, exit: [-3.1, -1.4] });
-  addSeat(ctx, bb2, { id: 'seat-classroom-teal', label: 'Sit on the teal beanbag', x: 3.1, z: -2.3, top: 0.59, yaw: 0, exit: [3.1, -1.4] });
+  addSeat(ctx, bb1, { id: 'seat-classroom-coral', label: 'Sit on the coral beanbag', x: -3.1, z: -2.3, top: 0.55, yaw: 0, forward: 0.37, exit: [-3.1, -1.4] });
+  addSeat(ctx, bb2, { id: 'seat-classroom-teal', label: 'Sit on the teal beanbag', x: 3.1, z: -2.3, top: 0.55, yaw: 0, forward: 0.37, exit: [3.1, -1.4] });
   ctx.collide(-3.1, -2.3, 0.8, 0.8);
   ctx.collide(3.1, -2.3, 0.8, 0.8);
 

@@ -30,7 +30,7 @@ export function addSeat(
 ): InteractableDef {
   const forward = options.forward ?? 0;
   const seat: SeatAnchor = {
-    position: new THREE.Vector3(options.x + Math.sin(options.yaw) * forward, options.top + 0.14 - 0.4, options.z + Math.cos(options.yaw) * forward),
+    position: new THREE.Vector3(options.x + Math.sin(options.yaw) * forward, options.top + 0.07 - 0.4, options.z + Math.cos(options.yaw) * forward),
     yaw: options.yaw,
     exit: new THREE.Vector3(options.exit[0], 0, options.exit[1]),
     reading: options.reading ?? false,

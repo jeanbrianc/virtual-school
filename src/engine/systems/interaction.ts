@@ -174,15 +174,23 @@ export class InteractionSystem {
     // Seat bubbles get a 48 CSS-pixel target independent of phone resolution.
     // Prefer the nearest visible bubble so adjacent classroom chairs stay distinct.
     let nearest: InteractableDef | null = null;
-    let distance = 24;
+    let distance = Infinity;
     const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
     for (const d of this.defs) {
       const marker = this.markers.get(d.id)?.sprite;
       if (!d.seat || !d.enabled || !marker?.visible) continue;
       const projected = marker.position.clone().project(camera);
       if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1) continue;
-      const pixels = (Math.hypot((projected.x - ndc.x) * aspect, projected.y - ndc.y) * this.viewportHeight) / 2;
-      if (pixels < distance) {
+      const depth = -marker.position.clone().applyMatrix4(camera.matrixWorldInverse).z;
+      const spritePixels =
+        camera instanceof THREE.PerspectiveCamera
+          ? (marker.scale.x * this.viewportHeight) / (2 * Math.max(0.001, depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)))
+          : 66;
+      // iconTexture paints its circle eight texture pixels above the sprite center.
+      const circleY = projected.y + (((spritePixels * 8) / 192) * 2) / this.viewportHeight;
+      const pixels = (Math.hypot((projected.x - ndc.x) * aspect, circleY - ndc.y) * this.viewportHeight) / 2;
+      const paintedRadius = (spritePixels * 70) / 192;
+      if (pixels <= Math.max(24, paintedRadius) && pixels < distance) {
         nearest = d;
         distance = pixels;
       }

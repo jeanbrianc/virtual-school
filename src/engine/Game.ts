@@ -383,7 +383,9 @@ export class Game {
 
   /** Walks to an interactable (if needed) and activates it. */
   goInteract(def: InteractableDef): void {
-    if (!def.enabled || !this.input.enabled || this.cinematicDepth > 0 || this.disposed) return;
+    if (!def.enabled || this.disposed) return;
+    // Existing lesson proxies intentionally greet/walk to their teacher after blocking input.
+    if (def.seat && (!this.input.enabled || this.cinematicDepth > 0)) return;
     this.standUp();
     if (def.seat) {
       this.pendingSeat = def.id;

@@ -6,7 +6,9 @@ import type { WorldState } from '../../src/domain/world/worldState';
 import type { InteractableDef } from '../../src/engine/world/types';
 import type { SeatAnchor } from '../../src/engine/world/seats';
 import { APP, enterSchool } from './helpers';
-import { loadBookSample, savedReading } from './fixtures/book-arrival';
+import { loadBookSample } from './fixtures/book-arrival';
+import { CHILD_SCOPED_TABLES, DB_NAME } from '../../src/data/schema';
+import { CAMERA } from '../../src/config/gameConfig';
 
 type SeatingGame = {
   busy: boolean;
@@ -45,6 +47,35 @@ type SeatingGame = {
   };
 };
 
+/** Visual play must not write reading, evidence, mastery, rewards, or saved appearances. */
+async function savedLearning(page: Page) {
+  return page.evaluate(
+    async ({ name, tables }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        const entries = await Promise.all(
+          tables.map(
+            (table) =>
+              new Promise<[string, unknown[]]>((resolve, reject) => {
+                const request = db.transaction(table).objectStore(table).getAll();
+                request.onsuccess = () => resolve([table, request.result]);
+                request.onerror = () => reject(request.error);
+              }),
+          ),
+        );
+        return Object.fromEntries(entries);
+      } finally {
+        db.close();
+      }
+    },
+    { name: DB_NAME, tables: CHILD_SCOPED_TABLES },
+  );
+}
+
 async function frames(page: Page, count = 6) {
   const current = await page.evaluate(() => (window.__izzy!.game() as unknown as SeatingGame).renderer.info.render.frame);
   await page.waitForFunction(
@@ -81,7 +112,7 @@ async function prepareSeat(page: Page, id: string) {
     );
     g.rig.yaw = seat.yaw + 0.3;
     g.rig.pitch = 0.65;
-    g.rig.distance = 5.5;
+    g.rig.distance = 9;
     g.rig.snapTo(g.player.position);
   }, id);
   await frames(page);
@@ -96,9 +127,15 @@ async function tapSeat(page: Page, id: string, mobile: boolean) {
     const x = bounds.left + ((p.x + 1) * bounds.width) / 2;
     const y = bounds.top + ((1 - p.y) * bounds.height) / 2;
     const depth = -marker.position.clone().applyMatrix4(g.rig.camera.matrixWorldInverse).z;
+    const diameter = (((marker.scale.x * bounds.height) / (2 * depth * Math.tan((g.rig.camera.fov * Math.PI) / 360))) * 140) / 192;
+    const edgeY = y - (diameter * 71) / 140;
+    const edge = p.clone().setY(p.y + (diameter * 71) / 70 / bounds.height);
     return {
       x,
       y,
+      edgeY,
+      edgePicked: g.interaction.pick(edge as unknown as THREE.Vector2, g.rig.camera)?.id,
+      edgeOnCanvas: document.elementFromPoint(x, edgeY) === canvas,
       visible: marker.visible,
       picked: g.interaction.pick(p as unknown as THREE.Vector2, g.rig.camera)?.id,
       onCanvas: document.elementFromPoint(x, y) === canvas,
@@ -109,10 +146,13 @@ async function tapSeat(page: Page, id: string, mobile: boolean) {
   expect(point.picked, id + ' exact chair target').toBe(id);
   expect(point.onCanvas, id + ' unobstructed touch target').toBe(true);
   expect(point.targetDiameter, id + ' minimum 44 CSS-pixel marker').toBeGreaterThanOrEqual(44);
-  if (mobile) await page.touchscreen.tap(point.x, point.y);
-  else await page.mouse.click(point.x, point.y);
+  if (mobile) {
+    expect(point.edgePicked, id + ' visible upper bubble edge is tappable').toBe(id);
+    expect(point.edgeOnCanvas).toBe(true);
+    await page.touchscreen.tap(point.x, point.edgeY);
+  } else await page.mouse.click(point.x, point.y);
 }
-async function expectSeated(page: Page, id: string) {
+async function expectSeated(page: Page, id: string, settleFrames = 15) {
   await expect
     .poll(
       () =>
@@ -123,7 +163,7 @@ async function expectSeated(page: Page, id: string) {
       { timeout: 120_000 },
     )
     .toBe(true);
-  await frames(page, 15);
+  await frames(page, settleFrames);
   await expect(page.getByTestId('interact-prompt')).toContainText('Stand up');
   await expect(page.getByTestId('interact-prompt')).toBeInViewport();
   const box = await page.getByTestId('interact-prompt').boundingBox();
@@ -179,7 +219,7 @@ test('all eleven seats have real reachable taps, framed personalized poses and s
   await loadBookSample(page, 25);
   await enterSchool(page, 'sample');
   await ready(page);
-  const before = await savedReading(page);
+  const before = await savedLearning(page);
   const config = await page.evaluate(() => (window.__izzy!.game() as unknown as SeatingGame).avatar.config);
   const ids = await page.evaluate(() => (window.__izzy!.game() as unknown as SeatingGame).world.interactables.filter((d) => d.seat).map((d) => d.id));
   expect(ids).toHaveLength(11);
@@ -191,15 +231,39 @@ test('all eleven seats have real reachable taps, framed personalized poses and s
     expect(await page.evaluate(() => (window.__izzy!.game() as unknown as SeatingGame).avatar.config)).toEqual(config);
     await page.getByTestId('interact-prompt').click();
     await expectStanding(page);
+    // Normal follow camera, no seat shot or special aiming: every chair has the
+    // same accessible prompt a learner sees when walking up to the furniture.
+    await page.evaluate(
+      ({ id, camera }) => {
+        const g = window.__izzy!.game() as unknown as SeatingGame;
+        const exit = g.world.interactables.find((d) => d.id === id)!.seat!.exit;
+        g.teleport(exit.x, exit.z);
+        g.rig.yaw = camera.defaultYaw;
+        g.rig.pitch = camera.defaultPitch;
+        g.rig.distance = camera.defaultDistance;
+        g.rig.spotlight = false;
+        g.rig.snapTo(g.player.position);
+      },
+      { id, camera: CAMERA },
+    );
+    await frames(page);
+    const label = await page.evaluate((id) => (window.__izzy!.game() as unknown as SeatingGame).world.interactables.find((d) => d.id === id)!.label, id);
+    await expect(page.getByTestId('interact-prompt')).toContainText(label);
+    await expect(page.getByTestId('interact-prompt')).toBeInViewport();
+    await snapshot(page, info, `${id}-default-approach`);
+    await page.getByTestId('interact-prompt').click();
+    await expectSeated(page, id, 2);
+    await page.getByTestId('interact-prompt').click();
+    await expectStanding(page);
   }
-  expect(await savedReading(page)).toEqual(before);
+  expect(await savedLearning(page)).toEqual(before);
 });
 
 test('seating cancels cleanly for taps, keys, repeated approaches, switching, resize and room or child travel', async ({ page, isMobile }, info) => {
   await loadBookSample(page, 25);
   await enterSchool(page, 'sample');
   await ready(page);
-  const before = await savedReading(page);
+  const before = await savedLearning(page);
   const couch = 'seat-nook-couch';
   await prepareSeat(page, couch);
   await tapSeat(page, couch, isMobile);
@@ -237,20 +301,22 @@ test('seating cancels cleanly for taps, keys, repeated approaches, switching, re
     const g = window.__izzy!.game() as unknown as SeatingGame;
     const canvas = document.querySelector('canvas.game-canvas')!;
     const b = canvas.getBoundingClientRect();
-    for (const x of [-16.7, -16.5, -15, -14.7])
-      for (const z of [1.4, 1.7, 2, 2.2]) {
-        if (g.world.structure.collisions.blocked(x, z, 0.32)) continue;
-        const p = g.player.position.clone().set(x, 0, z).project(g.rig.camera);
-        const sx = b.left + ((p.x + 1) * b.width) / 2,
-          sy = b.top + ((1 - p.y) * b.height) / 2;
+    // Scan the actual view rather than assuming a tiny world-space patch is visible.
+    for (const ny of [-0.4, -0.55, -0.7, -0.25, -0.1])
+      for (const nx of [-0.6, 0.6, -0.4, 0.4, -0.8, 0.8, 0]) {
+        const p = g.player.position.clone().set(nx, ny, 0) as unknown as THREE.Vector2;
+        const floor = g.interaction.pickFloor(p, g.rig.camera);
+        const sx = b.left + ((nx + 1) * b.width) / 2;
+        const sy = b.top + ((1 - ny) * b.height) / 2;
         if (
-          Math.abs(p.x) > 0.9 ||
-          Math.abs(p.y) > 0.7 ||
-          g.interaction.pick(p as unknown as THREE.Vector2, g.rig.camera) ||
+          !floor ||
+          floor.distanceTo(g.player.seated!.exit) < 0.6 ||
+          g.world.structure.collisions.blocked(floor.x, floor.z, 0.32) ||
+          g.interaction.pick(p, g.rig.camera) ||
           document.elementFromPoint(sx, sy) !== canvas
         )
           continue;
-        return { x: sx, y: sy };
+        return { x: sx, y: sy, floorX: floor.x, floorZ: floor.z };
       }
     return null;
   });
@@ -258,6 +324,17 @@ test('seating cancels cleanly for taps, keys, repeated approaches, switching, re
   if (isMobile) await page.touchscreen.tap(point!.x, point!.y);
   else await page.mouse.click(point!.x, point!.y);
   await expectStanding(page);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(({ floorX, floorZ }) => {
+          const g = window.__izzy!.game() as unknown as SeatingGame;
+          return Math.hypot(g.player.position.x - floorX, g.player.position.z - floorZ);
+        }, point!),
+      { timeout: 120_000 },
+    )
+    .toBeLessThan(0.35);
+  await snapshot(page, info, 'floor-tap-exit-navigation');
 
   await prepareSeat(page, 'seat-table-1-1');
   await tapSeat(page, 'seat-table-1-1', isMobile);
@@ -309,7 +386,7 @@ test('seating cancels cleanly for taps, keys, repeated approaches, switching, re
   await enterSchool(page, 'sample');
   await ready(page);
   await expectStanding(page);
-  expect(await savedReading(page)).toEqual(before);
+  expect(await savedLearning(page)).toEqual(before);
   await page.reload();
   await ready(page);
   await expectStanding(page);
@@ -319,7 +396,7 @@ test('locked nook cannot be seated by ID; unlocking, relocking and avatar restyl
   await loadBookSample(page, 24);
   await enterSchool(page, 'sample');
   await ready(page);
-  const before = await savedReading(page);
+  const before = await savedLearning(page);
   await page.evaluate(() => {
     const g = window.__izzy!.game() as unknown as SeatingGame;
     g.interactById('seat-nook-couch');
@@ -343,7 +420,20 @@ test('locked nook cannot be seated by ID; unlocking, relocking and avatar restyl
     await tapSeat(page, 'seat-nook-couch', isMobile);
     await expectSeated(page, 'seat-nook-couch');
     await snapshot(page, info, `reading-${outfit}-long-hair-backpack`);
+    for (const id of ['seat-table-1-1', 'seat-table-3-2']) {
+      await page.getByTestId('interact-prompt').click();
+      await expectStanding(page);
+      await prepareSeat(page, id);
+      await tapSeat(page, id, isMobile);
+      await expectSeated(page, id);
+      await snapshot(page, info, `${id}-${outfit}-long-hair-backpack`);
+    }
   }
+  await page.getByTestId('interact-prompt').click();
+  await expectStanding(page);
+  await prepareSeat(page, 'seat-nook-couch');
+  await tapSeat(page, 'seat-nook-couch', isMobile);
+  await expectSeated(page, 'seat-nook-couch');
   await page.evaluate(async () => {
     const g = window.__izzy!.game() as unknown as SeatingGame;
     await g.applyWorld({ ...g.world.currentState, readingNookOpen: false }, [], false);
@@ -359,5 +449,5 @@ test('locked nook cannot be seated by ID; unlocking, relocking and avatar restyl
   });
   await frames(page);
   await expectStanding(page);
-  expect(await savedReading(page)).toEqual(before);
+  expect(await savedLearning(page)).toEqual(before);
 });

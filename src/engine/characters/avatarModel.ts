@@ -113,7 +113,9 @@ export class AvatarModel {
       const knee = new THREE.Group();
       knee.name = side === -1 ? 'left-knee' : 'right-knee';
       knee.position.y = -0.17;
-      knee.add(capsule(0.061, 0.07, bareLeg ? skin : pants, 0, -0.075, 0));
+      const calf = capsule(0.061, 0.07, bareLeg ? skin : pants, 0, -0.075, 0);
+      calf.name = side === -1 ? 'left-calf' : 'right-calf';
+      knee.add(calf);
       if (c.outfit === 'dress') knee.add(cyl(0.062, 0.062, 0.07, mat('#fff8ee'), 0, -0.13, 0));
       const foot = sphere(0.085, shoe, 0, -0.19, 0.035);
       foot.name = side === -1 ? 'left-shoe' : 'right-shoe';
@@ -136,10 +138,12 @@ export class AvatarModel {
     this.torso.add(body);
     if (c.outfit === 'dress') {
       const skirt = cyl(0.15, 0.27, 0.3, outfit, 0, 0.02, 0, 28);
+      skirt.name = 'dress-skirt';
       this.torso.add(skirt);
       const hem = torus(0.265, 0.018, accent);
       hem.rotation.x = Math.PI / 2;
       hem.position.y = -0.12;
+      hem.name = 'dress-hem';
       this.torso.add(hem);
       const collar = torus(0.1, 0.02, mat('#fffaf0'));
       collar.rotation.x = Math.PI / 2;
@@ -173,6 +177,7 @@ export class AvatarModel {
     } else if (c.outfit === 'labcoat') {
       this.torso.add(cyl(0.175, 0.185, 0.12, pants, 0, 0.0, 0));
       const coat = cyl(0.19, 0.25, 0.46, mat('#fbfbf7', { roughness: 0.9 }), 0, 0.1, -0.01, 24);
+      coat.name = 'coat-hem';
       this.torso.add(coat);
       this.torso.add(rbox(0.07, 0.07, 0.02, 0.01, mat('#e8eef0'), 0.1, 0.1, 0.21));
       this.torso.add(rbox(0.012, 0.06, 0.012, 0.004, mat(c.accentColor), 0.1, 0.15, 0.225));
@@ -524,9 +529,20 @@ export class AvatarModel {
     this.armR.rotation.set(-0.95, 0, 0.06);
     this.head.rotation.set(this.seatPose === 'read' ? 0.24 : 0, 0, 0);
     this.torso.scale.y = 1;
+    // Fold long garments over the lap instead of pushing knees through a standing skirt.
+    this.torso.getObjectByName('dress-skirt')?.scale.set(1, 0.5, 1.5);
+    const hem = this.torso.getObjectByName('dress-hem');
+    if (hem) {
+      hem.scale.set(1, 1.5, 1);
+      hem.position.y = -0.055;
+    }
+    this.torso.getObjectByName('coat-hem')?.scale.set(1, 0.65, 1.5);
   }
 
   private resetPose() {
+    for (const name of ['dress-skirt', 'dress-hem', 'coat-hem']) this.torso.getObjectByName(name)?.scale.set(1, 1, 1);
+    const hem = this.torso.getObjectByName('dress-hem');
+    if (hem) hem.position.y = -0.12;
     this.rig.rotation.set(0, 0, 0);
     this.rig.position.set(0, 0, 0);
     this.rig.scale.set(1, 1, 1);

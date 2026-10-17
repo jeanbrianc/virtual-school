@@ -148,8 +148,8 @@ export function buildLibrary(ctx: BuildContext): void {
     z: -3.3,
     top: 0.65,
     yaw: chair.rotation.y,
-    forward: 0.17,
-    exit: [-11.0, -3.9],
+    forward: 0.38,
+    exit: [-11.1, -3.8],
   });
   ctx.addStatic(contactShadow(1.4, 1.3, 0.3, -12.1, -3.3));
   ctx.collide(-12.1, -3.3, 1.0, 1.0);
@@ -337,7 +337,7 @@ function buildReadingNook(ctx: BuildContext) {
     z: cz,
     top: 0.58,
     yaw: Math.PI / 2,
-    forward: 0.18,
+    forward: 0.42,
     exit: [benchX + 1.05, cz],
     reading: true,
     nook: true,
@@ -361,8 +361,9 @@ function buildReadingNook(ctx: BuildContext) {
     label: 'Sit on the daisy cushion',
     x: cx + 0.2,
     z: maxZ - 0.85,
-    top: 0.64,
+    top: 0.6,
     yaw: Math.PI / 2,
+    forward: 0.47,
     exit: [cx + 1.15, maxZ - 0.85],
     nook: true,
   });
