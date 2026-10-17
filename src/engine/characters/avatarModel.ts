@@ -525,8 +525,12 @@ export class AvatarModel {
   private updateSeated(): void {
     this.legL.rotation.x = this.legR.rotation.x = -Math.PI / 2;
     for (const knee of this.knees) knee.rotation.x = Math.PI / 2;
-    this.armL.rotation.set(-0.95, 0, -0.06);
-    this.armR.rotation.set(-0.95, 0, 0.06);
+    const coatReading = this.seatPose === 'read' && this.config.outfit === 'labcoat';
+    const armAngle = coatReading ? -1.25 : -0.95;
+    this.armL.rotation.set(armAngle, 0, -0.06);
+    this.armR.rotation.set(armAngle, 0, 0.06);
+    // Hold the book above and in front of the folded coat, with hands at its back edge.
+    if (coatReading) this.readingBook.position.set(0, 0.23, 0.44);
     this.head.rotation.set(this.seatPose === 'read' ? 0.24 : 0, 0, 0);
     this.torso.scale.y = 1;
     // Fold long garments over the lap instead of pushing knees through a standing skirt.
@@ -540,6 +544,7 @@ export class AvatarModel {
   }
 
   private resetPose() {
+    this.readingBook.position.set(0, 0.15, 0.27);
     for (const name of ['dress-skirt', 'dress-hem', 'coat-hem']) this.torso.getObjectByName(name)?.scale.set(1, 1, 1);
     const hem = this.torso.getObjectByName('dress-hem');
     if (hem) hem.position.y = -0.12;

@@ -386,3 +386,266 @@ it('tabletop clearance catches triangles that cross the table without a vertex i
     ) > 0.646,
   );
 });
+
+it('all seat edge targets stay stable across delayed frames and focus changes', () => {
+  const { seats, world } = setup();
+  seats.forEach((d) => (d.enabled = true));
+  const interaction = new InteractionSystem(world.interactables);
+  const markers = (interaction as unknown as { markers: Map<string, { sprite: THREE.Sprite }> }).markers;
+  for (const def of seats) {
+    const seat = def.seat!;
+    for (const [width, height] of [
+      [320, 812],
+      [375, 812],
+      [412, 915],
+      [1100, 720],
+    ]) {
+      const rig = new CameraRig(width! / height!, new Tweens());
+      if (width! < height!) rig.camera.fov = 55;
+      rig.camera.updateProjectionMatrix();
+      Object.assign(rig, { yaw: seat.yaw + 0.3, pitch: 0.65, distance: 9 });
+      for (let i = 0; i < 30; i++) rig.update(0.1, seat.exit);
+      rig.camera.updateMatrixWorld(true);
+      interaction.focused = null;
+      interaction.update(0.1, seat.exit, rig.camera, height);
+      const marker = markers.get(def.id)!.sprite;
+      const position = marker.position.clone();
+      const p = position.clone().project(rig.camera);
+      const depth = -position.clone().applyMatrix4(rig.camera.matrixWorldInverse).z;
+      const pixels = (marker.scale.x * height!) / (2 * depth * Math.tan((rig.camera.fov * Math.PI) / 360));
+      const points = Array.from({ length: 8 }, (_, i) => {
+        const angle = (i * Math.PI) / 4;
+        return new THREE.Vector2(
+          p.x + (((Math.cos(angle) * 70 * pixels) / 192) * 2) / width!,
+          p.y + ((((Math.sin(angle) * 70 + 8) * pixels) / 192) * 2) / height!,
+        );
+      });
+      for (let i = 0; i < 20; i++) {
+        interaction.focused = i % 2 ? def : null;
+        interaction.update(0.1, seat.exit, rig.camera, height);
+        assert.deepEqual(marker.position, position, def.id + ' does not move under a finger');
+        for (const point of points) assert.equal(interaction.pick(point, rig.camera)?.id, def.id, `${def.id} delayed edge at ${width}`);
+      }
+    }
+  }
+});
+
+it('held seat touches preserve their target and reject drag, cancellation, stale or unavailable seats', () => {
+  const { world, seats } = setup();
+  const seat = seats.find((d) => d.id === 'seat-nook-couch')!;
+  seat.enabled = true;
+  const interaction = new InteractionSystem(world.interactables);
+  let picked: typeof seat | null = seat;
+  interaction.pick = () => picked;
+  interaction.pickFloor = () => null;
+  const calls: string[] = [];
+  const handlers = new Map<string, (e: PointerEvent) => void>();
+  const canvas = {
+    focus() {},
+    style: {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 412, height: 915 }),
+    addEventListener: (name: string, fn: (e: PointerEvent) => void) => handlers.set(name, fn),
+  };
+  const game = Object.assign(Object.create(Game.prototype), {
+    opts: { audio: { unlock() {}, play() {} }, container: { clientWidth: 0, clientHeight: 0 }, callbacks: { onInteract() {} } },
+    renderer: { domElement: canvas },
+    input: { enabled: true },
+    cinematicDepth: 0,
+    disposed: false,
+    pendingSeat: null,
+    rig: { camera: new THREE.PerspectiveCamera(), inCinematic: false, orbit() {}, zoom() {}, snapTo() {} },
+    interaction,
+    avatar: { performing: false },
+    player: { seated: null, stand() {}, stop() {}, teleport() {}, position: new THREE.Vector3() },
+    goInteract: (def: typeof seat) => calls.push(def.id),
+  }) as Game;
+  const internal = game as unknown as {
+    attachPointer(c: HTMLCanvasElement): void;
+    activate(d: typeof seat): void;
+    pointerDown: unknown;
+    disposed: boolean;
+    cinematicDepth: number;
+    frame(): void;
+    input: object;
+    player: object;
+    rig: object;
+  };
+  internal.attachPointer(canvas as unknown as HTMLCanvasElement);
+  const event = (name: string, x = 100, id = 1) =>
+    handlers.get(name)!({ clientX: x, clientY: 100, pointerId: id, pointerType: 'touch', button: 0 } as PointerEvent);
+  const down = () => {
+    picked = seat;
+    seat.enabled = true;
+    interaction.hideMarker(seat.id, false);
+    event('pointerdown');
+  };
+  const up = () => event('pointerup');
+  const wheel = (deltaY: number) => handlers.get('wheel')!({ deltaY, preventDefault() {} } as unknown as PointerEvent);
+  const stopAfterCamera = new Error('stop frame after camera input');
+  const cameraFrame = (cameraYaw: number, cameraZoom: number) => {
+    Object.assign(game, { lastTime: performance.now() - 16, tweens: { update() {} } });
+    Object.assign(internal.input, { poll: () => ({ cameraYaw, cameraZoom, moveX: 0, moveY: 0 }) });
+    Object.assign(internal.player, {
+      update: () => {
+        throw stopAfterCamera;
+      },
+    });
+    assert.throws(
+      () => internal.frame(),
+      (error) => error === stopAfterCamera,
+    );
+  };
+  down();
+  const originalRig = internal.rig;
+  const settlingRig = new CameraRig(412 / 915, new Tweens());
+  Object.assign(game, { rig: settlingRig });
+  settlingRig.yaw = 1.2;
+  for (let i = 0; i < 10; i++) settlingRig.update(0.1, new THREE.Vector3(1, 0, 1));
+  wheel(0);
+  cameraFrame(0, 0);
+  Object.assign(game, { rig: originalRig });
+  picked = null;
+  up();
+  assert.deepEqual(calls.splice(0), [seat.id], 'zero camera intent/passive settling preserves a captured seat');
+  down();
+  picked = null;
+  up();
+  assert.deepEqual(calls.splice(0), [seat.id], 'slow touch keeps the seat pressed, not the now-empty pixel');
+  down();
+  event('pointerdown', 100, 2);
+  event('pointerup', 100, 2);
+  event('pointercancel', 100, 2);
+  assert.notEqual(internal.pointerDown, null, 'unrelated finger cannot consume original seat press');
+  picked = null;
+  up();
+  assert.deepEqual(calls.splice(0), [seat.id]);
+  const cancellations = [
+    () => event('pointermove', 130),
+    () => event('pointercancel'),
+    () => wheel(1),
+    () => cameraFrame(1, 0),
+    () => cameraFrame(0, -1),
+    () => game.standUp(),
+    () => game.resize(),
+    () => {
+      game.setInputEnabled(false);
+      game.setInputEnabled(true);
+    },
+    () => game.teleport(0, 0),
+    () => internal.activate({ ...seat, seat: undefined }),
+    () => {
+      seat.enabled = false;
+    },
+    () => interaction.hideMarker(seat.id, true),
+    () => {
+      internal.disposed = true;
+    },
+    () => {
+      internal.cinematicDepth = 1;
+    },
+  ];
+  for (const cancel of cancellations) {
+    down();
+    cancel();
+    up();
+    assert.deepEqual(calls, [], 'cancelled press must not activate later');
+    internal.disposed = false;
+    internal.cinematicDepth = 0;
+  }
+  down();
+  const index = world.interactables.indexOf(seat);
+  world.interactables[index] = { ...seat };
+  up();
+  assert.deepEqual(calls, [], 'replaced target identity is rejected');
+  world.interactables[index] = seat;
+  game.setInputEnabled(false);
+  down();
+  game.setInputEnabled(true);
+  up();
+  assert.deepEqual(calls, [], 'a touch begun while input was blocked cannot initiate seating');
+  internal.cinematicDepth = 1;
+  down();
+  internal.cinematicDepth = 0;
+  up();
+  assert.deepEqual(calls, [], 'a touch begun during a cinematic cannot initiate seating');
+  // The existing non-seat path still selects the pointer-up hit.
+  picked = { ...seat, seat: undefined };
+  event('pointerdown');
+  wheel(1);
+  cameraFrame(1, 0);
+  picked = seat;
+  up();
+  assert.deepEqual(calls.splice(0), [seat.id]);
+});
+
+it('reading pages clear folded garments and remain visible for every outfit and viewport', () => {
+  for (const outfit of ['overalls', 'dress', 'tee', 'sweater', 'labcoat'] as const) {
+    const config = { ...DEFAULT_AVATAR, outfit, hairStyle: 'long' as const, accessory: 'backpack' as const };
+    const avatar = new AvatarModel(config);
+    const book = avatar.root.getObjectByName('seated-open-book')!;
+    const neutralPosition = book.position.clone();
+    avatar.setSeated('read');
+    avatar.root.updateMatrixWorld(true);
+    const coat = avatar.root.getObjectByName('coat-hem') as THREE.Mesh | undefined;
+    const coatIntersectsPages = () => {
+      if (!coat) return false;
+      const position = coat.geometry.getAttribute('position');
+      const index = coat.geometry.index;
+      for (const page of book.children) {
+        const paper = page.children[1] as THREE.Mesh;
+        paper.geometry.computeBoundingBox();
+        const transform = paper.matrixWorld.clone().invert().multiply(coat.matrixWorld);
+        const count = index?.count ?? position.count;
+        for (let i = 0; i < count; i += 3) {
+          const vertices = [0, 1, 2].map((offset) =>
+            new THREE.Vector3().fromBufferAttribute(position, index ? index.getX(i + offset) : i + offset).applyMatrix4(transform),
+          );
+          if (paper.geometry.boundingBox!.intersectsTriangle(new THREE.Triangle(vertices[0]!, vertices[1]!, vertices[2]!))) return true;
+        }
+      }
+      return false;
+    };
+    assert.equal(coatIntersectsPages(), false, outfit + ' coat triangles clear page surfaces');
+    if (coat) {
+      const readingPosition = book.position.clone();
+      book.position.copy(neutralPosition);
+      avatar.root.updateMatrixWorld(true);
+      assert.equal(coatIntersectsPages(), true, 'regression detects the previous folded-coat/page intersection');
+      book.position.copy(readingPosition);
+      avatar.root.updateMatrixWorld(true);
+    }
+    const blockers: THREE.Object3D[] = [];
+    avatar.root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      for (let parent: THREE.Object3D | null = object; parent; parent = parent.parent) if (parent === book || !parent.visible) return;
+      blockers.push(object);
+    });
+    for (const [width, height] of [
+      [1100, 720],
+      [320, 812],
+      [375, 812],
+      [412, 915],
+      [915, 412],
+    ]) {
+      const rig = new CameraRig(width! / height!, new Tweens());
+      if (width! < height!) rig.camera.fov = 55;
+      rig.camera.updateProjectionMatrix();
+      Object.assign(rig, { yaw: 0.3, pitch: 0.48, distance: 5.5, spotlight: true });
+      for (let i = 0; i < 100; i++) rig.update(0.1, new THREE.Vector3());
+      rig.camera.updateMatrixWorld(true);
+      for (const [index, page] of book.children.entries()) {
+        const side = index === 0 ? -1 : 1;
+        for (const x of [0.045, 0.09, 0.135])
+          for (const z of [-0.07, -0.03, 0.01, 0.05]) {
+            const target = page.localToWorld(new THREE.Vector3(x * side, 0.035, z));
+            const delta = target.clone().sub(rig.camera.position);
+            const ray = new THREE.Raycaster(rig.camera.position, delta.clone().normalize(), 0.01, delta.length() - 0.001);
+            assert.equal(ray.intersectObjects(blockers, false).length, 0, `${outfit} ${width}×${height} printed page at ${side * x},${z} unobscured`);
+          }
+      }
+    }
+    avatar.setSeated(null);
+    assert.deepEqual(book.position, neutralPosition, outfit + ' restores temporary book transform');
+    assert.deepEqual(avatar.config, config);
+  }
+});

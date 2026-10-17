@@ -129,7 +129,7 @@ export class Game {
   private resizeObserver: ResizeObserver;
   private disposed = false;
   private lastFocusId: string | null = null;
-  private pointerDown: { x: number; y: number; moved: number; id: number; button: number } | null = null;
+  private pointerDown: { x: number; y: number; moved: number; id: number; button: number; seat: InteractableDef | null; seatAllowed: boolean } | null = null;
   private quality: GraphicsQuality;
   private maxFps = Number(new URLSearchParams(window.location.search).get('maxfps') ?? 0) || 0;
   private cinematicDepth = 0;
@@ -305,15 +305,27 @@ export class Game {
 
   private attachPointer(canvas: HTMLCanvasElement) {
     canvas.addEventListener('pointerdown', (e) => {
+      if (this.pointerDown?.seat && this.pointerDown.id !== e.pointerId) return;
       this.opts.audio.unlock();
       canvas.focus({ preventScroll: true });
-      this.pointerDown = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId, button: e.button };
+      const seatAllowed = this.input.enabled && this.cinematicDepth === 0 && !this.disposed;
+      const target = seatAllowed ? this.interaction.pick(this.ndc(e), this.rig.camera) : null;
+      this.pointerDown = {
+        x: e.clientX,
+        y: e.clientY,
+        moved: 0,
+        id: e.pointerId,
+        button: e.button,
+        seat: target && this.interaction.canCommitSeatPress(target) ? target : null,
+        seatAllowed,
+      };
     });
     canvas.addEventListener('pointermove', (e) => {
       if (this.pointerDown && e.pointerId === this.pointerDown.id) {
         const dx = e.clientX - this.pointerDown.x;
         const dy = e.clientY - this.pointerDown.y;
         this.pointerDown.moved += Math.abs(dx) + Math.abs(dy);
+        if (this.pointerDown.moved > INTERACTION.clickDragThreshold) this.pointerDown.seat = null;
         if (this.pointerDown.moved > INTERACTION.clickDragThreshold && !this.rig.inCinematic) {
           this.rig.orbit(-dx * CAMERA.dragSensitivity, dy * CAMERA.dragSensitivity * 0.6);
         }
@@ -329,17 +341,26 @@ export class Game {
     });
     const up = (e: PointerEvent) => {
       const down = this.pointerDown;
+      if (down?.seat && down.id !== e.pointerId) return;
       this.pointerDown = null;
       if (!down || down.moved > INTERACTION.clickDragThreshold || !this.input.enabled || this.cinematicDepth > 0) return;
+      // Keep the furniture the finger actually pressed, even if the camera settles
+      // during a slow touch. A replaced, disabled or cancelled target cannot commit.
+      if (down.seat && (this.disposed || !this.interaction.canCommitSeatPress(down.seat))) return;
+      const ndc = this.ndc(e);
+      if (!down.seatAllowed && this.interaction.pick(ndc, this.rig.camera)?.seat) return;
       this.input.lastDevice = 'pointer';
-      this.handleTap(this.ndc(e));
+      this.handleTap(ndc, down.seat);
     };
     canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', () => (this.pointerDown = null));
+    canvas.addEventListener('pointercancel', (e) => {
+      if (!this.pointerDown?.seat || this.pointerDown.id === e.pointerId) this.pointerDown = null;
+    });
     canvas.addEventListener(
       'wheel',
       (e) => {
         e.preventDefault();
+        if (e.deltaY && this.pointerDown?.seat) this.pointerDown = null;
         if (!this.rig.inCinematic) this.rig.zoom(e.deltaY * CAMERA.wheelSensitivity);
       },
       { passive: false },
@@ -351,9 +372,9 @@ export class Game {
     return new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   }
 
-  private handleTap(ndc: THREE.Vector2) {
+  private handleTap(ndc: THREE.Vector2, pressedSeat: InteractableDef | null = null) {
     this.standUp();
-    const hit = this.interaction.pick(ndc, this.rig.camera);
+    const hit = pressedSeat ?? this.interaction.pick(ndc, this.rig.camera);
     const p = hit ? null : this.interaction.pickFloor(ndc, this.rig.camera);
     if (this.avatar.performing) {
       // Mid-move: remember the tap and go when she's done.
@@ -418,6 +439,7 @@ export class Game {
   }
 
   private activate(def: InteractableDef) {
+    if (this.pointerDown?.seat) this.pointerDown = null;
     this.opts.audio.play('pop');
     if (def.kind === 'teacher') {
       this.world.teachers.get(def.id as TeacherId)?.greet();
@@ -438,6 +460,7 @@ export class Game {
 
   /** Ends active and pending seating before any competing movement or activity. */
   standUp(): void {
+    if (this.pointerDown?.seat) this.pointerDown = null;
     this.afterMove = null;
     if (this.pendingSeat) this.player.stop();
     this.pendingSeat = null;
@@ -467,6 +490,8 @@ export class Game {
     // Cinematics follow wall-clock time even when frames are slow.
     this.tweens.update(Math.min(0.5, realDt));
     const intents = this.input.poll();
+    // Deliberate camera gestures end a held seat press; passive settling does not.
+    if ((intents.cameraYaw || intents.cameraZoom) && this.pointerDown?.seat) this.pointerDown = null;
     if (!this.rig.inCinematic) {
       this.rig.orbit(intents.cameraYaw * CAMERA.keyOrbitSpeed * dt, 0);
       if (intents.cameraZoom) this.rig.zoom(intents.cameraZoom * dt * 6);
@@ -505,6 +530,7 @@ export class Game {
       else if (this.input.enabled && this.matTile !== null) this.station(this.matTile);
     }
     if (this.input.consumeBack()) {
+      if (this.pointerDown?.seat) this.pointerDown = null;
       this.afterMove = null;
       if (this.seated || this.pendingSeat) this.standUp();
       else this.opts.callbacks.onBack?.();

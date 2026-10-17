@@ -1,4 +1,5 @@
 /** Real pointer/touch, keyboard and interrupted seating with synthetic profiles only. */
+import { writeFileSync } from 'node:fs';
 import { expect, test, type Page, type TestInfo } from 'playwright/test';
 import type * as THREE from 'three';
 import type { AvatarConfig } from '../../src/domain/types';
@@ -24,7 +25,13 @@ type SeatingGame = {
   renderer: { info: { render: { frame: number } } };
   input: { enabled: boolean };
   avatar: { root: THREE.Group; config: AvatarConfig; seatedPose: string | null };
-  player: { position: THREE.Vector3; yaw: number; seated: SeatAnchor | null; isWalkingPath: boolean };
+  player: {
+    position: THREE.Vector3;
+    yaw: number;
+    seated: SeatAnchor | null;
+    isWalkingPath: boolean;
+    nav: { findPath(from: { x: number; z: number }, to: { x: number; z: number }): { x: number; z: number }[] | null };
+  };
   interaction: {
     markers: Map<string, { sprite: THREE.Sprite }>;
     pick(point: THREE.Vector2, camera: THREE.PerspectiveCamera): InteractableDef | null;
@@ -301,6 +308,7 @@ test('seating cancels cleanly for taps, keys, repeated approaches, switching, re
     const g = window.__izzy!.game() as unknown as SeatingGame;
     const canvas = document.querySelector('canvas.game-canvas')!;
     const b = canvas.getBoundingClientRect();
+    const unreachable: { x: number; z: number; reason: string }[] = [];
     // Scan the actual view rather than assuming a tiny world-space patch is visible.
     for (const ny of [-0.4, -0.55, -0.7, -0.25, -0.1])
       for (const nx of [-0.6, 0.6, -0.4, 0.4, -0.8, 0.8, 0]) {
@@ -316,11 +324,22 @@ test('seating cancels cleanly for taps, keys, repeated approaches, switching, re
           document.elementFromPoint(sx, sy) !== canvas
         )
           continue;
-        return { x: sx, y: sy, floorX: floor.x, floorZ: floor.z };
+        // Collision-clear floor can still be an isolated pocket behind furniture.
+        // Require the ordinary navigation graph to reach this exact destination.
+        const path = g.player.nav.findPath(g.player.seated!.exit, floor);
+        const end = path?.at(-1);
+        if (!end || Math.hypot(end.x - floor.x, end.z - floor.z) > 0.1) {
+          unreachable.push({ x: floor.x, z: floor.z, reason: !path ? 'no connected path' : 'path ends elsewhere' });
+          continue;
+        }
+        return { x: sx, y: sy, floorX: floor.x, floorZ: floor.z, exit: g.player.seated!.exit.toArray(), path, unreachable };
       }
     return null;
   });
   expect(point).not.toBeNull();
+  const proofPath = info.outputPath('floor-target-navigation-proof.json');
+  writeFileSync(proofPath, JSON.stringify(point, null, 2));
+  await info.attach('floor-target-navigation-proof', { path: proofPath, contentType: 'application/json' });
   if (isMobile) await page.touchscreen.tap(point!.x, point!.y);
   else await page.mouse.click(point!.x, point!.y);
   await expectStanding(page);

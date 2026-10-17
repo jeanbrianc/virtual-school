@@ -155,6 +155,11 @@ export class InteractionSystem {
     return this.defs.find((d) => d.id === id);
   }
 
+  /** A held touch may only commit the same currently available seat. */
+  canCommitSeatPress(def: InteractableDef): boolean {
+    return !!def.seat && def.enabled && this.byId(def.id) === def && !this.hiddenMarkers.has(def.id) && !!this.markers.get(def.id)?.sprite.visible;
+  }
+
   /** Nearest enabled interactable whose radius contains the player. */
   computeFocus(player: THREE.Vector3): InteractableDef | null {
     let best: InteractableDef | null = null;
@@ -190,7 +195,8 @@ export class InteractionSystem {
       const circleY = projected.y + (((spritePixels * 8) / 192) * 2) / this.viewportHeight;
       const pixels = (Math.hypot((projected.x - ndc.x) * aspect, circleY - ndc.y) * this.viewportHeight) / 2;
       const paintedRadius = (spritePixels * 70) / 192;
-      if (pixels <= Math.max(24, paintedRadius) && pixels < distance) {
+      // Six CSS pixels cover the painted stroke and normal finger imprecision.
+      if (pixels <= Math.max(24, paintedRadius) + 6 && pixels < distance) {
         nearest = d;
         distance = pixels;
       }
@@ -231,10 +237,11 @@ export class InteractionSystem {
       // marker nearby; discovered objects only when close.
       m.sprite.visible =
         !this.hiddenMarkers.has(d.id) && d.enabled && (isFocus || (fresh ? dist < 22 : d.kind === 'teacher' ? near : near && dist < d.radius + 2.5));
-      const bob = Math.sin(this.time * (fresh ? 3.4 : 2.6) + m.phase) * (fresh ? 0.16 : 0.1);
-      m.sprite.position.set(m.base.x, m.base.y + bob + (isFocus ? 0.15 : 0), m.base.z);
+      const bob = d.seat ? 0 : Math.sin(this.time * (fresh ? 3.4 : 2.6) + m.phase) * (fresh ? 0.16 : 0.1);
+      m.sprite.position.set(m.base.x, m.base.y + bob + (!d.seat && isFocus ? 0.15 : 0), m.base.z);
       const pulse = fresh ? 1 + Math.sin(this.time * 3 + m.phase) * 0.06 : 1;
-      const target = (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : fresh ? 1.3 * pulse : 1);
+      // Seats are stable touch targets, not moving/focus-lifting decorations.
+      const target = d.seat ? 0.5 : (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : fresh ? 1.3 * pulse : 1);
       let minimum = 0;
       if (d.seat && camera) {
         const depth = -m.sprite.position.clone().applyMatrix4(camera.matrixWorldInverse).z;
