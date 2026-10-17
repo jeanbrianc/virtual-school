@@ -1,4 +1,6 @@
 import { expect, test, type Page, type TestInfo, type Locator } from 'playwright/test';
+import type { PerspectiveCamera, Vector3 } from 'three';
+import { PLAYER } from '../../src/config/gameConfig';
 import { DB_NAME } from '../../src/data/schema';
 import type { Evidence, LessonAttempt } from '../../src/domain/types';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
@@ -106,6 +108,9 @@ test('offline tap/keyboard steps, explicit 2→3→4 offers, valid alternative o
   await context.setOffline(false);
   await page.goto(`${APP}#/parent/conversations`);
   await unlockParent(page);
+  if (info.project.name === 'phone') await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await page.getByLabel('Viewing learner').selectOption('child_izzy');
+  await page.reload();
   await expect(page.getByText('Fictional picture ordering only', { exact: false }).first()).toBeVisible();
   await screenshot(page, info, 'parent-record');
   await page.reload();
@@ -136,6 +141,7 @@ test('incomplete, invalid, model, simpler, interruption, skip, replay, cancel an
   await activate(page.getByTestId('routine-next'), info);
   await expect(page.getByTestId('routine-next-level')).toHaveCount(0);
   await activate(page.getByRole('button', { name: 'Save & play again' }), info);
+  await expect.poll(async () => (await records(page)).lessons.length).toBe(1);
   const saved = await records(page);
   expect(saved.lessons).toHaveLength(1);
   expect(saved.evidence).toHaveLength(2);
@@ -160,6 +166,57 @@ test('incomplete, invalid, model, simpler, interruption, skip, replay, cancel an
 test('new teacher placement leaves existing teachers, globe, dance, keyboard and bookshelf usable', async ({ page }, info) => {
   await loadRoutineSample(page);
   await screenshot(page, info, 'school-with-tavi');
+  // Frame the teacher with the ordinary orbit camera, then use a real canvas click/tap.
+  // No teleport or programmatic interaction: the avatar must walk to the clear approach.
+  type Scene = {
+    rig: { yaw: number; camera: PerspectiveCamera; snapTo(position: Vector3): void };
+    renderer: { info: { render: { frame: number } } };
+    player: { position: Vector3; nav: { findPath(from: { x: number; z: number }, to: { x: number; z: number }): { x: number; z: number }[] | null } };
+    interaction: { byId(id: string): { position: Vector3; approach: Vector3 }; pick(point: Vector3, camera: PerspectiveCamera): { id: string } | null };
+    world: { structure: { collisions: { blocked(x: number, z: number, radius: number): boolean } } };
+  };
+  const initial = await page.evaluate((radius) => {
+    const game = window.__izzy!.game() as unknown as Scene;
+    const teacher = game.interaction.byId('tavi');
+    const from = game.player.position;
+    const path = game.player.nav.findPath(from, teacher.approach);
+    game.rig.yaw = Math.atan2(from.x - teacher.position.x, from.z - teacher.position.z);
+    game.rig.snapTo(from);
+    return {
+      x: from.x,
+      z: from.z,
+      frame: game.renderer.info.render.frame,
+      approach: { x: teacher.approach.x, z: teacher.approach.z },
+      modelClear: !game.world.structure.collisions.blocked(teacher.position.x, teacher.position.z, 0.6),
+      pathClear: !!path?.length && path.every((p) => !game.world.structure.collisions.blocked(p.x, p.z, radius)),
+    };
+  }, PLAYER.radius);
+  expect(initial.modelClear).toBe(true);
+  expect(initial.pathClear).toBe(true);
+  await page.waitForFunction((frame) => (window.__izzy!.game() as unknown as Scene).renderer.info.render.frame > frame, initial.frame, { timeout: 180_000 });
+  const target = await page.evaluate(() => {
+    const game = window.__izzy!.game() as unknown as Scene;
+    const point = game.interaction.byId('tavi').position.clone().setY(1.1).project(game.rig.camera);
+    const canvas = document.querySelector('canvas.game-canvas')!;
+    const rect = canvas.getBoundingClientRect();
+    const x = rect.left + ((point.x + 1) * rect.width) / 2,
+      y = rect.top + ((1 - point.y) * rect.height) / 2;
+    return { x, y, picked: game.interaction.pick(point, game.rig.camera)?.id, onCanvas: document.elementFromPoint(x, y) === canvas };
+  });
+  expect(target.picked).toBe('tavi');
+  expect(target.onCanvas).toBe(true);
+  await screenshot(page, info, 'tavi-reachable-world');
+  if (info.project.name === 'phone') await page.touchscreen.tap(target.x, target.y);
+  else await page.mouse.click(target.x, target.y);
+  await expect(page.getByTestId('routine-start-2')).toBeVisible({ timeout: 180_000 });
+  const arrived = await page.evaluate(() => {
+    const p = (window.__izzy!.game() as unknown as Scene).player.position;
+    return { x: p.x, z: p.z };
+  });
+  expect(Math.hypot(arrived.x - initial.x, arrived.z - initial.z)).toBeGreaterThan(0.4);
+  expect(Math.hypot(arrived.x - initial.approach.x, arrived.z - initial.approach.z)).toBeLessThan(0.6);
+  await page.getByTestId('dialogue-close').click();
+  await page.waitForFunction(() => window.__izzy?.game()?.busy === false, null, { timeout: 180_000 });
   for (const id of ['hoot', 'digit', 'nova', 'pippa']) {
     await talkTo(page, id);
     await expect(page.locator(`[data-teacher="${id}"]`)).toBeVisible();
