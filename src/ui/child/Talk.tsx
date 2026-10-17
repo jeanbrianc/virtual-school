@@ -386,9 +386,9 @@ export function useTeacherTalk(opts: {
   /** Read the live latch at playback time, including Replay and queued flow callbacks. */
   const guardSpeech = (speech: Speech): Speech => ({
     ...speech,
-    speak: (text) => {
+    speak: (text, options) => {
       if (opts.transcript().some((line) => line.localOnly || recognizedSafetyText(line.text))) contain();
-      speech.speak(text, { localOnly: privacy.current.localOnly });
+      speech.speak(text, { localOnly: options?.localOnly || privacy.current.localOnly });
     },
   });
   return { send, reset, markFinished, topic, thinking, lastReply, notes: notes.current, guardSpeech };

@@ -200,6 +200,17 @@ test('hook keeps notes and boundary across reset, truncation, replacement and re
     await api.send('I like books');
   });
   assert.equal(remote, 1, 'genuinely fresh flow may use opted-in AI');
+  api
+    .guardSpeech({
+      auto: false,
+      canSpeak: true,
+      speak: (text, options) => {
+        spoken.push({ text, options });
+      },
+    })
+    .speak('An explicitly local line in a fresh conversation', { localOnly: true });
+  assert.equal(spoken.at(-1)!.options?.localOnly, true, 'guard must never downgrade a stricter caller');
+
   await act(async () => tree.unmount());
 });
 

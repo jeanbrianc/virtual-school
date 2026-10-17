@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'playwright/test';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
 
+test.use({ actionTimeout: 45_000 });
+
 const chime = readFileSync(new URL('./fixtures/chime.mp3', import.meta.url));
 
 test('recognized safety stays local through repeated turns and Back; retained parent evidence and fresh AI both work', async ({ page }, info) => {
