@@ -132,14 +132,28 @@ async function correctChoice(page: Page) {
   const unitLength = Number(await stage.getAttribute('data-unit-length'));
   return page.getByTestId(`choice-${shapes[shapes.length % unitLength]}`);
 }
+async function assertFitsWidth(page: Page) {
+  const overflow = await page.locator('.dialogue').evaluate((dialog) => {
+    const bounds = dialog.getBoundingClientRect();
+    return [...dialog.querySelectorAll('.pattern-playground-choice, .pattern-controls button, .pattern-worked-model, .pattern-next')]
+      .filter((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.left < bounds.left || rect.right > bounds.right;
+      })
+      .map((node) => node.textContent?.trim());
+  });
+  expect(overflow, 'All choices and controls must fit horizontally before automated scrolling').toEqual([]);
+}
 async function solveRound(page: Page, info: TestInfo, round: number) {
   await expect(page.locator('.lesson-progress')).toHaveAttribute('aria-label', `Round ${round + 1} of 4`);
+  await assertFitsWidth(page);
   await activate(await correctChoice(page), info);
   await activate(page.getByTestId('pattern-next'), info);
   if (round < 3) await expect(page.locator('.lesson-progress')).toHaveAttribute('aria-label', `Round ${round + 2} of 4`);
   else await expect(page.getByTestId('choice-yay')).toBeVisible();
 }
 async function screenshot(page: Page, info: TestInfo, name: string) {
+  await assertFitsWidth(page);
   const path = info.outputPath(`${name}-${info.project.name}.png`);
   await page.screenshot({ path, fullPage: true });
   await info.attach(name, { path, contentType: 'image/png' });
@@ -213,6 +227,7 @@ test('hint, model, skip, blur, close and replay preserve support and discard unf
   await activate(page.getByRole('button', { name: /Show the model/ }), info);
   await expect(page.getByLabel('Worked shape pattern model')).toBeVisible();
   await screenshot(page, info, 'supported-aab-model');
+  await assertFitsWidth(page);
   await activate(await correctChoice(page), info);
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
   await expect(page.getByTestId('pattern-next')).toBeVisible();

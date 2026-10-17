@@ -303,7 +303,7 @@ export function LessonFlow(props: LessonFlowProps) {
         </>
       )}
       {phase === 'play' && problem && (
-        <div className="lesson-play">
+        <div className="lesson-play" data-pattern-lab={patternLab ? true : undefined}>
           <div className="lesson-progress" aria-label={`Round ${shownRound + 1} of ${lesson.rounds}`}>
             {Array.from({ length: lesson.rounds }, (_, i) => (
               <span key={i} className={`pip ${i < shownRound ? 'done' : i === shownRound ? 'now' : ''}`} />
