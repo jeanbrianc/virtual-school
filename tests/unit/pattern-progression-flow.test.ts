@@ -213,3 +213,16 @@ test('completed challenge saves once before matching and stale completion cannot
   await act(async () => stale('replay'));
   assert.equal(h.saves.length, 1);
 });
+
+test('final answered challenge requires the completed save-and-matching action rather than an unsaved restart', async (t) => {
+  const h = await harness(t);
+  await h.pick('challenge');
+  for (let i = 0; i < 3; i++) await h.answer();
+  const final = h.tree.root.findByType(PatternProgressionChoices).props.problem;
+  await act(async () => h.tree.root.findByProps({ 'data-testid': `choice-${final.answerId}` }).props.onClick());
+  assert.equal(h.tree.root.findAllByProps({ 'data-testid': 'pattern-return-matching' }).length, 0);
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'pattern-next' }).props.onClick());
+  await h.pick('match');
+  assert.equal(h.saves.length, 1);
+  assert.equal(h.tree.root.findByType(PatternProgressionStage).props.matching, true);
+});

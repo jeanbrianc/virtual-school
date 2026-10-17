@@ -388,7 +388,7 @@ export function LessonFlow(props: LessonFlowProps) {
                   Skip this round
                 </button>
               </div>
-              {patternLab && run && run.startTier > 0 && (
+              {patternLab && run && !run.isComplete && run.startTier > 0 && (
                 <div className="pattern-controls">
                   <button
                     type="button"
