@@ -33,7 +33,9 @@ test('helper quota failure keeps built-in speech available and counts cooldown f
   await page.getByTestId('ai-endpoint').blur();
   await page.getByTestId('ai-check').click();
   await expect(page.getByTestId('natural-toggle')).toBeEnabled();
-  await page.getByTestId('natural-toggle').check();
+  // Settings persist asynchronously, so wait for the saved state after the click.
+  await page.getByTestId('natural-toggle').click();
+  await expect(page.getByTestId('natural-toggle')).toBeChecked();
   await page.getByTestId('say-name-hear').click();
   const spoken = () => page.evaluate(() => (window as unknown as { batchSpoken: string[] }).batchSpoken);
   await expect.poll(spoken).toEqual(['Hoo-hoo! Hello, Sample! Ready to read with me, Sample?']);

@@ -3,8 +3,6 @@ import { expect, test } from 'playwright/test';
 import { APP, unlockParent } from './helpers';
 import { useSyntheticHousehold } from './synthetic-household';
 
-test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
-
 const chime = readFileSync(new URL('./fixtures/chime.mp3', import.meta.url));
 for (const viewport of [
   { width: 1100, height: 720 },
@@ -38,6 +36,7 @@ for (const viewport of [
         throw new Error('Usage view must never open a microphone');
       };
     });
+    await useSyntheticHousehold(page);
     await page.goto(`${APP}#/parent/settings`);
     await expect(page.getByTestId('usage-view')).toHaveCount(0);
     await unlockParent(page);

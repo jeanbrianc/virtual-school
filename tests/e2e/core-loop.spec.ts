@@ -11,7 +11,7 @@ import { useSyntheticHousehold } from './synthetic-household';
 
 test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
 
-test('first day: discover the school and put the first book on the shelf', async ({ page }) => {
+test('first day: discover the school and put the first book on the shelf', async ({ page, isMobile }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -65,8 +65,10 @@ test('first day: discover the school and put the first book on the shelf', async
   // The parent sees the new evidence, the conversation, and the first-week checklist.
   await page.goto(`${APP}#/parent/today`);
   await unlockParent(page);
+  await expect(page.getByRole('heading', { name: 'Today with Sample', exact: true })).toBeVisible();
   await expect(page.getByTestId('today-feed')).toContainText('Finished Charlotte’s Web');
   await expect(page.getByText('Getting started')).toBeVisible();
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByTestId('nav-conversations').click();
   await expect(page.getByText('Professor Hoot').first()).toBeVisible();
 

@@ -10,8 +10,6 @@ import { expect, test } from 'playwright/test';
 import { APP, enterSchool, unlockParent } from './helpers';
 import { useSyntheticHousehold } from './synthetic-household';
 
-test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
-
 declare global {
   interface Window {
     __fallback: string[];
@@ -99,6 +97,7 @@ test('natural teacher voices and listening through the AI helper', async ({ page
   });
 
   // ── A parent points the school at the helper and turns both on ──────────
+  await useSyntheticHousehold(page);
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
   await page.getByTestId('ai-endpoint').fill('/api');
