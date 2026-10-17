@@ -12,6 +12,19 @@ export function TeacherPortrait({ id, mood = 'happy', size = 120 }: { id: Teache
         </text>
       </svg>
     );
+  if (id === 'tavi')
+    return (
+      <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Tavi the teal turtle">
+        <circle cx="60" cy="60" r="58" fill="#f0e4bd" />
+        <ellipse cx="60" cy="86" rx="36" ry="30" fill="#356f6b" />
+        <path d="M60 59 79 75 72 98H48L41 75Z" fill="#82bdb5" stroke="#233f42" strokeWidth="3" />
+        <ellipse cx="60" cy="45" rx="30" ry="26" fill="#a4d4cb" stroke="#356f6b" strokeWidth="3" />
+        <circle cx="47" cy="41" r="4" fill="#233f42" />
+        <circle cx="73" cy="41" r="4" fill="#233f42" />
+        <path d="M48 53Q60 63 72 53" fill="none" stroke="#233f42" strokeWidth="3" strokeLinecap="round" />
+        <path d="M38 73 24 91M82 73 96 91" stroke="#a4d4cb" strokeWidth="13" strokeLinecap="round" />
+      </svg>
+    );
   if (id === 'pippa')
     return (
       <svg width={size} height={size} viewBox="0 0 120 120" role="img" aria-label="Pippa the fox">

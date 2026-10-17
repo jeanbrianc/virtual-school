@@ -80,6 +80,7 @@ export class HelperSpeechOutput implements SpeechOutput {
   async speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     this.cancel();
     const { natural, ...rest } = opts;
+    if (opts.localOnly) return this.device.speak(text, { ...rest, localOnly: true });
     if (!natural || typeof Audio === 'undefined') return this.device.speak(text, rest);
     const mine = ++this.token;
     try {

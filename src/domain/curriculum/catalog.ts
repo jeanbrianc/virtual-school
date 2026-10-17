@@ -892,6 +892,34 @@ export const SKILLS: Skill[] = defineSkills({
     idea: 'Arrange paper shapes freely and describe the design together.',
   },
   // ── Reasoning ───────────────────────────────────────────────────────────
+  'reason.routine-constraints': {
+    strand: 'reason.logic',
+    name: 'Fictional picture precedence',
+    can: 'arrange two to four picture cards within stated before-and-after constraints',
+    childName: 'Picture Steps',
+    difficulty: 0,
+    standards: [
+      family(
+        'Follow explicit precedence in a fictional picture task; independent steps may have multiple valid orders. Not evidence of reading, verbal explanation, or general sequencing mastery.',
+      ),
+    ],
+    lessons: ['everyday-sequencing'],
+    idea: 'Try a different pretend card order and discuss which steps can change places.',
+  },
+  'life.fictional-routine': {
+    strand: 'life.home',
+    name: 'Planning a fictional picture routine',
+    can: 'plan a short fictional art-box or toy-bag picture routine within stated constraints',
+    childName: 'Pretend Plans',
+    difficulty: 0,
+    standards: [
+      family(
+        'Order low-risk fictional picture actions. This does not assess actual household routines, independence in chores, cultural habits, self-care, or motor skill.',
+      ),
+    ],
+    lessons: ['everyday-sequencing'],
+    idea: 'Describe a pretend picture plan together without judging how anyone does things at home.',
+  },
   'reason.sequencing': {
     strand: 'reason.logic',
     name: 'Sequencing',

@@ -1,6 +1,6 @@
 import type { DomainId } from '../curriculum/types';
 
-export type TeacherActivity = { kind: 'reading' } | { kind: 'lesson'; lessonId: string } | { kind: 'keyboard' } | { kind: 'globe' };
+export type TeacherActivity = { kind: 'reading' } | { kind: 'lesson'; lessonId: string } | { kind: 'keyboard' } | { kind: 'globe' } | { kind: 'routine' };
 
 export interface TeacherActivityChoice {
   /** Stable route key, never a label or user-supplied lesson ID. */
@@ -16,7 +16,7 @@ export interface TeacherRegistration {
   local: { questions: readonly string[]; shares: readonly string[]; likes: string; unclear: string };
   activity: TeacherActivity;
   activities: readonly TeacherActivityChoice[];
-  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox'; icon: string };
+  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox' | 'turtle'; icon: string };
   room: string;
   startLabel: string;
   completionIcon: string;
@@ -90,6 +90,30 @@ export const TEACHER_REGISTRY = {
       shares: ['Tell me about the shapes you chose!', 'You can make a design in your own way.'],
       likes: 'You love {likes}? Let’s imagine a shape design about it!',
       unclear: 'Shall we copy a shape pattern or make a design?',
+    },
+  },
+  tavi: {
+    domains: ['lifeSkills', 'reasoning'],
+    activity: { kind: 'routine' },
+    activities: [
+      {
+        id: 'everyday-sequencing',
+        label: 'What comes next?',
+        description: 'Arrange pretend picture steps in an order that works.',
+        icon: '🐢',
+        activity: { kind: 'routine' },
+      },
+    ],
+    scene: { x: 3.6, z: 5.8, model: 'turtle', icon: '🐢' },
+    room: 'the picture-steps corner, where fictional art and toy routines can have more than one valid order',
+    startLabel: 'Let’s try two pictures!',
+    completionIcon: '🐢',
+    celebration: { icon: '🐢', anchor: 'pippa', message: 'You explored some pretend picture steps with Tavi.' },
+    local: {
+      questions: ['Which picture needs to come first in our pretend task?', 'Sometimes two steps can happen in either order. Let’s look at the pictures.'],
+      shares: ['We can try your picture order and see if it works.', 'Take your time. You can ask for a hint or a smaller task.'],
+      likes: 'You like {likes}? We can imagine a pretend picture task together.',
+      unclear: 'Shall we arrange two pretend picture steps?',
     },
   },
   nova: {

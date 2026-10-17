@@ -447,7 +447,34 @@ class Pippa extends BaseTeacher {
   }
 }
 
+class Tavi extends BaseTeacher {
+  id = 'tavi' as const;
+  headHeight = 1.75;
+  constructor(yaw: number) {
+    super(yaw);
+    const shell = mat('#356f6b'),
+      skin = mat('#a4d4cb'),
+      dark = mat('#233f42');
+    this.body.add(
+      sphere(0.48, shell, 0, 0.9, -0.08),
+      sphere(0.28, skin, 0, 1.52, 0.12),
+      sphere(0.04, dark, -0.1, 1.57, 0.36),
+      sphere(0.04, dark, 0.1, 1.57, 0.36),
+      sphere(0.16, skin, -0.24, 0.32, 0.1),
+      sphere(0.16, skin, 0.24, 0.32, 0.1),
+      sphere(0.13, skin, -0.48, 0.95, 0.1),
+      sphere(0.13, skin, 0.48, 0.95, 0.1),
+      rbox(0.52, 0.48, 0.08, 0.06, mat('#e9bb61'), 0, 0.95, 0.38),
+    );
+    for (let i = 0; i < 3; i++) this.body.add(rbox(0.11, 0.14, 0.02, 0.01, mat('#fffdf6'), -0.15 + i * 0.15, 0.96, 0.43));
+  }
+  update(dt: number, lookAt: THREE.Vector3 | null): void {
+    this.turnToward(dt, lookAt);
+  }
+}
+
 const MODEL_FACTORIES: Record<TeacherRegistration['scene']['model'], (yaw: number) => TeacherModel> = {
+  turtle: (yaw) => new Tavi(yaw),
   fox: (yaw) => new Pippa(yaw),
   owl: (yaw) => new Hoot(yaw),
   robot: (yaw) => new Digit(yaw),
