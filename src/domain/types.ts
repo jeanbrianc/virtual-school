@@ -51,6 +51,8 @@ export interface HouseholdSettings {
   parentPin: string;
   audio: AudioSettings;
   readAloud: boolean;
+  /** Parent-selected story depth; unset keeps the adaptive legacy behavior. */
+  storyConversationDepth?: 'adaptive' | 'gentler' | 'deeper';
   /** The built-in voice teachers read with (its name on this device); '' or unset = pick automatically. */
   voiceName?: string;
   /**
@@ -71,6 +73,8 @@ export interface HouseholdSettings {
   teacherAi: TeacherAiSettings;
   /** Shows demo tooling (milestone previews, demo banners). */
   demoTools: boolean;
+  /** Advisory threshold for this tab’s observed requests; never a paid-use limit. */
+  usageWarningRequests?: number;
 }
 
 export interface Household {
@@ -198,6 +202,8 @@ export interface Book {
   favoritePart?: string;
   parentNotes?: string;
   comprehensionNotes?: string;
+  /** Optional parent-authored custom-book conversation; never auto-graded. */
+  storyPrompt?: { prompt: string; answer: string };
   workSampleMediaId?: ID;
   readingMode: ReadingMode;
   tags: string[];

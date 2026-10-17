@@ -153,6 +153,26 @@ function defineSkills(input: Record<string, SkillInput>): Skill[] {
 }
 
 export const SKILLS: Skill[] = defineSkills({
+  'sci.life-picture-match': {
+    strand: 'sci.life',
+    name: 'Life-cycle picture-and-label matching',
+    can: 'match a picture and label for a stage in a flowering-plant or butterfly model',
+    childName: 'Picture Noticer',
+    difficulty: 0,
+    standards: [family('Picture-and-label matching only; not evidence of explaining life cycles or observing a real organism.')],
+    lessons: ['life-cycle'],
+    idea: 'Look closely at a real plant with a grown-up and draw what you notice.',
+  },
+  'sci.life-next-stage': {
+    strand: 'sci.life',
+    name: 'Next-stage life-cycle sequencing',
+    can: 'choose the next pictured stage in two simple life-cycle models',
+    childName: 'Life-Cycle Sequencer',
+    difficulty: 2,
+    standards: [dci('LS1.B', 'Introductory picture sequencing toward growth and development; not the full 3-LS1-1 modeling expectation.')],
+    lessons: ['life-cycle'],
+    idea: 'Revisit the pictures, then observe how a real plant changes over several days.',
+  },
   'reason.keyboard-match': {
     strand: 'reason.logic',
     name: 'Letter and keyboard matching',

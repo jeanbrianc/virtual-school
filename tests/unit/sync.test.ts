@@ -13,10 +13,14 @@ import { seedDemoData } from '../../src/data/seed/demoSeed';
 import { seedFreshHousehold, startFresh } from '../../src/data/seed/launch';
 import { MemoryDatabase } from '../../src/data/storage/memory';
 import { modClock, OUTBOX, SyncingDatabase, type OutboxEntry } from '../../src/data/storage/syncing';
+import { getCatalogBook, selectQuestions } from '../../src/domain/reading/bookCatalog';
+import { recentStoryQuestionIds } from '../../src/domain/reading/storySelection';
+import { LessonRun } from '../../src/domain/lessons/engine';
+import { storyChatLesson } from '../../src/domain/lessons/storyChat';
 import { sequentialIds } from '../../src/domain/util/ids';
 import type { ServiceContext } from '../../src/services/context';
-import { addMedia, updateChild } from '../../src/services/householdService';
-import { addBook } from '../../src/services/readingService';
+import { addMedia, updateChild, updateSettings } from '../../src/services/householdService';
+import { addBook, completeBook, updateBook } from '../../src/services/readingService';
 import { SyncEngine } from '../../src/sync/engine';
 import { validChange, type SyncRequest, type SyncResponse, type SyncStatus } from '../../src/sync/protocol';
 import type { SyncTransport } from '../../src/sync/transport';
@@ -183,6 +187,44 @@ describe('the helper’s sync routes', () => {
 });
 
 describe('two devices, one school', () => {
+  it('story history, parent depth and custom-book prompts sync without adding evidence or rewards', async () => {
+    const helper = familyHelper();
+    const mac = device('storymac');
+    await seedFreshHousehold(mac.repos, mac.clock);
+    await updateSettings(mac.ctx, { storyConversationDepth: 'deeper' });
+    const custom = await addBook(mac.ctx, 'child_izzy', { title: 'Synthetic custom story' });
+    const storyPrompt = { prompt: 'Who brought the kite?', answer: 'Avery' };
+    await updateBook(mac.ctx, { ...custom, storyPrompt });
+    const cat = getCatalogBook('tom-kitten')!;
+    const run = new LessonRun(storyChatLesson(cat, selectQuestions(cat, false)), 0, 4);
+    while (!run.isComplete) run.answer(run.currentProblem()!.answerId);
+    await completeBook(mac.ctx, 'child_izzy', {
+      newBook: { title: cat.title, catalogId: cat.id },
+      answers: [...run.attempts],
+      problems: run.problemIndex,
+      startedAt: mac.clock.now().toISOString(),
+      transcript: [],
+      source: 'child',
+    });
+    const macSync = engine(mac, helper.transport);
+    await macSync.init();
+    await macSync.turnOn();
+    const phone = device('storyphone', '2026-09-30T11:00:00.000Z');
+    await seedFreshHousehold(phone.repos, phone.clock);
+    const phoneSync = engine(phone, helper.transport);
+    assert.equal((await phoneSync.init()).joined, 'adopted');
+    assert.equal((await phone.repos.households.all())[0]!.settings.storyConversationDepth, 'deeper');
+    assert.deepEqual((await phone.repos.books.get(custom.id))!.storyPrompt, storyPrompt);
+    const recent = recentStoryQuestionIds(await phone.repos.books.all(), await phone.repos.evidence.all());
+    assert.deepEqual(new Set(recent), new Set(run.attempts.map((a) => a.problemId)));
+    await phoneSync.syncNow();
+    await macSync.syncNow();
+    assert.equal((await phone.repos.evidence.all()).length, (await mac.repos.evidence.all()).length);
+    assert.equal((await phone.repos.rewardUnlocks.all()).length, 1);
+    const next = selectQuestions(cat, { depth: 'gentler', recentQuestionIds: recent });
+    assert.ok(next.every((q) => !recent.includes(q.id)));
+  });
+
   it('the Mac saves the school; the iPad (unused) takes it automatically; changes flow both ways', async () => {
     const helper = familyHelper();
     const mac = device('mac');

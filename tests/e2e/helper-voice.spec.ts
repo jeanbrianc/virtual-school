@@ -2,12 +2,15 @@
  * Natural voices and listening through the family's AI helper (OpenAI on the
  * hosted site). The helper is simulated at /api: it "speaks" with a short
  * chime and "hears" a fixed sentence. A parent turns both on in Settings, then
- * Hoot talks in his natural voice and hears Izzy through the helper.
+ * Hoot talks in his natural voice and hears Sample through the helper.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'playwright/test';
 import { APP, enterSchool, unlockParent } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
+
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
 
 declare global {
   interface Window {
@@ -64,7 +67,7 @@ test('natural teacher voices and listening through the AI helper', async ({ page
         keywords: body.keywords,
         ...(body.childName ? { childName: body.childName } : {}),
       });
-      return route.fulfill({ json: { text: 'i read daddy the goodnight leelanau book' } });
+      return route.fulfill({ json: { text: 'i read daddy the tale of peter rabbit' } });
     }
     return route.fulfill({ status: 404, json: { error: 'Not found' } });
   });
@@ -129,29 +132,29 @@ test('natural teacher voices and listening through the AI helper', async ({ page
 
   // "Hear it" uses Hoot's natural voice.
   await page.getByTestId('say-name-hear').click();
-  await expect.poll(() => spoken.at(-1)).toEqual({ teacherId: 'hoot', text: 'Hoo-hoo! Hello, Izzy! Ready to read with me, Izzy?' });
+  await expect.poll(() => spoken.at(-1)).toEqual({ teacherId: 'hoot', text: 'Hoo-hoo! Hello, Sample! Ready to read with me, Sample?' });
   await expect.poll(() => page.evaluate(() => window.__played)).toBeGreaterThan(0);
 
   // ── In the school ───────────────────────────────────────────────────────
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click(); // "Meet Professor Hoot"
-  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Izzy', { timeout: 120_000 });
+  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Sample', { timeout: 120_000 });
   const playedBefore = await page.evaluate(() => window.__played);
   await page.locator('.dialogue-tools').getByRole('button', { name: 'Read it to me' }).click();
-  await expect.poll(() => spoken.at(-1)?.text ?? '').toContain('you must be Izzy');
+  await expect.poll(() => spoken.at(-1)?.text ?? '').toContain('you must be Sample');
   await expect.poll(() => page.evaluate(() => window.__played)).toBeGreaterThan(playedBefore);
 
   // She talks: the recording goes to the helper, and Hoot answers what she said — out loud.
   await page.getByTestId('talk-bar').getByTestId('mic-btn').click();
   await expect(page.getByTestId('talk-status')).toContainText('I’m listening', { timeout: 60_000 });
   // She stops talking; listening stops by itself and the words come back from the helper.
-  await expect(page.getByTestId('dialogue-line')).toContainText('You read Goodnight Leelanau to Daddy?', { timeout: 90_000 });
+  await expect(page.getByTestId('dialogue-line')).toContainText('You read The Tale of Peter Rabbit to Daddy?', { timeout: 90_000 });
   expect(heard).toHaveLength(1);
   expect(heard[0]!.mime).toMatch(/^audio\/(webm|ogg|mp4)/);
   expect(heard[0]!.bytes).toBeGreaterThan(1000);
-  expect(heard[0]!.childName).toBe('Izzy');
+  expect(heard[0]!.childName).toBe('Sample');
   expect(await page.evaluate(() => window.__micOpened.at(-1))).toBe(chosen.id);
-  await expect.poll(() => spoken.at(-1)?.text ?? '').toContain('Goodnight Leelanau');
+  await expect.poll(() => spoken.at(-1)?.text ?? '').toContain('The Tale of Peter Rabbit');
 
   // Nothing fell back to the computer's voice, and nothing broke.
   expect(await page.evaluate(() => window.__fallback)).toEqual([]);

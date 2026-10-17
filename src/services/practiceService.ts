@@ -54,7 +54,8 @@ export async function recordPractice(ctx: ServiceContext, childId: string, progr
     if (problems.length > 5) throw new Error('An adventure has at most five rounds.');
     const complete = existing?.complete === true || (progress.complete && problems.length === 5);
     if (existing && existing.complete === complete && JSON.stringify(existing.problems) === JSON.stringify(problems)) return;
-    const title = progress.lessonId === 'globe-states' ? 'US State Adventure' : 'World Country Adventure';
+    const shapePractice = problems.every((problem) => problem.skillId === 'geography.state-shapes');
+    const title = shapePractice ? 'US State Shapes (three choices)' : progress.lessonId === 'globe-states' ? 'US State Adventure' : 'World Country Adventure';
     const attempt: LessonAttempt = {
       id: progress.id,
       childId,
@@ -63,10 +64,10 @@ export async function recordPractice(ctx: ServiceContext, childId: string, progr
       startedAt: progress.startedAt,
       completedAt: existing?.complete ? existing.completedAt : nowIso(ctx),
       complete,
-      startTier: 0,
-      endTier: 0,
+      startTier: problems[0]?.tier ?? 0,
+      endTier: problems[problems.length - 1]?.tier ?? 0,
       problems,
-      summary: `${title}: ${problems.length} rounds saved · ${complete ? 'complete' : 'in progress'}. ${problems.filter((p) => p.outcome === 'independent').length} independent; ${problems.filter((p) => p.outcome === 'supported').length} with visual support, a hint or retry; ${problems.filter((p) => p.outcome === 'not_yet' || p.outcome === 'skipped').length} skipped or not yet. Map identification observations only.`,
+      summary: `${title}: ${problems.length} rounds saved · ${complete ? 'complete' : 'in progress'}. ${problems.filter((p) => p.outcome === 'independent').length} independent; ${problems.filter((p) => p.outcome === 'supported').length} with visual support, a hint or retry; ${problems.filter((p) => p.outcome === 'not_yet' || p.outcome === 'skipped').length} skipped or not yet. ${shapePractice ? 'Three-choice state recognition' : 'Map identification'} observations only.`,
     };
     const uow = new UnitOfWork()
       .add('meta', { key: `${key}:${revision + 1}`, value: true })

@@ -25,6 +25,7 @@ import { Particles } from './fx/particles';
 import { LAYOUT } from './palette';
 import { canvasTexture } from './render/textures';
 import { CameraRig } from './systems/cameraRig';
+import { BookArrivalCutaway, bookArrivalPlan } from './systems/bookArrival';
 import { InputManager } from './systems/input';
 import { InteractionSystem } from './systems/interaction';
 import { PlayerController } from './systems/player';
@@ -128,6 +129,9 @@ export class Game {
   private quality: GraphicsQuality;
   private maxFps = Number(new URLSearchParams(window.location.search).get('maxfps') ?? 0) || 0;
   private cinematicDepth = 0;
+  private bookArrival: { book: ShelfBook; controller: AbortController; plan: ReturnType<typeof bookArrivalPlan>; phase: 'pan' | 'flight' | 'landed' } | null =
+    null;
+  private bookArrivalCutaway: BookArrivalCutaway | null = null;
   // ── Dance circuit on the rug ──
   private circuitMoves: DanceMoveId[] = [...DEFAULT_CIRCUIT];
   /** The rug number she's standing on (null when off the numbers). */
@@ -563,6 +567,18 @@ export class Game {
     // Portrait / narrow screens: pull back so more of the room is visible.
     this.rig.camera.fov = w / h < 1 ? 55 : CAMERA.fov;
     this.rig.camera.updateProjectionMatrix();
+    if (this.bookArrival) {
+      const plan = this.bookArrivalShot(this.bookArrival.book);
+      // Keep the same arrival promise/ID while adapting both camera and remaining flight.
+      this.bookArrival.plan.position.copy(plan.position);
+      this.bookArrival.plan.target.copy(plan.target);
+      this.bookArrival.plan.from.copy(plan.from);
+      this.bookArrival.plan.arcHeight = plan.arcHeight;
+      this.bookArrival.plan.near = plan.near;
+      this.bookArrival.plan.landNear = plan.landNear;
+      if (this.bookArrival.phase !== 'pan') this.clipBookArrival(this.bookArrival.phase === 'landed' ? plan.landNear : plan.near, plan);
+      void this.rig.shot(plan.position, plan.target, 0);
+    }
     if (this.composer) {
       this.composer.setPixelRatio(this.renderer.getPixelRatio());
       this.composer.setSize(w, h);
@@ -624,6 +640,8 @@ export class Game {
 
   /** Frames a teacher and Izzy for a conversation. */
   async focusTeacher(id: TeacherId): Promise<void> {
+    this.cancelBookArrival();
+    if (this.disposed) return;
     this.interaction.hideMarker(id, true);
     const anchor = this.world.anchors.get(`teacher:${id}`);
     if (!anchor) return;
@@ -642,6 +660,8 @@ export class Game {
   }
 
   async focusAlphabet(letter: string | null, found: string[] = []): Promise<void> {
+    this.cancelBookArrival();
+    if (this.disposed) return;
     this.interaction.hideMarker('alphabet', true);
     this.world.alphabet.setState(letter, found);
     const mobile = window.innerWidth < 760 || window.innerWidth / window.innerHeight < 0.9;
@@ -661,6 +681,8 @@ export class Game {
   }
 
   async releaseCamera(): Promise<void> {
+    this.cancelBookArrival();
+    if (this.disposed) return;
     this.interaction.hideMarker('alphabet', false);
     for (const id of this.world.teachers.keys()) this.interaction.hideMarker(id, false);
     await this.rig.release(0.9);
@@ -679,29 +701,67 @@ export class Game {
    * The core-loop payoff: camera turns to the bookshelf, the finished book
    * flies from Professor Hoot and lands in its permanent slot.
    */
+  private bookArrivalShot(book: ShelfBook) {
+    const destination = this.world.bookshelf.slotTransform(book.shelfIndex, book.id).position;
+    const hoot = this.world.anchors.get('teacher:hoot') ?? new THREE.Vector3(-8.3, 1.8, -5.2);
+    return bookArrivalPlan(destination, hoot.clone().add(new THREE.Vector3(0.2, 0.5, 0.4)), {
+      width: this.opts.container.clientWidth,
+      height: this.opts.container.clientHeight,
+      fov: this.rig.camera.fov,
+    });
+  }
+
+  private clipBookArrival(depth: number, plan: ReturnType<typeof bookArrivalPlan>): void {
+    this.bookArrivalCutaway ??= new BookArrivalCutaway(this.scene, [this.world.structure.root, this.world.bookshelf.root], this.renderer);
+    this.bookArrivalCutaway.update(plan.position, plan.target, depth);
+  }
+
+  private cancelBookArrival(): void {
+    this.bookArrival?.controller.abort();
+    this.bookArrival = null;
+    this.bookArrivalCutaway?.dispose();
+    this.bookArrivalCutaway = null;
+  }
+
   async celebrateBook(book: ShelfBook): Promise<void> {
+    this.cancelBookArrival();
+    if (this.disposed) return;
+    const arrival = { book, controller: new AbortController(), plan: this.bookArrivalShot(book), phase: 'pan' as 'pan' | 'flight' | 'landed' };
+    this.bookArrival = arrival;
+    const { signal } = arrival.controller;
     this.cinematicDepth++;
     try {
-      const focus = this.world.bookshelf.focus;
-      await this.rig.shot(focus.position, focus.target, 1.3);
+      const plan = arrival.plan;
+      await this.rig.shot(plan.position, plan.target, this.reducedMotion ? 0 : 1.3);
+      if (signal.aborted) return;
+      arrival.phase = 'flight';
+      this.clipBookArrival(plan.near, plan);
       this.cheer('hoot');
       this.opts.audio.play('whoosh');
-      const hoot = this.world.anchors.get('teacher:hoot') ?? new THREE.Vector3(-8.3, 1.8, -5.2);
-      const from = hoot.clone().add(new THREE.Vector3(0.2, 0.5, 0.4));
       this.opts.audio.play('pageFlip');
-      await this.world.bookshelf.flyBookIn(book, from, (at) => {
-        this.opts.audio.play('bookThunk');
-        this.opts.audio.play('chime');
-        this.particles.sparkle(at, { count: 70, speed: 2.4 });
-      });
-      await this.tweens.wait(0.9);
+      await this.world.bookshelf.flyBookIn(
+        book,
+        plan.from,
+        (at) => {
+          arrival.phase = 'landed';
+          this.clipBookArrival(plan.landNear, plan);
+          this.opts.audio.play('bookThunk');
+          this.opts.audio.play('chime');
+          this.particles.sparkle(at, { count: 70, speed: 2.4 });
+        },
+        { signal, flight: plan },
+      );
+      if (!signal.aborted) await this.tweens.wait(0.9);
     } finally {
+      if (this.bookArrival === arrival) this.bookArrival = null;
       this.cinematicDepth--;
     }
   }
 
   /** Shows newly unlocked rewards in the world with a camera visit. */
   async revealUnlocks(rewardIds: string[], state: WorldState, books: ShelfBook[], fallbackShot?: string): Promise<void> {
+    this.cancelBookArrival();
+    if (this.disposed) return;
     this.cinematicDepth++;
     try {
       const shots = [...new Set(rewardIds.map(shotForReward).filter((s): s is keyof typeof REWARD_SHOTS => s !== null))];
@@ -737,6 +797,8 @@ export class Game {
 
   /** Opening flourish: a sweeping establishing shot that settles on Izzy. */
   async introSweep(): Promise<void> {
+    this.cancelBookArrival();
+    if (this.disposed) return;
     // Respect reduced-motion preferences: no sweeping camera moves.
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     this.cinematicDepth++;
@@ -779,6 +841,7 @@ export class Game {
 
   dispose(): void {
     this.disposed = true;
+    this.cancelBookArrival();
     this.renderer.setAnimationLoop(null);
     this.resizeObserver.disconnect();
     this.input.detach();

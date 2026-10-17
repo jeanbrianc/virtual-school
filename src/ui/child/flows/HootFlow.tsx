@@ -8,15 +8,15 @@
  * and whether she finished it, and offers the next step as a big button.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { effectiveLevel, masteryRank } from '../../../domain/mastery/masteryEngine';
 import { LessonRun } from '../../../domain/lessons/engine';
 import { storyChatLesson } from '../../../domain/lessons/storyChat';
-import { GENERIC_FEELINGS, getCatalogBook, selectQuestions } from '../../../domain/reading/bookCatalog';
+import { GENERIC_FEELINGS, getCatalogBook, selectQuestions, type ConversationDepth } from '../../../domain/reading/bookCatalog';
+import { recentStoryQuestionIds } from '../../../domain/reading/storySelection';
 import { finishedBookGreeting, type BookHistoryStatus } from '../../../domain/reading/hootHistory';
 import { generatedCover, searchCatalogSync } from '../../../domain/reading/bookMetadata';
 import { readingNote, type TeacherChatReply } from '../../../domain/teachers/chat';
 import { TEACHERS, pickLine, teacherOpening } from '../../../domain/teachers/teachers';
-import type { Book, MasteryRecord, ReadingMode, TranscriptLine } from '../../../domain/types';
+import type { Book, Evidence, MasteryRecord, ReadingMode, TranscriptLine } from '../../../domain/types';
 import { hashString } from '../../../domain/util/random';
 import type { CompleteBookInput } from '../../../services/readingService';
 import { BookCover } from '../../shared/BookCover';
@@ -42,6 +42,10 @@ export interface HootFlowProps {
   /** Omitted by loaded callers; unknown history must never imply a first book. */
   historyStatus?: BookHistoryStatus;
   mastery: MasteryRecord[];
+  /** Child-scoped saved evidence; only explicit question-ID markers are read. */
+  storyEvidence?: Evidence[];
+  /** Set in the gated parent settings; no child-facing difficulty control. */
+  conversationDepth?: ConversationDepth;
   visitsToday: number;
   /** True until she has had a conversation with Professor Hoot. */
   firstMeeting: boolean;
@@ -116,6 +120,9 @@ export function HootFlow(props: HootFlowProps) {
     };
   }, []);
   const [favoriteText, setFavoriteText] = useState('');
+  const [narration, setNarration] = useState('');
+  const [parentResponse, setParentResponse] = useState('');
+  const [aiLine, setAiLine] = useState(false);
   const [feeling, setFeeling] = useState<string | undefined>();
   const [chapters, setChapters] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -130,6 +137,7 @@ export function HootFlow(props: HootFlowProps) {
     transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}) });
   const say = (text: string, m: typeof mood = 'happy', via?: TranscriptLine['via']) => {
     setLine(text);
+    setAiLine(via === 'ai');
     setMood(m);
     log('teacher', text, via);
   };
@@ -148,7 +156,7 @@ export function HootFlow(props: HootFlowProps) {
   const reading = props.books.filter((b) => b.status === 'reading');
   const upNext = props.books.filter((b) => b.status === 'up_next');
   const completedCount = props.books.filter((b) => b.status === 'completed').length;
-  const deeper = masteryRank(effectiveLevel(props.mastery.find((m) => m.skillId === 'read.key-details'))) >= masteryRank('proficient');
+  const recentQuestionIds = useMemo(() => recentStoryQuestionIds(props.books, props.storyEvidence ?? []), [props.books, props.storyEvidence]);
 
   const opening = useMemo(() => {
     if (props.historyStatus === 'loading') return 'Hello! Your bookshelf is loading. You can tell me about a book.';
@@ -202,6 +210,9 @@ export function HootFlow(props: HootFlowProps) {
     setNewTitle('');
     setChoiceState({});
     setFavoriteText('');
+    setNarration('');
+    setParentResponse('');
+    setAiLine(false);
     readingContext.current = {};
     setStep({ kind: 'menu' });
     setLine('');
@@ -283,7 +294,7 @@ export function HootFlow(props: HootFlowProps) {
   const startQuestions = (b: Book | null, catalogId: string | undefined) => {
     const cat = getCatalogBook(catalogId);
     if (cat && cat.questions.length > 0) {
-      const qs = selectQuestions(cat, deeper, 2);
+      const qs = selectQuestions(cat, { depth: props.conversationDepth ?? 'adaptive', mastery: props.mastery, recentQuestionIds }, 2);
       runRef.current = new LessonRun(storyChatLesson(cat, qs), 0, seed.current);
       const first = runRef.current.currentProblem();
       setStep({ kind: 'questions' });
@@ -291,7 +302,8 @@ export function HootFlow(props: HootFlowProps) {
       say(`Oh, ${b?.title ?? cat.title}! What a wonderful story. Let’s chat about it. ${first?.prompt ?? ''}`, 'thinking');
     } else {
       setStep({ kind: 'feeling' });
-      say('How wonderful! How did the story make you feel?', 'thinking');
+      runRef.current = null;
+      say('I don’t have checked story questions for this book. You can tell me your own ideas! How did the story make you feel?', 'thinking');
     }
   };
 
@@ -369,7 +381,7 @@ export function HootFlow(props: HootFlowProps) {
       setChoiceState({});
       if (run.isComplete) {
         setStep({ kind: 'rate' });
-        say('You really understood that story! How many stars would you give it?', 'cheer');
+        say('Thank you for sharing your thinking! How many stars would you give it?', 'cheer');
       } else {
         const next = run.currentProblem();
         say(next?.prompt ?? '', 'thinking');
@@ -385,6 +397,15 @@ export function HootFlow(props: HootFlowProps) {
     setStep({ kind: 'bye', line: '' });
     const b = book;
     const run = runRef.current;
+    const parentPrompt = b?.storyPrompt;
+    if (!run) {
+      log('system', 'Custom-book reflection: ungraded; book facts and independence were not assessed.');
+      if (narration.trim()) log('child', `My narration: ${narration.trim()}`, 'typed');
+      if (parentPrompt?.prompt.trim() && parentPrompt.answer.trim()) {
+        log('system', `Parent-authored prompt: ${parentPrompt.prompt.trim()} Reference answer: ${parentPrompt.answer.trim()}. Response is ungraded.`);
+        if (parentResponse.trim()) log('child', parentResponse.trim(), 'typed');
+      }
+    }
     say(pickLine(['Hoo-hoo! Let’s put it on your shelf!', 'Onto your bookshelf it goes!'], seed.current), 'cheer');
     playSfx('sparkle');
     const input: Omit<CompleteBookInput, 'source'> = {
@@ -402,7 +423,8 @@ export function HootFlow(props: HootFlowProps) {
       answers: run ? [...run.attempts] : [],
       ...(run ? { problems: run.problemIndex } : {}),
       ...(ratingRef.current ? { rating: ratingRef.current } : {}),
-      ...(favoritePart ? { favoritePart } : {}),
+      ...(favoritePart || (!run && favoriteText.trim()) ? { favoritePart: favoritePart || favoriteText.trim() } : {}),
+      ...(!run && narration.trim() ? { narration: narration.trim() } : {}),
       ...(feeling ? { feeling } : {}),
       ...readingContext.current,
       ...(talk.notes.length ? { parentNotes: [...talk.notes] } : {}),
@@ -624,12 +646,104 @@ export function HootFlow(props: HootFlowProps) {
     }
     case 'questions': {
       const p = runRef.current?.currentProblem();
-      content = p ? <Choices items={p.choices.map((c) => ({ id: c.id, label: c.label }))} onPick={answer} state={choiceState} columns={1} /> : null;
+      const cat = getCatalogBook(book?.catalogId ?? newBookInput?.catalogId);
+      content = p ? (
+        <>
+          <p className="talk-source" data-testid="story-source">
+            {cat?.provenance ? 'Source-checked story question' : 'Built-in story question'}
+          </p>
+          <Choices items={p.choices.map((c) => ({ id: c.id, label: c.label }))} onPick={answer} state={choiceState} columns={1} />
+          <button
+            type="button"
+            className="btn btn-big"
+            disabled={busy}
+            data-testid="story-hint"
+            onClick={() => {
+              if (!isCurrent() || locked.current || !runRef.current) return;
+              log('child', 'A hint, please');
+              say(runRef.current.hint().message, 'thinking');
+            }}
+          >
+            A hint, please
+          </button>
+          <button
+            type="button"
+            className="btn btn-big"
+            disabled={busy}
+            data-testid="story-skip"
+            onClick={() => {
+              if (!isCurrent() || locked.current || !runRef.current) return;
+              log('child', 'Skip this question');
+              const run = runRef.current;
+              run.skip();
+              setChoiceState({});
+              if (run.isComplete) {
+                setStep({ kind: 'rate' });
+                say('We can leave those questions for another day. How many stars would you give the book?', 'happy');
+              } else say(run.currentProblem()?.prompt ?? '', 'thinking');
+              force((n) => n + 1);
+            }}
+          >
+            Skip this question
+          </button>
+        </>
+      ) : null;
       break;
     }
     case 'feeling':
       content = (
         <>
+          <p className="talk-source" data-testid="story-source">
+            Your own reflections · ungraded
+          </p>
+          <details className="story-reflections">
+            <summary>Tell me more (optional)</summary>
+            <label>
+              Favorite part
+              <input
+                className="big-input"
+                data-testid="reflection-favorite"
+                value={favoriteText}
+                maxLength={500}
+                onChange={(e) => setFavoriteText(e.target.value)}
+                placeholder="A part you liked"
+              />
+            </label>
+            <label>
+              Tell the story in your own words
+              <textarea
+                className="big-input"
+                data-testid="reflection-narration"
+                value={narration}
+                maxLength={2000}
+                onChange={(e) => setNarration(e.target.value)}
+                rows={3}
+              />
+            </label>
+            <p>A grown-up can help you type. These ideas are saved without a score.</p>
+          </details>
+          {book?.storyPrompt?.prompt.trim() && book.storyPrompt.answer.trim() && (
+            <details className="story-reflections">
+              <summary>A question from your grown-up (optional)</summary>
+              <p data-testid="parent-story-prompt">{book.storyPrompt.prompt}</p>
+              <label>
+                Your answer
+                <textarea
+                  className="big-input"
+                  data-testid="parent-story-response"
+                  value={parentResponse}
+                  maxLength={2000}
+                  onChange={(e) => setParentResponse(e.target.value)}
+                  rows={2}
+                />
+              </label>
+              <details>
+                <summary>See your grown-up’s reference answer</summary>
+                <p>{book.storyPrompt.answer}</p>
+              </details>
+              <p>Parent-authored, ungraded. Talk about the answer together.</p>
+            </details>
+          )}
           <Choices
             columns={3}
             state={choiceState}
@@ -819,6 +933,11 @@ export function HootFlow(props: HootFlowProps) {
 
   return (
     <DialogueShell teacher="hoot" line={currentLine} mood={mood} onClose={close} speech={speech} wide={step.kind === 'pick'}>
+      {aiLine && (
+        <p className="talk-source" data-testid="ai-story-source">
+          AI conversation · book facts are unverified · no comprehension score
+        </p>
+      )}
       {content}
       {step.kind !== 'menu' && step.kind !== 'bye' && (
         <button type="button" className="btn btn-big" onClick={back}>

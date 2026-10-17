@@ -1,9 +1,12 @@
 import { expect, test } from 'playwright/test';
 import { enterSchool, talkTo, dismissCelebrations } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
 
 test.use({ viewport: { width: 320, height: 740 }, permissions: [] });
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+
 test('Hoot completes without microphone, cancels safely, and remembers returning readers', async ({ page }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click();
   await page.getByTestId('choice-finish').click();
   await expect(page.getByTestId('dialogue-line')).toContainText('first book');
@@ -58,7 +61,7 @@ test('Hoot completes without microphone, cancels safely, and remembers returning
   expect(synthetic).toHaveLength(1);
   expect(synthetic[0]!.childRating).toBe(5);
   await page.reload();
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await talkTo(page, 'hoot');
   await page.getByTestId('choice-finish').click();
   await expect(page.getByTestId('dialogue-line')).toContainText('another book');
@@ -66,7 +69,7 @@ test('Hoot completes without microphone, cancels safely, and remembers returning
 });
 
 test('Hoot cancels a pending save and offers an unrated completion on repeat open', async ({ page }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click();
   for (let attempt = 0; attempt < 2; attempt++) {
     await page.getByTestId('choice-finish').click();

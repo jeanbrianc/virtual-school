@@ -6,7 +6,8 @@
  * The catalog sits behind BookMetadataService so an online metadata provider
  * (e.g. Open Library) can be added later as an explicit, parent-enabled option.
  */
-import type { CoverStyle } from '../types';
+import type { CoverStyle, MasteryRecord } from '../types';
+import { effectiveLevel, masteryRank } from '../mastery/masteryEngine';
 
 export type QuestionType = 'detail' | 'character' | 'feelings' | 'inference' | 'sequence' | 'theme' | 'vocab';
 
@@ -33,6 +34,8 @@ export interface CatalogBook {
   cover: CoverStyle;
   moments: string[];
   questions: ComprehensionQuestion[];
+  /** Reviewed primary-text basis for this question bank, not an endorsement. */
+  provenance?: { sourceUrl: string; reviewedOn: string; edition: string; contentNote: string };
 }
 
 const QUESTION_SKILL: Record<QuestionType, string> = {
@@ -471,6 +474,311 @@ export const BOOK_CATALOG: CatalogBook[] = [
       },
     ]),
   },
+  {
+    id: 'tom-kitten',
+    title: 'The Tale of Tom Kitten',
+    author: 'Beatrix Potter',
+    band: 'Shared read-aloud; choose with a grown-up',
+    tags: ['animals', 'classic'],
+    cover: {
+      background: '#9fb8a0',
+      accent: '#fff4dc',
+      motif: 'house',
+    },
+    moments: ['Getting ready for visitors', 'Climbing the garden wall', 'The ducks trying on clothes'],
+    provenance: {
+      sourceUrl: 'https://www.gutenberg.org/cache/epub/14837/pg14837-images.html',
+      reviewedOn: '2026-10-17',
+      edition: 'Original English story (1907); Project Gutenberg transcription',
+      contentNote: 'Includes a parent smacking the kittens. Preview the story together; this app does not endorse that response.',
+    },
+    questions: [
+      {
+        id: 'tom-kitten.q1',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'Who puts on Tom’s clothes after they fall off?',
+        choices: ['Mr. Drake Puddle-Duck', 'Peter Rabbit', 'The visiting cats'],
+        answerIndex: 0,
+        hint: 'Think of the birds passing along the road.',
+        explain: 'Mr. Drake puts the clothes on himself.',
+      },
+      {
+        id: 'tom-kitten.q2',
+        type: 'sequence',
+        skillId: 'read.retell',
+        prompt: 'Which happens before the kittens play in the garden?',
+        choices: ['Their mother washes and dresses them', 'The ducks walk away wearing the clothes', 'Their mother finds them on the wall'],
+        answerIndex: 0,
+        hint: 'Think back to getting ready for visitors.',
+        explain: 'The kittens are washed and dressed before going outside.',
+      },
+      {
+        id: 'tom-kitten.q3',
+        type: 'inference',
+        skillId: 'read.inference',
+        prompt: 'Why is climbing difficult for Tom in his fancy clothes?',
+        choices: ['The clothes get in the way of moving', 'The wall is made of ice', 'He is carrying the ducks'],
+        answerIndex: 0,
+        hint: 'Think about Tom trying to jump in trousers.',
+        explain: 'The story shows Tom struggling to move in his clothes and losing buttons.',
+      },
+      {
+        id: 'tom-kitten.q4',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'Where do the kittens climb to sit?',
+        choices: ['On the garden wall', 'On a boat', 'In a cupboard'],
+        answerIndex: 0,
+        hint: 'They climb up the rockery to reach it.',
+        explain: 'The kittens climb to the top of the garden wall.',
+      },
+    ],
+  },
+  {
+    id: 'benjamin-bunny',
+    title: 'The Tale of Benjamin Bunny',
+    author: 'Beatrix Potter',
+    band: 'Shared read-aloud; choose with a grown-up',
+    tags: ['animals', 'classic'],
+    cover: {
+      background: '#9fb8a0',
+      accent: '#fff4dc',
+      motif: 'rabbit',
+    },
+    moments: ['Finding Peter’s clothes', 'Hiding under a basket', 'Returning home'],
+    provenance: {
+      sourceUrl: 'https://www.gutenberg.org/cache/epub/14407/pg14407-images.html',
+      reviewedOn: '2026-10-17',
+      edition: 'Original English story (1904); Project Gutenberg transcription',
+      contentNote: 'Includes danger from a cat and an adult rabbit hitting the young rabbits. Preview the story together.',
+    },
+    questions: [
+      {
+        id: 'benjamin-bunny.q1',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'Where do Benjamin and Peter find Peter’s coat and shoes?',
+        choices: ['On a scarecrow', 'Inside a boat', 'In a bird’s nest'],
+        answerIndex: 0,
+        hint: 'Look in Mr. McGregor’s garden.',
+        explain: 'Peter’s missing clothes are on the scarecrow.',
+      },
+      {
+        id: 'benjamin-bunny.q2',
+        type: 'sequence',
+        skillId: 'read.retell',
+        prompt: 'What do the rabbits do after taking Peter’s clothes from the scarecrow?',
+        choices: ['Collect onions in the handkerchief', 'Build a new scarecrow', 'Go swimming in a pond'],
+        answerIndex: 0,
+        hint: 'Benjamin wants to bring a present for his aunt.',
+        explain: 'After retrieving the clothes, they collect onions in the handkerchief.',
+      },
+      {
+        id: 'benjamin-bunny.q3',
+        type: 'inference',
+        skillId: 'read.inference',
+        prompt: 'Why can’t the rabbits simply leave their hiding place?',
+        choices: ['A cat is sitting on top of the basket', 'The basket has sailed away', 'They are waiting for a picnic'],
+        answerIndex: 0,
+        hint: 'Think about what is above their heads.',
+        explain: 'The cat on the basket makes it unsafe for the rabbits to come out.',
+      },
+      {
+        id: 'benjamin-bunny.q4',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'Who gets the cat away from the basket?',
+        choices: ['Benjamin’s father', 'Mrs. McGregor', 'Cotton-tail'],
+        answerIndex: 0,
+        hint: 'A grown-up rabbit comes looking for his son.',
+        explain: 'Benjamin’s father arrives and gets the cat off the basket.',
+      },
+    ],
+  },
+  {
+    id: 'mrs-tiggy-winkle',
+    title: 'The Tale of Mrs. Tiggy-Winkle',
+    author: 'Beatrix Potter',
+    band: 'Shared read-aloud; choose with a grown-up',
+    tags: ['animals', 'classic'],
+    cover: {
+      background: '#9fb8a0',
+      accent: '#fff4dc',
+      motif: 'leaf',
+    },
+    moments: ['Looking for lost handkerchiefs', 'Watching the ironing', 'Returning clean clothes'],
+    provenance: {
+      sourceUrl: 'https://www.gutenberg.org/cache/epub/12103/pg12103-images.html',
+      reviewedOn: '2026-10-17',
+      edition: 'Original English story (1905); Project Gutenberg transcription',
+      contentNote: 'The ending leaves room to wonder about Lucie’s experience; the questions do not grade whether it was a dream.',
+    },
+    questions: [
+      {
+        id: 'mrs-tiggy-winkle.q1',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'What is Lucie looking for at the beginning?',
+        choices: ['Her handkerchiefs and pinafore', 'A lost boat', 'A basket of apples'],
+        answerIndex: 0,
+        hint: 'She asks the animals about things she has lost.',
+        explain: 'Lucie is looking for handkerchiefs and her pinafore.',
+      },
+      {
+        id: 'mrs-tiggy-winkle.q2',
+        type: 'sequence',
+        skillId: 'read.retell',
+        prompt: 'What happens after Lucie and Mrs. Tiggy-Winkle finish tea?',
+        choices: ['They bundle the clothes to take back', 'Lucie first notices the hill', 'Lucie first loses her handkerchiefs'],
+        answerIndex: 0,
+        hint: 'Think about preparing to go down the hill.',
+        explain: 'They tie up the clean clothes before taking them back.',
+      },
+      {
+        id: 'mrs-tiggy-winkle.q3',
+        type: 'inference',
+        skillId: 'read.inference',
+        prompt: 'What clue hints that Mrs. Tiggy-Winkle is a hedgehog?',
+        choices: ['Prickles under her cap', 'Feathers on her wings', 'A long rabbit’s tail'],
+        answerIndex: 0,
+        hint: 'Lucie notices something unusual where hair would be.',
+        explain: 'The prickles are a clue to her being a hedgehog.',
+      },
+      {
+        id: 'mrs-tiggy-winkle.q4',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'What work does Mrs. Tiggy-Winkle do for the animals?',
+        choices: ['Washes and irons clothes', 'Repairs boats', 'Plants a forest'],
+        answerIndex: 0,
+        hint: 'Look at her basket and the iron she is using.',
+        explain: 'She cleans and irons clothes for her animal neighbors.',
+      },
+    ],
+  },
+  {
+    id: 'squirrel-nutkin',
+    title: 'The Tale of Squirrel Nutkin',
+    author: 'Beatrix Potter',
+    band: 'Shared read-aloud; choose with a grown-up',
+    tags: ['animals', 'classic'],
+    cover: {
+      background: '#9fb8a0',
+      accent: '#fff4dc',
+      motif: 'leaf',
+    },
+    moments: ['Crossing the lake on rafts', 'Gathering nuts', 'Nutkin making up games'],
+    provenance: {
+      sourceUrl: 'https://www.gutenberg.org/cache/epub/14872/pg14872-images.html',
+      reviewedOn: '2026-10-17',
+      edition: 'Original English story (1903); Project Gutenberg transcription',
+      contentNote: 'Includes an owl threatening Nutkin and Nutkin losing part of his tail. Preview the story together.',
+    },
+    questions: [
+      {
+        id: 'squirrel-nutkin.q1',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'How do the squirrels cross the lake?',
+        choices: ['On little twig rafts', 'On a train', 'Through a tunnel'],
+        answerIndex: 0,
+        hint: 'Their tails help catch the wind.',
+        explain: 'The squirrels paddle rafts made from twigs.',
+      },
+      {
+        id: 'squirrel-nutkin.q2',
+        type: 'sequence',
+        skillId: 'read.retell',
+        prompt: 'What do the other squirrels do before gathering nuts on the island?',
+        choices: ['Bring Old Brown a gift and ask permission', 'Plant new trees', 'Build a house for Nutkin'],
+        answerIndex: 0,
+        hint: 'Think about how they greet the owl.',
+        explain: 'They bring a gift and ask permission before collecting nuts.',
+      },
+      {
+        id: 'squirrel-nutkin.q3',
+        type: 'inference',
+        skillId: 'read.inference',
+        prompt: 'What suggests Old Brown does not enjoy Nutkin’s teasing?',
+        choices: ['He shuts the door and later looks disgusted', 'He asks for more riddles', 'He dances with Nutkin'],
+        answerIndex: 0,
+        hint: 'Notice how the owl responds instead of joining in.',
+        explain: 'Closing the door and looking disgusted are clues that the teasing bothers him.',
+      },
+      {
+        id: 'squirrel-nutkin.q4',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'What kind of animal is Old Brown?',
+        choices: ['An owl', 'A frog', 'A hedgehog'],
+        answerIndex: 0,
+        hint: 'He lives in a hollow oak tree.',
+        explain: 'Old Brown is the owl who lives on the island.',
+      },
+    ],
+  },
+  {
+    id: 'jemima-puddle-duck',
+    title: 'The Tale of Jemima Puddle-Duck',
+    author: 'Beatrix Potter',
+    band: 'Shared read-aloud; choose with a grown-up',
+    tags: ['animals', 'classic'],
+    cover: {
+      background: '#9fb8a0',
+      accent: '#fff4dc',
+      motif: 'house',
+    },
+    moments: ['Looking for a nesting place', 'Making a nest in the shed', 'Talking with Kep'],
+    provenance: {
+      sourceUrl: 'https://www.gutenberg.org/cache/epub/14814/pg14814-images.html',
+      reviewedOn: '2026-10-17',
+      edition: 'Original English story (1908); Project Gutenberg transcription',
+      contentNote: 'Includes a fox planning to eat Jemima and dogs eating her eggs. Preview the story together.',
+    },
+    questions: [
+      {
+        id: 'jemima-puddle-duck.q1',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'What is Jemima trying to find away from the farm?',
+        choices: ['A place to make her nest', 'A new pair of shoes', 'A school for rabbits'],
+        answerIndex: 0,
+        hint: 'She wants to hatch her own eggs.',
+        explain: 'Jemima looks for a nesting place away from the farm.',
+      },
+      {
+        id: 'jemima-puddle-duck.q2',
+        type: 'sequence',
+        skillId: 'read.retell',
+        prompt: 'What happens after Jemima gathers herbs and onions?',
+        choices: ['She tells Kep about the gentleman and the nest', 'She first leaves the farm to look for a nest', 'She first sees the gentleman reading'],
+        answerIndex: 0,
+        hint: 'A collie asks about the things she is carrying.',
+        explain: 'After gathering the herbs and onions, Jemima tells Kep what has happened.',
+      },
+      {
+        id: 'jemima-puddle-duck.q3',
+        type: 'inference',
+        skillId: 'read.inference',
+        prompt: 'Why is the gentleman’s request for herbs and onions a warning clue?',
+        choices: ['They are used to prepare roast duck', 'They will make the shed fly', 'They are toys for ducklings'],
+        answerIndex: 0,
+        hint: 'Think about why a fox might want cooking ingredients.',
+        explain: 'The cooking ingredients suggest the fox has a dangerous plan for Jemima.',
+      },
+      {
+        id: 'jemima-puddle-duck.q4',
+        type: 'detail',
+        skillId: 'read.key-details',
+        prompt: 'Who asks Jemima questions about the house and shed?',
+        choices: ['Kep the collie', 'Tom Kitten', 'Mrs. Tiggy-Winkle'],
+        answerIndex: 0,
+        hint: 'Think of the dog she meets at the farm.',
+        explain: 'Kep listens and asks where the house and shed are.',
+      },
+    ],
+  },
 ];
 
 const catalogIndex = new Map(BOOK_CATALOG.map((b) => [b.id, b]));
@@ -482,13 +790,39 @@ export function getCatalogBook(id: string | undefined): CatalogBook | undefined 
 /** Generic, honest prompts for books without a question bank. */
 export const GENERIC_FEELINGS = ['Funny', 'Exciting', 'Cozy', 'Surprising', 'A little sad', 'Mysterious'] as const;
 
+export type ConversationDepth = 'adaptive' | 'gentler' | 'deeper';
+
+export interface StoryQuestionSelection {
+  depth: ConversationDepth;
+  mastery?: readonly MasteryRecord[];
+  /** Most recently answered first; from explicit saved question IDs only. */
+  recentQuestionIds?: readonly string[];
+}
+
 /**
- * Picks questions for a book, ordered easy → hard. Readers already proficient
- * at literal questions get the deeper (feelings/inference/theme) ones first.
+ * Fresh questions first, then least-recently answered. Within equal freshness,
+ * use the parent's depth and practice/review needs. No randomness or age labels.
+ * The boolean form preserves older callers while they adopt richer context.
  */
-export function selectQuestions(book: CatalogBook, deeperFirst: boolean, max = 2): ComprehensionQuestion[] {
-  const order: QuestionType[] = deeperFirst
-    ? ['inference', 'feelings', 'theme', 'vocab', 'character', 'detail', 'sequence']
-    : ['detail', 'character', 'sequence', 'feelings', 'vocab', 'inference', 'theme'];
-  return [...book.questions].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type)).slice(0, max);
+export function selectQuestions(book: CatalogBook, selection: boolean | StoryQuestionSelection, max = 2): ComprehensionQuestion[] {
+  const options = typeof selection === 'boolean' ? { depth: selection ? ('deeper' as const) : ('gentler' as const) } : selection;
+  const mastery = new Map((options.mastery ?? []).map((m) => [m.skillId, m]));
+  const deeper =
+    options.depth === 'deeper' || (options.depth === 'adaptive' && masteryRank(effectiveLevel(mastery.get('read.key-details'))) >= masteryRank('proficient'));
+  const recent = options.recentQuestionIds ?? [];
+  const freshness = (q: ComprehensionQuestion) => {
+    const index = recent.indexOf(q.id);
+    return index < 0 ? -1 : recent.length - index;
+  };
+  const depth = (q: ComprehensionQuestion) => (['inference', 'feelings', 'theme', 'vocab'].includes(q.type) === deeper ? 0 : 1);
+  const practice = (q: ComprehensionQuestion) => {
+    const m = mastery.get(q.skillId);
+    if (m?.needsReview) return 0;
+    const level = effectiveLevel(m);
+    if (level === 'introduced' || level === 'developing') return 1;
+    return level === 'not_started' ? 2 : 3;
+  };
+  return [...book.questions]
+    .sort((a, b) => freshness(a) - freshness(b) || depth(a) - depth(b) || practice(a) - practice(b))
+    .slice(0, Math.max(0, Math.floor(max)));
 }

@@ -1,0 +1,50 @@
+name: Book arrival regression
+
+on:
+  pull_request:
+    paths:
+      - 'src/engine/**'
+      - 'tests/e2e/book-arrival.spec.ts'
+      - 'tests/e2e/fixtures/book-arrival.ts'
+      - 'tests/unit/book-arrival.test.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/book-arrival.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: book-arrival-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify exact candidate head
+        run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - name: Synthetic destination and interrupted-arrival regressions
+        run: npm run test:e2e -- tests/e2e/book-arrival.spec.ts --project=${{ matrix.project }}
+      - name: Save actual rendered synthetic screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-arrival-${{ matrix.project }}-${{ github.event.pull_request.head.sha }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: warn

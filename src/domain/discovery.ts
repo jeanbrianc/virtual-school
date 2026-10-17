@@ -72,7 +72,7 @@ export function describeDiscovery(id: string, ctx: DiscoveryContext): Discovery 
         id,
         icon: '🌍',
         title: 'Our globe',
-        text: 'A globe is a model of Earth. Explore a flat map with Nova: find five US states, or choose a harder country adventure. You can use the map or the list, ask for help, or skip a place.',
+        text: 'A globe is a model of Earth. Start with Nova’s state-shape game: choose one of three big shapes. You can ask for a hint, hear the question again, or skip. The whole US map and a harder country map are ready when you want them.',
         action: { label: 'Explore with Nova', target: 'globe', icon: '🌍' },
       };
     case 'bookshelf':

@@ -1,3 +1,4 @@
+import { usageJournal, USAGE_HEADER } from '../domain/usage';
 /**
  * Natural teacher voices and listening through the family's AI helper
  * (scripts/ai-helper — on this computer, or /api on the family's site, which
@@ -88,7 +89,10 @@ export class HelperSpeechOutput implements SpeechOutput {
       await this.play(blob, rest.volume ?? 1, mine);
     } catch {
       // Helper down, limit reached, or the audio wouldn't play: the computer's voice says it instead.
-      if (mine === this.token) return this.device.speak(text, rest);
+      if (mine === this.token) {
+        usageJournal.event('speech', 'fallbacks');
+        return this.device.speak(text, rest);
+      }
     }
   }
 
@@ -96,16 +100,20 @@ export class HelperSpeechOutput implements SpeechOutput {
     const key = `${natural.teacher}\n${text}`;
     const hit = this.memory.get(key);
     if (hit) {
+      usageJournal.event('speech', 'cacheHits');
       this.remember(key, hit);
       return hit;
     }
     const cacheUrl = `${location.origin}/__teacher-voice/${await sha256Hex(key)}`;
     const stored = await this.fromCache(cacheUrl);
     if (stored) {
+      usageJournal.event('speech', 'cacheHits');
       this.remember(key, stored);
       return stored;
     }
     if ((this.cooldowns.get(natural.endpoint) ?? 0) > Date.now()) throw new Error('voice cooldown');
+    const finishUsage = usageJournal.begin('speech');
+    let usageHeader: string | null = null;
     const controller = new AbortController();
     this.inflight = controller;
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -116,6 +124,7 @@ export class HelperSpeechOutput implements SpeechOutput {
         body: JSON.stringify({ teacherId: natural.teacher, text }),
         signal: controller.signal,
       });
+      usageHeader = res.headers?.get?.(USAGE_HEADER) ?? null;
       if (!res.ok) {
         if (res.status === 429) {
           let seconds = 60;
@@ -132,9 +141,13 @@ export class HelperSpeechOutput implements SpeechOutput {
       }
       const blob = new Blob([await res.arrayBuffer()], { type: res.headers.get('content-type') || 'audio/mpeg' });
       if (blob.size < 100) throw new Error('empty audio');
+      finishUsage('succeeded', usageHeader);
       this.remember(key, blob);
       void this.toCache(cacheUrl, blob);
       return blob;
+    } catch (error) {
+      finishUsage(controller.signal.aborted ? 'cancelled' : 'failed', usageHeader);
+      throw error;
     } finally {
       clearTimeout(timer);
       if (this.inflight === controller) this.inflight = null;
@@ -351,6 +364,8 @@ export class HelperListener {
     const blob = new Blob(chunks, { type: recorder.mimeType || type || 'audio/webm' });
     if (blob.size < 200) return { result: null, error: 'no-speech' };
     opts.onInterim?.('Got it! Thinking…');
+    const finishUsage = usageJournal.begin('listening');
+    let usageHeader: string | null = null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20_000);
     try {
@@ -365,11 +380,17 @@ export class HelperListener {
         }),
         signal: controller.signal,
       });
-      if (!res.ok) return { result: null, error: 'network' };
+      usageHeader = res.headers?.get?.(USAGE_HEADER) ?? null;
+      if (!res.ok) {
+        finishUsage('failed', usageHeader);
+        return { result: null, error: 'network' };
+      }
       const text = ((await res.json()) as { text?: unknown }).text;
       const words = typeof text === 'string' ? text.trim() : '';
+      finishUsage(typeof text === 'string' ? 'succeeded' : 'failed', usageHeader);
       return words ? { result: { transcript: words, confidence: 0.9, onDevice: false } } : { result: null, error: 'no-speech' };
     } catch {
+      finishUsage(controller.signal.aborted ? 'cancelled' : 'failed', usageHeader);
       return { result: null, error: 'network' };
     } finally {
       clearTimeout(timer);

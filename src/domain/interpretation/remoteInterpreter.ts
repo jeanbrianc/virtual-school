@@ -1,3 +1,4 @@
+import { usageJournal, USAGE_HEADER } from '../usage';
 /**
  * Optional AI-backed interpreter.
  *
@@ -119,6 +120,8 @@ export class HttpInterpretationService implements ActivityInterpretationService 
     // Local structure is always computed: books/measurements come from it, and
     // it is the fallback if the remote call fails or returns invalid data.
     const local = interpretLocally(narrative, context);
+    const finishUsage = usageJournal.begin('interpretation');
+    let usageHeader: string | null = null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -138,11 +141,15 @@ export class HttpInterpretationService implements ActivityInterpretationService 
         }),
         signal: controller.signal,
       });
+      usageHeader = res.headers?.get?.(USAGE_HEADER) ?? null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const validated = validateInterpretation(await res.json(), context, this.id);
       if (!validated || validated.skills.length === 0) throw new Error('Invalid interpretation payload');
+      finishUsage('succeeded', usageHeader);
       return { ...validated, books: local.books, measurements: local.measurements };
     } catch (err) {
+      finishUsage('failed', usageHeader);
+      usageJournal.event('interpretation', 'fallbacks');
       return {
         ...local,
         notes: [...local.notes, `AI interpreter unavailable (${err instanceof Error ? err.message : 'error'}); used on-device interpreter instead.`],

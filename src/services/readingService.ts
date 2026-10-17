@@ -7,6 +7,7 @@ import { getSkill } from '../domain/curriculum';
 import { tallyBySkill } from '../domain/lessons/engine';
 import type { Problem } from '../domain/lessons/types';
 import { getCatalogBook } from '../domain/reading/bookCatalog';
+import { catalogQuestionMarker } from '../domain/reading/storySelection';
 import { generatedCover } from '../domain/reading/bookMetadata';
 import type { Book, Evidence, ProblemAttemptRecord, ReadingMode, ReadingSession, TeacherInteraction, TranscriptLine } from '../domain/types';
 import { toDay } from '../domain/util/time';
@@ -224,7 +225,9 @@ export async function completeBook(ctx: ServiceContext, childId: string, input: 
     if (tally.independent) parts.push(`${tally.independent} independently`);
     if (tally.supported) parts.push(`${tally.supported} after a hint`);
     if (tally.notYet) parts.push(`${tally.notYet} not yet (answer modeled)`);
-    const prompts = input.answers.filter((a) => a.skillId === tally.skillId).map((a) => `“${a.prompt}”`);
+    const prompts = input.answers
+      .filter((a) => a.skillId === tally.skillId)
+      .map((a) => `${catalogQuestionMarker(a.problemId, a.skillId, a.prompt, book.catalogId)}“${a.prompt}”`);
     evidence.push(
       makeEvidence(ctx, {
         childId,
@@ -264,9 +267,9 @@ export async function completeBook(ctx: ServiceContext, childId: string, input: 
         skillId: 'read.narration',
         source,
         kind: 'observation',
-        trials: { independent: 1, supported: 0, notYet: 0 },
-        independence: 'independent',
-        statement: `Told Professor Hoot about ${book.title} in her own words: “${input.narration.trim().slice(0, 240)}”`,
+        trials: { independent: 0, supported: 0, notYet: 0 },
+        independence: 'assisted',
+        statement: `Shared an ungraded narration with Professor Hoot about ${book.title}; accuracy and independence were not assessed: “${input.narration.trim().slice(0, 240)}”`,
         createdBy: 'system',
       }),
     );

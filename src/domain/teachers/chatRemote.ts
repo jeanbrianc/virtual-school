@@ -1,3 +1,4 @@
+import { usageJournal, USAGE_HEADER } from '../usage';
 /**
  * AI teachers through the family's own helper (scripts/ai-helper — on this
  * computer, or /api on the family's site), which uses OpenAI or Anthropic.
@@ -51,6 +52,8 @@ export class HttpTeacherChat implements TeacherChatService {
     if (understand(req.utterance, lastTeacher).intent === 'safety') return this.local.respond(req);
     if (!isAllowedHelperUrl(this.endpoint)) return this.local.respond(req);
 
+    const finishUsage = usageJournal.begin('teacher');
+    let usageHeader: string | null = null;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -66,6 +69,7 @@ export class HttpTeacherChat implements TeacherChatService {
         }),
         signal: controller.signal,
       });
+      usageHeader = res.headers?.get?.(USAGE_HEADER) ?? null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const reply = validateTeacherReply(await res.json(), req);
       if (!reply) throw new Error('Invalid reply');
@@ -73,12 +77,15 @@ export class HttpTeacherChat implements TeacherChatService {
       // "yes" / "not yet" to "did you read the whole book?".
       const local = localTeacherReply(req);
       const answered = req.topic ? answerToFinishedQuestion(req.utterance, lastTeacher) : null;
+      finishUsage('succeeded', usageHeader);
       return {
         ...reply,
         ...(!reply.book && local.book && reply.intent !== 'share' && reply.intent !== 'unclear' ? { book: local.book } : {}),
         ...(reply.finished === null && answered !== null ? { finished: answered } : {}),
       };
     } catch {
+      finishUsage('failed', usageHeader);
+      usageJournal.event('teacher', 'fallbacks');
       return this.local.respond(req);
     } finally {
       clearTimeout(timer);
@@ -108,7 +115,15 @@ export async function checkHelper(endpoint: string, fetchImpl: typeof fetch = (.
   const hosted = endpoint.startsWith('/');
   try {
     const res = await fetchImpl(`${endpoint.replace(/\/+$/, '')}/health`, { headers: { [HELPER_HEADER]: '1' } });
-    const body = (await res.json()) as { ok?: boolean; model?: string; keyConfigured?: boolean; provider?: unknown; voices?: unknown; listening?: unknown };
+    const body = (await res.json()) as {
+      ok?: boolean;
+      model?: string;
+      keyConfigured?: boolean;
+      provider?: unknown;
+      voices?: unknown;
+      listening?: unknown;
+      voiceMigrationRequired?: unknown;
+    };
     if (!body.keyConfigured)
       return {
         ok: false,
@@ -121,7 +136,12 @@ export async function checkHelper(endpoint: string, fetchImpl: typeof fetch = (.
     const voices = body.voices === true;
     const listening = body.listening === true;
     const who = provider ? `${PROVIDER_NAMES[provider]}${body.model ? ` (${body.model})` : ''}` : (body.model ?? 'the AI service');
-    const extras = voices && listening ? ' Natural voices and listening are configured; not tested.' : '';
+    const extras =
+      body.voiceMigrationRequired === true
+        ? ' Natural speech is disabled: the configured Realtime model needs a reviewed transport migration. Built-in voices still work.'
+        : voices && listening
+          ? ' Natural voices and listening are configured; not tested.'
+          : '';
     return {
       ok: !!body.ok,
       voices,
@@ -155,6 +175,8 @@ export function createTeacherChat(settings: TeacherAiSettings | undefined): Teac
 /** Parent-triggered nonpersonal sample; never called by a passive connection check. */
 export async function testNaturalVoice(endpoint: string, fetchImpl: typeof fetch = (...args) => fetch(...args)): Promise<{ message: string; audio?: Blob }> {
   if (!isAllowedHelperUrl(endpoint)) return { message: 'Choose a valid helper address before testing.' };
+  const finishUsage = usageJournal.begin('speech');
+  let usageHeader: string | null = null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
@@ -164,14 +186,18 @@ export async function testNaturalVoice(endpoint: string, fetchImpl: typeof fetch
       body: JSON.stringify({ teacherId: 'hoot', text: 'Hoo-hoo! This is a teacher voice test.' }),
       signal: controller.signal,
     });
+    usageHeader = res.headers?.get?.(USAGE_HEADER) ?? null;
     if (!res.ok) {
+      finishUsage('failed', usageHeader);
       const body = (await res.json()) as { error?: unknown };
       return { message: typeof body.error === 'string' ? body.error : 'Voice test failed. Built-in voices still work.' };
     }
     const audio = await res.blob();
     if (!audio.type.startsWith('audio/') || audio.size < 100) throw new Error('invalid audio');
+    finishUsage('succeeded', usageHeader);
     return { message: 'Voice generation passed. Press play to check the sound on this device.', audio };
   } catch {
+    finishUsage('failed', usageHeader);
     return { message: 'Could not complete the voice test. Built-in voices still work.' };
   } finally {
     clearTimeout(timer);
