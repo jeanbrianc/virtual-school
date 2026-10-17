@@ -12,6 +12,7 @@ export interface LessonChoice {
 }
 
 export type LessonVisual =
+  | { type: 'base-ten'; tens: number; ones: number; numeral: number | null; revealLabels?: boolean }
   | { type: 'pattern'; shapes: readonly Shape[] }
   | { type: 'none' }
   | { type: 'life-cycle'; cycle: LifeCycle; stage: LifeStage; next: boolean }

@@ -2709,3 +2709,81 @@ button.treasure {
 .talk-source {
   font-size: 0.9rem;
 }
+
+/* Readable base-ten bundles. Quantities remain accessible without color or sound. */
+.base-ten-stage {
+  margin: 12px 0;
+  text-align: center;
+}
+.base-ten-number {
+  font-size: 2rem;
+}
+.base-ten-parts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.base-ten-parts section {
+  border: 2px solid #2f7f8a;
+  border-radius: 14px;
+  padding: 10px;
+  min-width: 0;
+}
+.base-ten-parts h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.base-ten-parts p {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+}
+.base-ten-bundles,
+.base-ten-ones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.base-ten-bundle,
+.base-ten-one {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #275b62;
+  border-radius: 5px;
+  font-weight: 800;
+  color: #173c40;
+}
+.base-ten-bundle {
+  width: 30px;
+  height: 48px;
+  background: repeating-linear-gradient(to bottom, #c7e5dc 0 4px, #9dc9bb 4px 5px);
+}
+.base-ten-one {
+  width: 25px;
+  height: 25px;
+  background: #fff2cc;
+}
+.base-ten-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.base-ten-actions button {
+  min-height: 44px;
+  flex: 1 1 140px;
+}
+.base-ten-goal {
+  font-size: 0.95rem;
+  margin: 10px 0;
+}
+.base-ten-parent label {
+  display: block;
+  margin: 10px 0;
+}
+.base-ten-parent select {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+}

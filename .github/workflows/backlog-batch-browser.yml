@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         project: [desktop, phone]
-        suite: [globe, activity-chooser, teacher-registry, story-conversations, core-loop, hoot-mobile, usage-parent, helper-voice, batch-voice-fallback, book-arrival, nova-life-cycle, reading-nook]
+        suite: [globe, activity-chooser, teacher-registry, story-conversations, core-loop, hoot-mobile, usage-parent, helper-voice, batch-voice-fallback, book-arrival, nova-life-cycle, reading-nook, base-ten]
     steps:
       - uses: actions/checkout@v4
         with:

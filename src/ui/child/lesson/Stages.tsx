@@ -1,4 +1,5 @@
 import { LifeCycleStage } from './LifeCyclePicture';
+import { BaseTenStage } from './BaseTenStage';
 import { ShapePicture } from './ShapePicture';
 /**
  * Visual "stages" for adaptive lessons: moon rocks to tap and count,
@@ -122,6 +123,8 @@ export function LessonStage({ visual, seed, dropping }: { visual: LessonVisual; 
   switch (visual.type) {
     case 'life-cycle':
       return <LifeCycleStage stage={visual.stage} next={visual.next} />;
+    case 'base-ten':
+      return <BaseTenStage tens={visual.tens} ones={visual.ones} numeral={visual.numeral} revealLabels={visual.revealLabels ?? false} />;
     case 'pattern':
       return (
         <div
