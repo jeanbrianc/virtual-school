@@ -274,7 +274,7 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
   expect(saved.evidence.map((e) => e.skillId)).toEqual(['art.rhythm-copy', 'art.rhythm-copy']);
   expect(saved.evidence.map((e) => e.independence)).toEqual(['supported', 'independent']);
   expect(saved.evidence.every((e) => e.statement.includes('visual-only'))).toBeTruthy();
-  expect(saved.evidence.every((e) => e.statement.includes(info.project.name === 'phone' ? 'touch' : 'keyboard'))).toBeTruthy();
+  expect(saved.evidence.every((e) => e.statement.includes(info.project.name === 'phone' ? 'pointer-or-touch' : 'keyboard-or-assistive'))).toBeTruthy();
   await screenshot(page, info, 'copy-complete');
   await activate(page.getByRole('button', { name: 'Back to school', exact: true }), info);
   await context.setOffline(false);

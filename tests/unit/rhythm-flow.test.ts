@@ -153,7 +153,7 @@ test('native keyboard repeat/modified input cannot inflate a copy attempt', asyn
   await h.click('Skip this pattern');
   await h.click('Finish visit');
   await h.click('Save visit');
-  assert.ok(h.saves[0]!.trials.every((x) => x.outcome === 'skipped'));
+  assert.ok(h.saves[0]!.trials.every((x) => x.outcome === 'skipped' && x.input === 'none'));
 });
 
 test('final feedback protects completed work from stale alternate-mode and replay callbacks', async (t) => {

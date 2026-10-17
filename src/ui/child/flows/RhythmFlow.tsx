@@ -202,7 +202,7 @@ export function RhythmFlow({
     );
     setStage('feedback');
   };
-  const tap = (kind: 'keyboard' | 'touch', eventTime: number) => {
+  const tap = (kind: 'keyboard-or-assistive' | 'pointer-or-touch', eventTime: number) => {
     if (pausedRef.current || finished.current) return;
     const current = stateRef.current.stage;
     if (current !== 'calibrate' && current !== 'attempt') return;
@@ -411,10 +411,10 @@ export function RhythmFlow({
                 onKeyDown={(event) => {
                   if ((event.key === ' ' || event.key === 'Enter') && !event.ctrlKey && !event.metaKey && !event.altKey && !event.nativeEvent.isComposing) {
                     event.preventDefault();
-                    if (!event.repeat) tap('keyboard', event.timeStamp);
+                    if (!event.repeat) tap('keyboard-or-assistive', event.timeStamp);
                   }
                 }}
-                onClick={(event) => tap(event.detail === 0 ? 'keyboard' : 'touch', event.timeStamp)}
+                onClick={(event) => tap(event.detail === 0 ? 'keyboard-or-assistive' : 'pointer-or-touch', event.timeStamp)}
               >
                 Tap beat{' '}
                 <span>
@@ -458,7 +458,7 @@ export function RhythmFlow({
                 >
                   Replay the model with help
                 </button>
-                <button className="btn" onClick={() => record('skipped', mode === 'recognize' ? 'choice' : (input.current ?? 'touch'))}>
+                <button className="btn" onClick={() => record('skipped', input.current ?? 'none')}>
                   Skip this pattern
                 </button>
               </div>

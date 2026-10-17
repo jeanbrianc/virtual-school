@@ -1,7 +1,7 @@
 /** Small, original beat patterns. Times are transient, never persisted. */
 export type BeatCount = 2 | 3 | 4;
 export type RhythmMode = 'copy' | 'recognize';
-export type RhythmInput = 'keyboard' | 'touch' | 'mixed' | 'choice';
+export type RhythmInput = 'keyboard-or-assistive' | 'pointer-or-touch' | 'mixed' | 'choice' | 'none';
 export type RhythmPresentation = 'visual-only' | 'sound-and-visual';
 export type RhythmOutcome = 'matched' | 'explored' | 'skipped';
 export interface RhythmTrial {
@@ -73,7 +73,11 @@ export function validRhythmRun(run: RhythmRun): boolean {
         typeof t.supported === 'boolean' &&
         (i !== 0 || t.supported) &&
         ['visual-only', 'sound-and-visual'].includes(t.presentation) &&
-        (run.mode === 'recognize' ? t.input === 'choice' : ['keyboard', 'touch', 'mixed'].includes(t.input)),
+        (t.input === 'none'
+          ? t.outcome === 'skipped'
+          : run.mode === 'recognize'
+            ? t.input === 'choice'
+            : ['keyboard-or-assistive', 'pointer-or-touch', 'mixed'].includes(t.input)),
     )
   );
 }

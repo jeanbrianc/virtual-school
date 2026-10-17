@@ -28,13 +28,20 @@ function run(mode: 'copy' | 'recognize' = 'copy'): RhythmRun {
     mode,
     cancelled: false,
     trials: [
-      { stage: 'guided', pattern: 'a', supported: true, outcome: 'matched', input: mode === 'copy' ? 'keyboard' : 'choice', presentation: 'visual-only' },
+      {
+        stage: 'guided',
+        pattern: 'a',
+        supported: true,
+        outcome: 'matched',
+        input: mode === 'copy' ? 'keyboard-or-assistive' : 'choice',
+        presentation: 'visual-only',
+      },
       {
         stage: 'independent',
         pattern: 'b',
         supported: false,
         outcome: 'matched',
-        input: mode === 'copy' ? 'touch' : 'choice',
+        input: mode === 'copy' ? 'pointer-or-touch' : 'choice',
         presentation: 'sound-and-visual',
       },
     ],
@@ -125,8 +132,8 @@ for (const adapter of ['memory', 'indexeddb', 'syncing'] as const)
       assert.equal(evidence[0]!.skillId, 'art.rhythm-copy');
       assert.equal(evidence[0]!.trials.supported, 1);
       assert.equal(evidence[1]!.trials.independent, 1);
-      assert.match(evidence[0]!.statement, /keyboard and visual-only/);
-      assert.match(evidence[1]!.statement, /touch and sound-and-visual/);
+      assert.match(evidence[0]!.statement, /keyboard-or-assistive and visual-only/);
+      assert.match(evidence[1]!.statement, /pointer-or-touch and sound-and-visual/);
       assert.equal((await ctx.repos.forChild(ctx.repos.evidence, 'sample-sibling')).length, 0);
       await assert.rejects(recordRhythm(ctx, 'sample-sibling', r), /another child/);
       await recordRhythm(ctx, 'sample-sibling', { ...r, childId: 'sample-sibling' });
@@ -193,4 +200,15 @@ it('unknown children cannot create a completion, evidence, mastery or unlock', a
   const { ctx } = makeContext();
   await assert.rejects(recordRhythm(ctx, 'sample', run()), /Unknown rhythm learner/);
   for (const name of ['lessonAttempts', 'evidence', 'mastery', 'rewardUnlocks'] as const) assert.equal(await ctx.repos[name].count(), 0);
+});
+
+it('unobserved input is valid only for a skip and mixed access remains explicit', () => {
+  const r = run();
+  r.trials[1]!.input = 'none';
+  assert.equal(validRhythmRun(r), false);
+  r.trials[1]!.outcome = 'skipped';
+  assert.equal(validRhythmRun(r), true);
+  r.trials[1]!.input = 'mixed';
+  r.trials[1]!.outcome = 'matched';
+  assert.equal(validRhythmRun(r), true);
 });
