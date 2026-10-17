@@ -1,3 +1,4 @@
+import { BaseTenStage } from './BaseTenStage';
 import { ShapePicture } from './ShapePicture';
 /**
  * Visual "stages" for adaptive lessons: moon rocks to tap and count,
@@ -119,6 +120,8 @@ function TankStage({ objectId, showResult, floats, dropping }: { objectId: strin
 
 export function LessonStage({ visual, seed, dropping }: { visual: LessonVisual; seed: number; dropping?: { floats: boolean } | null }) {
   switch (visual.type) {
+    case 'base-ten':
+      return <BaseTenStage tens={visual.tens} ones={visual.ones} numeral={visual.numeral} />;
     case 'pattern':
       return (
         <div

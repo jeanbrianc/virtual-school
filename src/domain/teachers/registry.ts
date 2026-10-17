@@ -61,6 +61,13 @@ export const TEACHER_REGISTRY = {
         icon: '🚀',
         activity: { kind: 'lesson', lessonId: 'moon-rocks' },
       },
+      {
+        id: 'base-ten-mission',
+        label: 'Tens and ones mission',
+        description: 'Build and take apart numbers from 20 to 99.',
+        icon: '🔢',
+        activity: { kind: 'lesson', lessonId: 'base-ten-mission' },
+      },
     ],
     scene: { x: 8.3, z: 4.4, model: 'robot', icon: '🤖' },
     room: 'the math corner, where you rescue moon rocks by counting, adding and sharing',

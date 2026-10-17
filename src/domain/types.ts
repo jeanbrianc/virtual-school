@@ -350,6 +350,8 @@ export interface ProblemAttemptRecord {
 }
 
 export interface LessonAttempt {
+  /** Explicitly separate optional review observations from new learning. */
+  practiceMode?: 'learning' | 'review';
   /** False for a saved, unfinished practice adventure; absent preserves historical completions. */
   complete?: boolean;
   id: ID;

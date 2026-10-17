@@ -10,6 +10,7 @@ export interface LessonChoice {
 }
 
 export type LessonVisual =
+  | { type: 'base-ten'; tens: number; ones: number; numeral: number | null }
   | { type: 'pattern'; shapes: readonly Shape[] }
   | { type: 'none' }
   | { type: 'rocks'; groups: number[]; removed?: number }
