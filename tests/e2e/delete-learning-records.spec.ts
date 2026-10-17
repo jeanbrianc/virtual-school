@@ -99,10 +99,20 @@ test('explicit learning-history reset retains avatar appearance across reload an
   await expect(page.getByText('Sample’s learning records were deleted. Their profile and avatar appearance remain.')).toBeVisible();
   const after = await records(page);
   expect(after.children).toEqual(before.children);
-  const avatar = after.avatars.find((a) => a.childId === 'child_izzy')!;
-  const { inspirationMediaId: _removed, updatedAt: _old, ...appearance } = before.avatars.find((a) => a.childId === 'child_izzy')!;
-  const { updatedAt: _updated, ...retained } = avatar;
+  const avatar = after.avatars.find((a) => a.childId === 'child_izzy')! as Avatar & { _mod: string };
+  const {
+    inspirationMediaId: _removed,
+    updatedAt: _old,
+    _mod: oldMod,
+    ...appearance
+  } = before.avatars.find((a) => a.childId === 'child_izzy')! as Avatar & {
+    _mod: string;
+  };
+  const { updatedAt: _updated, _mod: newMod, ...retained } = avatar;
   expect(retained).toEqual(appearance);
+  // Clearing the deleted-photo reference is a real synced avatar update, so its sync stamp must change.
+  expect(typeof newMod).toBe('string');
+  expect(newMod).not.toBe(oldMod);
   expect(after.books.filter((b) => b.childId === 'child_izzy')).toHaveLength(0);
   expect(after.media.filter((m) => m.childId === 'child_izzy')).toHaveLength(0);
   expect(after.avatars.find((a) => a.childId === 'child_georgia')).toEqual(before.avatars.find((a) => a.childId === 'child_georgia'));
