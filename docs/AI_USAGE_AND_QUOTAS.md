@@ -2,7 +2,7 @@
 
 Design checked 2026-10-17. Partial delivery for [#25](https://github.com/jeanbrianc/virtual-school/issues/25); keep the issue open. No infrastructure, permissions, credentials, billing settings or deployment are changed here.
 
-## Shipped observation layer
+## Observation layer in this PR
 
 Parent Studio → Settings → AI usage and costs shows aggregate attempts, successful responses, failures, cancellations, pending requests, voice cache hits and actual built-in fallback invocations. The existing Parent PIN gates the UI; it is not authentication against an adult with device access. There is **no new usage endpoint**. No counts are sent to an analytics service or synced with family records.
 
@@ -10,7 +10,7 @@ The source is this tab's in-memory journal, within the current partial UTC day s
 
 Only service, allowlisted provider/model labels and numeric counters are retained. Unknown/custom models become `unreported`; names, learner identifiers, book titles, prompts, transcripts, recordings, URLs and arbitrary provider metadata cannot become labels. The optional helper response header contains only allowlisted model/provider and reported input/output token counts. An older or custom helper can omit it without breaking the app. Missing units are unknown, never zero. Raw provider bodies do not leave the helper for metering.
 
-Outcomes describe the browser's request/validation result, not the provider's charge. Cancelled/timed-out/failed calls may still incur cost. Speech generation success does not prove successful audio playback. Parent voice tests count as speech attempts. Cache/fallback events are separate and may occur without a new request. Device-only speech/listening and local lessons are not metered. Existing consent gates are unchanged.
+Outcomes describe the browser's request/validation result, not the provider's charge. Cancelled/timed-out/failed calls may still incur cost. Teacher-reply and interpretation adapters currently count timeout aborts as failed; speech/listening adapters count their aborts (including timeouts) as cancelled. These are adapter-specific diagnostics, not a uniform cancellation or billing classification. Speech generation success does not prove successful audio playback. Parent voice tests count as speech attempts. Cache/fallback events are separate and may occur without a new request. Device-only speech/listening and local lessons are not metered. Existing consent gates are unchanged.
 
 Estimated API cost, verified provider billing and hosting cost are separate **unknown/unavailable** fields. No runtime price conversion is installed. Complete units, effective model pricing and authorized billing reconciliation are prerequisites for a credible estimate. The reference Realtime pricing snapshot in [the speech plan](VOICE_MIGRATION.md) is for planning, not retrospective billing.
 
