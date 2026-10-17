@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'playwright/test';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
 
 test.use({ actionTimeout: 45_000 });
 
@@ -24,7 +25,9 @@ test('recognized safety stays local through repeated turns and Back; retained pa
     if (url.pathname === '/api/health')
       return route.fulfill({ json: { ok: true, keyConfigured: true, provider: 'openai', model: 'gpt-6-luna', voices: true, listening: false } });
     if (url.pathname === '/api/v1/teacher') {
-      teacherRequests.push(request.postDataJSON());
+      const body = request.postDataJSON() as { childName: string };
+      expect(body.childName).toBe('Sample');
+      teacherRequests.push(body);
       return route.fulfill({ json: { reply: 'A synthetic story reply!', intent: 'share', finished: null } });
     }
     if (url.pathname === '/api/v1/speak') {
@@ -58,8 +61,12 @@ test('recognized safety stays local through repeated turns and Back; retained pa
       window.setTimeout(() => this.dispatchEvent(new Event('ended')), 0);
     };
   });
+  await useSyntheticHousehold(page);
+  expect(teacherRequests).toHaveLength(0);
+  expect(voiceRequests).toHaveLength(0);
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
+  await page.getByLabel('Viewing learner').selectOption({ label: 'Sample' });
   await page.getByTestId('ai-endpoint').fill('/api');
   await page.getByTestId('ai-endpoint').blur();
   await page.getByTestId('ai-check').click();
@@ -72,8 +79,8 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   await expect(page.getByTestId('natural-toggle')).toBeChecked();
   await page.getByLabel(/Teachers read their/).click();
   await expect(page.getByLabel(/Teachers read their/)).toBeChecked();
-  await enterSchool(page);
-  await talkTo(page, 'hoot');
+  await enterSchool(page, 'sample');
+  await page.getByTestId('discover-action').click();
   const say = async (text: string) => {
     await page.getByTestId('talk-input').fill(text);
     await page.getByTestId('talk-send').click();
@@ -112,6 +119,7 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   await page.getByTestId('dialogue-close').click();
   await page.goto(`${APP}#/parent/today`);
   await unlockParent(page);
+  await page.getByLabel('Viewing learner').selectOption({ label: 'Sample' });
   await expect(page.getByTestId('teacher-notes')).toContainText('I am scared');
   await page.getByTestId('teacher-notes').screenshot({ path: `test-results/safety-parent-note-${info.project.name}.png` });
   await page.getByTestId('nav-conversations').click();

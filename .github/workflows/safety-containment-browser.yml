@@ -7,6 +7,7 @@ on:
       - 'src/voice/**'
       - 'tests/unit/safety-containment.test.ts'
       - 'tests/e2e/safety-containment.spec.ts'
+      - 'tests/e2e/synthetic-household.ts'
       - 'playwright.config.ts'
       - '.github/workflows/safety-containment-browser.yml'
   workflow_dispatch:
