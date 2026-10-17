@@ -21,7 +21,7 @@ concurrency:
 jobs:
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: ${{ matrix.suite == 'seating' && 55 || 40 }}
     strategy:
       fail-fast: false
       matrix:

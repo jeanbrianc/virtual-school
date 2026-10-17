@@ -36,7 +36,11 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { appendFileSync, readdirSync } from 'node:fs';
-          const suites = readdirSync('tests/e2e').filter((name) => name.endsWith('.spec.ts')).map((name) => name.slice(0, -8)).sort();
+          const priority = ['seating', 'combined-classroom-release'];
+          const suites = readdirSync('tests/e2e').filter((name) => name.endsWith('.spec.ts')).map((name) => name.slice(0, -8)).sort((a, b) => {
+            const rank = (name) => priority.includes(name) ? priority.indexOf(name) : priority.length;
+            return rank(a) - rank(b) || a.localeCompare(b);
+          });
           if (!suites.length || suites.some((name) => !/^[a-z0-9-]+$/.test(name))) throw new Error('Missing or invalid E2E suite names');
           for (const required of ['combined-classroom-release', 'pattern-progression', 'delete-learning-records', 'tavi-routines', 'milo-rhythm', 'conversation-privacy-parent', 'nova-weather', 'base-ten-arithmetic', 'seating']) {
             if (!suites.includes(required)) throw new Error(`Missing implemented feature suite: ${required}`);
@@ -48,13 +52,15 @@ jobs:
     needs: checks-and-matrix
     name: Combined / ${{ matrix.suite }} / ${{ matrix.project }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Software-rendered seating captures need measured extra headroom, without relaxing assertions.
+    timeout-minutes: ${{ matrix.suite == 'seating' && 55 || 45 }}
     strategy:
       fail-fast: false
       max-parallel: 16
       matrix:
-        project: [desktop, phone]
+        # Put both devices of the longest/highest-risk suites at the front of the queue.
         suite: ${{ fromJSON(needs.checks-and-matrix.outputs.suites) }}
+        project: [desktop, phone]
     env:
       CI: 'true'
       RELEASE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -112,7 +118,7 @@ jobs:
           NODE
       - name: Run the synthetic combined-candidate browser suite
         run: npx playwright test --config=playwright.release.config.ts "tests/e2e/$RELEASE_SUITE.spec.ts" --project="$RELEASE_PROJECT"
-        timeout-minutes: 35
+        timeout-minutes: ${{ matrix.suite == 'seating' && 45 || 35 }}
       - name: Reject missing execution, skipped tests, flaky results, or failures
         if: always()
         run: |

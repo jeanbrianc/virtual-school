@@ -35,11 +35,11 @@ when an original draft passed.
 | #47 privacy copy | Teacher talk distinguishes saved summaries/transcripts, optional AI and separate speech/microphone, sync/export sharing | `b20411705e0e272ddb908ab45e0559b5350eb3cc` |
 | #48 weather | Four-round fictional picture matching/chart comparison, explicit levels and strictly local optional narration | `5f7330aece5917faa491cbae064a50cfd4495b65` |
 | #49 final arithmetic | Parent-selected four-round answer choices within 100 without regrouping; review separation, model-only semantics, exact-run parent evidence and responsiveness fixes | `dc6e5c6ac537e6269d63174952cc0c52e5ca887b` |
-| #50 corrected seating | Eleven registered seats, safe exits, delayed-touch targets, reading-coat/book clearance and garden-couch visual reading; no learning/progress credit | `3a26ee20e5941a8d178bef4607a98e68e686b504` |
+| #50 corrected seating | Eleven registered seats, safe exits, delayed-touch targets, reading-coat/book clearance and garden-couch visual reading; no learning/progress credit | `6b77b17ef047530a9dcc1d61d251e83050d2f5c4` |
 
 
 Public runtime provenance was checked October 17, 2026 at 19:36 UTC; corrected
-#50 was rechecked at 20:05 UTC. Each tree
+#50 was rechecked at 20:44 UTC. Each tree
 below matches the corresponding integrated source checkpoint above; it identifies
 the source branch before cross-feature conflict resolution, not the combined tree.
 
@@ -52,7 +52,7 @@ the source branch before cross-feature conflict resolution, not the combined tre
 | #47 | [`b20411705e0e272ddb908ab45e0559b5350eb3cc`](https://github.com/jeanbrianc/virtual-school/commit/b20411705e0e272ddb908ab45e0559b5350eb3cc) | `564b6b968a960ef02a9f7d1dd6d87b3b4598687f` |
 | #48 | [`b50321d5f3bdb4b1191e8d686464c9b38e03c232`](https://github.com/jeanbrianc/virtual-school/commit/b50321d5f3bdb4b1191e8d686464c9b38e03c232) | `8c7e6c9cbb958c5c54773886c57a8ddccf5f7645` |
 | #49 | [`b6ce7c05baaa0d0e310a1762e45917f17f745a75`](https://github.com/jeanbrianc/virtual-school/commit/b6ce7c05baaa0d0e310a1762e45917f17f745a75) | `cd5986a364117ffef3dbfbd99b07c5e910a4c143` |
-| #50 | [`ba39f75d459e315dbe8194e33fbfdceca578c460`](https://github.com/jeanbrianc/virtual-school/commit/ba39f75d459e315dbe8194e33fbfdceca578c460) | `a10e6222a5e7fc149881107cdb7ffedbffca52d3` |
+| #50 | [`f401efa9103f4ea30b6dacb1d72cd839321b872e`](https://github.com/jeanbrianc/virtual-school/commit/f401efa9103f4ea30b6dacb1d72cd839321b872e) | `0eadd8f8daf34897c760a7bb7d1df77dd745588e` |
 
 Already-live #37 place value, #40 life cycles and #46 recognized-conversation
 containment are retained dependencies, not duplicate new deliveries. Candidate
@@ -79,6 +79,9 @@ the original hit, separates the reading coat from the book pages, and makes
 floor-navigation fixtures choose an actual connected target without changing
 runtime navigation. The combined floor journey retains real canvas input,
 strict arrival/displacement assertions and persisted target/scene JSON.
+A later measured-budget-only #50 update gives the eleven-seat inventory
+25 minutes and its hosted seating jobs extra headroom. Assertions, captures,
+frame waits and all runtime/build bytes are unchanged by that budget update.
 
 After the final seating import and combined floor-fixture update, local
 `npm run check` passed all **435 tests in 52 suites**, strict typecheck/lint and
