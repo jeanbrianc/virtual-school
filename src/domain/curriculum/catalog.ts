@@ -625,6 +625,36 @@ export const SKILLS: Skill[] = defineSkills({
     lessons: ['base-ten-mission'],
     idea: 'Bundle straws into tens. Build a number with bundles and loose straws, then explain how the digits match.',
   },
+  'math.add-100-no-regroup-answer': {
+    strand: 'math.baseTen',
+    name: 'Choose two-digit addition answers without regrouping (within 100)',
+    can: 'choose the sum of two two-digit numbers without regrouping, with base-ten operand representations',
+    childName: 'Join Tens and Ones',
+    difficulty: 3,
+    prereq: ['math.decompose-20-99', 'math.add-20'],
+    standards: [
+      family(
+        'Choose a two-digit arithmetic answer without regrouping, with base-ten operands. This narrow observation does not establish manipulation or algorithm mastery.',
+      ),
+    ],
+    lessons: ['base-ten-arithmetic'],
+    idea: 'Join two amounts using bundles of ten straws and loose ones. Ask the child to explain the joining. Answer choice alone does not show how they calculated.',
+  },
+  'math.subtract-100-no-regroup-answer': {
+    strand: 'math.baseTen',
+    name: 'Choose two-digit subtraction answers without regrouping (within 100)',
+    can: 'choose the difference of two two-digit numbers without regrouping, with base-ten operand representations',
+    childName: 'Take Away Tens and Ones',
+    difficulty: 3,
+    prereq: ['math.decompose-20-99', 'math.sub-10'],
+    standards: [
+      family(
+        'Choose a two-digit arithmetic answer without regrouping, with base-ten operands. This narrow observation does not establish manipulation or algorithm mastery.',
+      ),
+    ],
+    lessons: ['base-ten-arithmetic'],
+    idea: 'Build a starting amount, then take away whole tens and loose ones. Watch and record the child’s explanation separately from an app answer choice.',
+  },
   'math.place-value': {
     strand: 'math.baseTen',
     name: 'Tens and ones',
