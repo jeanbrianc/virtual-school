@@ -4,7 +4,7 @@ import { Icon } from '../shared/Icon';
 import { TeacherPortrait } from './TeacherPortrait';
 
 export interface Speech {
-  speak(text: string): void;
+  speak(text: string, options?: { localOnly: boolean }): void;
   canSpeak: boolean;
   /** Read each new line aloud automatically (parent setting). */
   auto: boolean;

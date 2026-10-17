@@ -1,3 +1,4 @@
+import { recognizedSafetyText } from '../domain/teachers/chat';
 import { usageJournal, USAGE_HEADER } from '../domain/usage';
 /**
  * Natural teacher voices and listening through the family's AI helper
@@ -81,10 +82,13 @@ export class HelperSpeechOutput implements SpeechOutput {
   async speak(text: string, opts: SpeakOptions = {}): Promise<void> {
     this.cancel();
     const { natural, ...rest } = opts;
+    // Inspect raw text before hashing, cache lookup or helper dispatch. Local-only lines
+    // never enter the helper voice cache, including manual Replay of an old echo.
+    if (opts.localOnly || recognizedSafetyText(text)) return this.device.speak(text, { ...rest, localOnly: true });
     if (!natural || typeof Audio === 'undefined') return this.device.speak(text, rest);
     const mine = ++this.token;
     try {
-      const blob = await this.audioFor(text, natural);
+      const blob = await this.audioFor(text, natural, mine);
       if (mine !== this.token) return;
       await this.play(blob, rest.volume ?? 1, mine);
     } catch {
@@ -96,7 +100,7 @@ export class HelperSpeechOutput implements SpeechOutput {
     }
   }
 
-  private async audioFor(text: string, natural: NaturalVoice): Promise<Blob> {
+  private async audioFor(text: string, natural: NaturalVoice, mine: number): Promise<Blob> {
     const key = `${natural.teacher}\n${text}`;
     const hit = this.memory.get(key);
     if (hit) {
@@ -105,7 +109,9 @@ export class HelperSpeechOutput implements SpeechOutput {
       return hit;
     }
     const cacheUrl = `${location.origin}/__teacher-voice/${await sha256Hex(key)}`;
+    if (mine !== this.token) throw new Error('speech cancelled');
     const stored = await this.fromCache(cacheUrl);
+    if (mine !== this.token) throw new Error('speech cancelled');
     if (stored) {
       usageJournal.event('speech', 'cacheHits');
       this.remember(key, stored);

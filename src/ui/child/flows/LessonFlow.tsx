@@ -95,8 +95,8 @@ export function LessonFlow(props: LessonFlowProps) {
   const [, force] = useState(0);
   const [stars, setStars] = useState(0);
 
-  const log = (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via']) =>
-    transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}) });
+  const log = (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via'], localOnly?: true) =>
+    transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}), ...(localOnly ? { localOnly } : {}) });
   const say = (text: string, m: typeof mood = 'happy', via?: TranscriptLine['via']) => {
     if (!active.current) return;
     setLine(text);
@@ -261,7 +261,7 @@ export function LessonFlow(props: LessonFlowProps) {
   const problem = shownProblem;
 
   return (
-    <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} closeDisabled={saving} speech={speech} wide={phase === 'play'}>
+    <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} closeDisabled={saving} speech={talk.guardSpeech(speech)} wide={phase === 'play'}>
       {phase === 'intro' && (
         <>
           <Choices

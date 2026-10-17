@@ -133,8 +133,8 @@ export function HootFlow(props: HootFlowProps) {
   const [titleLive, setTitleLive] = useState('');
   const [micTrouble, setMicTrouble] = useState('');
 
-  const log = (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via']) =>
-    transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}) });
+  const log = (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via'], localOnly?: true) =>
+    transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}), ...(localOnly ? { localOnly } : {}) });
   const say = (text: string, m: typeof mood = 'happy', via?: TranscriptLine['via']) => {
     setLine(text);
     setAiLine(via === 'ai');
@@ -932,7 +932,7 @@ export function HootFlow(props: HootFlowProps) {
   }
 
   return (
-    <DialogueShell teacher="hoot" line={currentLine} mood={mood} onClose={close} speech={speech} wide={step.kind === 'pick'}>
+    <DialogueShell teacher="hoot" line={currentLine} mood={mood} onClose={close} speech={talk.guardSpeech(speech)} wide={step.kind === 'pick'}>
       {aiLine && (
         <p className="talk-source" data-testid="ai-story-source">
           AI conversation · book facts are unverified · no comprehension score
