@@ -2,10 +2,11 @@ import { expect, test, type Page } from 'playwright/test';
 import { enterSchool, talkTo } from './helpers';
 async function openGlobe(page: Page) {
   await talkTo(page, 'globe');
-  if (await page.getByTestId('discover-ok').count()) {
-    await page.getByRole('button', { name: 'Explore with Nova', exact: false }).click();
-  }
-  await expect(page.getByRole('group', { name: 'Three state shapes', exact: true })).toBeVisible();
+  const explore = page.getByRole('button', { name: 'Explore with Nova', exact: false });
+  const shapes = page.getByRole('group', { name: 'Three state shapes', exact: true });
+  await expect(explore.or(shapes)).toBeVisible();
+  if (await explore.isVisible()) await explore.click();
+  await expect(shapes).toBeVisible();
 }
 async function records(page: Page) {
   return page.evaluate(async () => {
