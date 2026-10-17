@@ -61,12 +61,15 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   await page.getByTestId('ai-endpoint').fill('/api');
   await page.getByTestId('ai-endpoint').blur();
   await page.getByTestId('ai-check').click();
-  await page.getByTestId('ai-consent').check();
-  await page.getByTestId('ai-enabled').check();
+  await expect(page.getByTestId('ai-check-result')).toContainText('Connected to helper');
+  await page.getByTestId('ai-consent').click();
+  await expect(page.getByTestId('ai-consent')).toBeChecked();
+  await page.getByTestId('ai-enabled').click();
   await expect(page.getByTestId('ai-enabled')).toBeChecked();
-  await page.getByTestId('natural-toggle').check();
+  await page.getByTestId('natural-toggle').click();
   await expect(page.getByTestId('natural-toggle')).toBeChecked();
-  await page.getByLabel(/Teachers read their/).check();
+  await page.getByLabel(/Teachers read their/).click();
+  await expect(page.getByLabel(/Teachers read their/)).toBeChecked();
   await enterSchool(page);
   await talkTo(page, 'hoot');
   const say = async (text: string) => {
