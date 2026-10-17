@@ -300,7 +300,7 @@ export function useTeacherTalk(opts: {
     containmentNotified.current = true;
     opts.kit.stopSpeaking?.();
     if (!opts.transcript().some((line) => line.localOnly)) {
-      opts.log('system', 'This conversation continues on this device.', undefined, true);
+      opts.log('system', 'Teacher replies for this conversation use built-in responses.', undefined, true);
     }
   };
   const active = useRef(true);

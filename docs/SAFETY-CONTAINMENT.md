@@ -6,7 +6,7 @@ credentials, permissions, provider configuration or saved family settings.
 
 ## Boundary
 
-The existing on-device recognizer already handles certain safety utterances
+The existing local text/intent classifier already handles certain safety utterances
 locally. Previously a later ordinary utterance could send that earlier text in
 its last-eight-turn history. A conversation now owns a monotonic local-only
 boundary separate from its retained transcript. The full available history is

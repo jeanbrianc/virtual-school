@@ -79,7 +79,7 @@ export interface TeacherConversationPrivacy {
   localOnly: boolean;
 }
 
-/** Uses the existing bounded recognizer, not a comprehensive safety classifier. */
+/** Uses the existing local text/intent classifier, not comprehensive safety detection. */
 export function recognizedSafetyText(text: string): boolean {
   return understand(text).intent === 'safety';
 }
