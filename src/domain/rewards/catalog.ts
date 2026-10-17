@@ -89,7 +89,7 @@ export const REWARDS: RewardDefinition[] = [
     kind: 'room',
     name: 'Reading Nook',
     childTitle: 'The Reading Nook is open!',
-    childMessage: 'The curtain opened! A cozy nook with pillows and twinkly lights is waiting for you.',
+    childMessage: 'The curtain opened! A sunny garden nook with flowers and soft pillows is waiting for you.',
     hint: 'Read 25 books',
     rule: { type: 'books', count: 25 },
     icon: '🏕️',
