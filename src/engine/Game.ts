@@ -129,7 +129,9 @@ export class Game {
   private quality: GraphicsQuality;
   private maxFps = Number(new URLSearchParams(window.location.search).get('maxfps') ?? 0) || 0;
   private cinematicDepth = 0;
-  private bookArrival: { book: ShelfBook; controller: AbortController } | null = null;
+  private bookArrival: { book: ShelfBook; controller: AbortController; plan: ReturnType<typeof bookArrivalPlan>; phase: 'pan' | 'flight' | 'landed' } | null =
+    null;
+  private bookArrivalNear: number | null = null;
   // ── Dance circuit on the rug ──
   private circuitMoves: DanceMoveId[] = [...DEFAULT_CIRCUIT];
   /** The rug number she's standing on (null when off the numbers). */
@@ -567,6 +569,12 @@ export class Game {
     this.rig.camera.updateProjectionMatrix();
     if (this.bookArrival) {
       const plan = this.bookArrivalShot(this.bookArrival.book);
+      // Keep the same arrival promise/ID while adapting both camera and remaining flight.
+      this.bookArrival.plan.from.copy(plan.from);
+      this.bookArrival.plan.arcHeight = plan.arcHeight;
+      this.bookArrival.plan.near = plan.near;
+      this.bookArrival.plan.landNear = plan.landNear;
+      if (this.bookArrival.phase !== 'pan') this.clipBookArrival(this.bookArrival.phase === 'landed' ? plan.landNear : plan.near);
       void this.rig.shot(plan.position, plan.target, 0);
     }
     if (this.composer) {
@@ -701,22 +709,35 @@ export class Game {
     });
   }
 
+  private clipBookArrival(near: number): void {
+    if (this.bookArrivalNear === null) this.bookArrivalNear = this.rig.camera.near;
+    this.rig.camera.near = near;
+    this.rig.camera.updateProjectionMatrix();
+  }
+
   private cancelBookArrival(): void {
     this.bookArrival?.controller.abort();
     this.bookArrival = null;
+    if (this.bookArrivalNear !== null) {
+      this.rig.camera.near = this.bookArrivalNear;
+      this.rig.camera.updateProjectionMatrix();
+      this.bookArrivalNear = null;
+    }
   }
 
   async celebrateBook(book: ShelfBook): Promise<void> {
     this.cancelBookArrival();
     if (this.disposed) return;
-    const arrival = { book, controller: new AbortController() };
+    const arrival = { book, controller: new AbortController(), plan: this.bookArrivalShot(book), phase: 'pan' as 'pan' | 'flight' | 'landed' };
     this.bookArrival = arrival;
     const { signal } = arrival.controller;
     this.cinematicDepth++;
     try {
-      const plan = this.bookArrivalShot(book);
+      const plan = arrival.plan;
       await this.rig.shot(plan.position, plan.target, this.reducedMotion ? 0 : 1.3);
       if (signal.aborted) return;
+      arrival.phase = 'flight';
+      this.clipBookArrival(plan.near);
       this.cheer('hoot');
       this.opts.audio.play('whoosh');
       this.opts.audio.play('pageFlip');
@@ -724,11 +745,13 @@ export class Game {
         book,
         plan.from,
         (at) => {
+          arrival.phase = 'landed';
+          this.clipBookArrival(plan.landNear);
           this.opts.audio.play('bookThunk');
           this.opts.audio.play('chime');
           this.particles.sparkle(at, { count: 70, speed: 2.4 });
         },
-        { signal, arcHeight: plan.arcHeight },
+        { signal, flight: plan },
       );
       if (!signal.aborted) await this.tweens.wait(0.9);
     } finally {
@@ -776,6 +799,8 @@ export class Game {
 
   /** Opening flourish: a sweeping establishing shot that settles on Izzy. */
   async introSweep(): Promise<void> {
+    this.cancelBookArrival();
+    if (this.disposed) return;
     // Respect reduced-motion preferences: no sweeping camera moves.
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     this.cinematicDepth++;

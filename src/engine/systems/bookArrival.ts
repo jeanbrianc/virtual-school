@@ -10,12 +10,16 @@ export interface BookArrivalViewport {
 export function bookArrivalPlan(destination: THREE.Vector3, teacher: THREE.Vector3, viewport: BookArrivalViewport) {
   const compact = viewport.width < 760 || viewport.width / viewport.height < 0.9;
   if (!compact) {
-    // Keep the desktop angle, distance and long flight from Hoot, translated to the actual book.
+    // Keep the desktop sweep from Hoot. Face the grand shelf head-on so its ladder
+    // does not cross the new book; retain the familiar oblique view for earlier cases.
+    const side = destination.x > -8.3 ? 0 : 0.9;
     return {
-      position: destination.clone().add(new THREE.Vector3(0.9, 1.35, 4.25)),
+      position: destination.clone().add(new THREE.Vector3(side, 1.35, 4.25)),
       target: destination.clone(),
       from: teacher.clone(),
       arcHeight: 2.4,
+      near: 0.1,
+      landNear: Math.hypot(side, 1.35, 4.25) - 0.4,
     };
   }
 
@@ -35,5 +39,14 @@ export function bookArrivalPlan(destination: THREE.Vector3, teacher: THREE.Vecto
   const distance = front + Math.max(halfWidth / (tangent * aspect * 0.8), halfHeight / (tangent * safeHeight));
   const screenCenter = (top + bottom) / (2 * viewport.height);
   const target = destination.clone().add(new THREE.Vector3(0.09, 0.3125 + (2 * screenCenter - 1) * distance * tangent, 0));
-  return { position: target.clone().add(new THREE.Vector3(0, 0, distance)), target, from, arcHeight };
+  return {
+    position: target.clone().add(new THREE.Vector3(0, 0, distance)),
+    target,
+    from,
+    arcHeight,
+    // A temporary cinematic cutaway removes foreground teachers/furniture, while
+    // retaining the whole enlarged flight hull (front edge is at most 1.69m).
+    near: distance - 1.8,
+    landNear: distance - 0.4,
+  };
 }

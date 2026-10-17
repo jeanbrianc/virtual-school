@@ -6,6 +6,8 @@ import { Game } from '../../src/engine/Game';
 import { Tweens } from '../../src/engine/core/tween';
 import { bookArrivalPlan } from '../../src/engine/systems/bookArrival';
 import { CameraRig } from '../../src/engine/systems/cameraRig';
+import { SchoolWorld } from '../../src/engine/world/SchoolWorld';
+import { Particles } from '../../src/engine/fx/particles';
 import { Bookshelf, type ShelfBook } from '../../src/engine/world/bookshelf';
 
 // Real geometry/projection, synthetic canvas text. Pixel checks live in Playwright.
@@ -56,7 +58,7 @@ it('frames the actual slot and whole compact flight at every shelf and overflow 
       const destination = shelf.slotTransform(index, book(index).id).position;
       const fov = viewport.width / viewport.height < 1 ? 55 : CAMERA.fov;
       const plan = bookArrivalPlan(destination, teacher, { ...viewport, fov });
-      const camera = new THREE.PerspectiveCamera(fov, viewport.width / viewport.height, 0.1, 200);
+      const camera = new THREE.PerspectiveCamera(fov, viewport.width / viewport.height, plan.near, 200);
       camera.position.copy(plan.position);
       camera.lookAt(plan.target);
       camera.updateMatrixWorld(true);
@@ -95,7 +97,7 @@ it('preserves the desktop arrival angle and flight from Hoot while translating t
       plan.position
         .clone()
         .sub(destination)
-        .distanceTo(new THREE.Vector3(0.9, 1.35, 4.25)) < 1e-12,
+        .distanceTo(new THREE.Vector3(destination.x > -8.3 ? 0 : 0.9, 1.35, 4.25)) < 1e-12,
     );
     assert.deepEqual(plan.from, teacher);
     assert.equal(plan.arcHeight, 2.4);
@@ -168,6 +170,7 @@ it('newer arrival and camera release cannot be overwritten by an older awaited a
     disposed: false,
     cinematicDepth: 0,
     bookArrival: null,
+    bookArrivalNear: null,
     reducedMotion: false,
     opts: { container: { clientWidth: 320, clientHeight: 740 }, audio: { play() {} } },
     world: { bookshelf: shelf, anchors: new Map(), teachers: new Map() },
@@ -189,4 +192,123 @@ it('newer arrival and camera release cannot be overwritten by an older awaited a
   await Promise.all([interrupted, released]);
   assert.equal(game.busy, false);
   assert.equal(rig.inCinematic, false, 'stale arrival must not recapture the camera');
+  assert.equal(rig.camera.near, 0.1, 'camera release restores the ordinary clipping plane');
+});
+
+it('desktop-to-phone resize updates the current pan and flight without replacing its completion promise', async () => {
+  for (const framesBeforeResize of [3, 22]) {
+    const tweens = new Tweens();
+    const shelf = new Bookshelf(tweens, 'Sample');
+    const rig = new CameraRig(1100 / 720, tweens);
+    const container = { clientWidth: 1100, clientHeight: 720 };
+    const player = new THREE.Vector3();
+    rig.update(0.01, player);
+    const game = Object.assign(Object.create(Game.prototype) as object, {
+      tweens,
+      rig,
+      disposed: false,
+      cinematicDepth: 0,
+      bookArrival: null,
+      bookArrivalNear: null,
+      reducedMotion: false,
+      composer: null,
+      renderer: { setSize() {}, domElement: { style: {} } },
+      opts: { container, audio: { play() {} } },
+      world: { bookshelf: shelf, anchors: new Map(), teachers: new Map() },
+      interaction: { hideMarker() {} },
+      particles: { sparkle() {} },
+    }) as unknown as Game;
+    const b = book(25);
+    let completions = 0;
+    const arrival = game.celebrateBook(b).then(() => completions++);
+    await pump(tweens, framesBeforeResize);
+    container.clientWidth = 320;
+    container.clientHeight = 740;
+    game.resize();
+    for (let i = 0; i < 60; i++) {
+      await pump(tweens, 1);
+      rig.update(0.1, player);
+      rig.camera.updateMatrixWorld(true);
+      const mesh = shelf.root.getObjectByName(`book:${b.id}`);
+      if (!mesh) continue;
+      const point = mesh.position.clone().project(rig.camera);
+      assert.ok(
+        Math.abs(point.x) < 0.9 && Math.abs(point.y) < 0.7 && point.z > -1 && point.z < 1,
+        `resize after frame ${framesBeforeResize} lost book at ${point.toArray()}`,
+      );
+    }
+    await arrival;
+    assert.equal(completions, 1);
+    assert.equal(game.busy, false);
+    assert.deepEqual(shelf.root.getObjectByName(`book:${b.id}`)!.position, shelf.slotTransform(25, b.id).position);
+  }
+});
+
+it('full-world landed books remain visible past Hoot, furniture and the grand ladder at every slot', async () => {
+  const world = new SchoolWorld(new Tweens(), new Particles(), new Date('2026-06-01'), 'Sample');
+  const books = Array.from({ length: 141 }, (_, index) => book(index));
+  await world.apply(
+    {
+      shelfUnits: 4,
+      shelfCapacities: [10, 15, 25, 50],
+      booksOnShelves: 141,
+      readingLamp: true,
+      storyStars: true,
+      readingNookOpen: true,
+      grandLibrary: true,
+      greenhouseOpen: false,
+      plantCount: 0,
+      fossilDisplay: false,
+      dinoSkeleton: false,
+      telescope: false,
+      planetMobile: false,
+      natureTable: false,
+      natureItems: [],
+      artLine: false,
+      artworkCount: 0,
+      artStudioOpen: false,
+      rocketStage: 0,
+      aquariumFish: 2,
+      pets: [],
+      trophies: [],
+      preview: false,
+    },
+    books,
+    false,
+  );
+  for (const viewport of [...viewports, { width: 1100, height: 720 }])
+    for (const b of books) {
+      world.bookshelf.setBooks(books.filter((prior) => prior.shelfIndex <= b.shelfIndex));
+      const transform = world.bookshelf.slotTransform(b.shelfIndex, b.id);
+      const mesh = world.bookshelf.root.getObjectByName(`book:${b.id}`) as THREE.Mesh;
+      mesh.position.copy(transform.position);
+      mesh.rotation.z = transform.rotationZ;
+      // Final bounce is the widest landing pose; even its corners must avoid near clipping.
+      mesh.scale.set(1.12, 1 / 1.12, 1.12);
+      world.root.updateMatrixWorld(true);
+      const fov = viewport.width / viewport.height < 1 ? 55 : CAMERA.fov;
+      const plan = bookArrivalPlan(transform.position, teacher, { ...viewport, fov });
+      const camera = new THREE.PerspectiveCamera(fov, viewport.width / viewport.height, plan.landNear, 200);
+      camera.position.copy(plan.position);
+      camera.lookAt(plan.target);
+      camera.updateMatrixWorld(true);
+      mesh.geometry.computeBoundingBox();
+      const bounds = mesh.geometry.boundingBox!;
+      for (const x of [bounds.min.x, bounds.max.x])
+        for (const y of [bounds.min.y, bounds.max.y])
+          for (const z of [bounds.min.z, bounds.max.z]) {
+            const point = new THREE.Vector3(x, y, z).applyMatrix4(mesh.matrixWorld).project(camera);
+            assert.ok(point.z > -1 && point.z < 1, `clipped landing corner at ${viewport.width}px, slot ${b.shelfIndex}`);
+          }
+      const point = transform.position.clone().project(camera);
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(point.x, point.y), camera);
+      const hits = ray.intersectObject(world.root, true).filter((hit) => {
+        for (let node: THREE.Object3D | null = hit.object; node; node = node.parent) if (!node.visible) return false;
+        // Perspective near clipping is an axial plane, not Raycaster's radial distance.
+        const depth = -hit.point.clone().applyMatrix4(camera.matrixWorldInverse).z;
+        return depth >= camera.near && depth <= camera.far;
+      });
+      assert.equal(hits[0]?.object.name, mesh.name, `foreground obstruction at ${viewport.width}px slot ${b.shelfIndex}`);
+    }
 });

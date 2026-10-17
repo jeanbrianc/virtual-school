@@ -94,7 +94,8 @@ async function inspectBook(page: Page, id: string) {
     ray.setFromCamera(projected as unknown as import('three').Vector2, game.rig.camera);
     const hits = ray.intersectObject(game.world.root, true).filter((hit) => {
       for (let node: import('three').Object3D | null = hit.object; node; node = node.parent) if (!node.visible) return false;
-      return true;
+      const cameraDepth = -hit.point.clone().applyMatrix4(game.rig.camera.matrixWorldInverse).z;
+      return cameraDepth >= game.rig.camera.near && cameraDepth <= game.rig.camera.far;
     });
     ray.layers.mask = mask;
     return {
@@ -147,7 +148,7 @@ async function pausedImage(page: Page, info: TestInfo, label: string) {
 }
 
 test('destination book stays visible through third, grand and overflow arrivals across phone sizes', async ({ page, isMobile }, info) => {
-  await loadBookSample(page, 109);
+  await loadBookSample(page, 131);
   await enterSchool(page, 'sample');
   await ready(page);
   const saved = await savedReading(page);
@@ -163,12 +164,18 @@ test('destination book stays visible through third, grand and overflow arrivals 
     : [{ width: 1100, height: 720 }];
   for (const size of sizes) {
     await page.setViewportSize(size);
-    for (const slot of [25, 50, 100]) {
+    // Full geometry scans cover every slot; pixels sample each reported obstruction
+    // at 320px and the third-case boundary at every other required phone shape.
+    const slots = isMobile && size.width !== 320 ? [25] : [25, 38, 48, 53, 63, 100, 130];
+    for (const slot of slots) {
       const book = books.find((b) => b.shelfIndex === slot)!;
-      await page.evaluate(({ books, book }) => (window.__izzy!.game() as unknown as InspectGame).setShelfBooks(books.filter((b) => b.id !== book.id)), {
-        books,
-        book,
-      });
+      await page.evaluate(
+        ({ books, book }) => (window.__izzy!.game() as unknown as InspectGame).setShelfBooks(books.filter((b) => b.shelfIndex < book.shelfIndex)),
+        {
+          books,
+          book,
+        },
+      );
       await captureNextArrival(page);
       await page.evaluate((book) => {
         void (window.__izzy!.game() as unknown as InspectGame).celebrateBook(book);

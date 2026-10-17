@@ -293,7 +293,7 @@ export class Bookshelf {
     book: ShelfBook,
     from: THREE.Vector3,
     onLand: (at: THREE.Vector3) => void,
-    options: { signal?: AbortSignal; arcHeight?: number } = {},
+    options: { signal?: AbortSignal; flight?: { from: THREE.Vector3; arcHeight: number } } = {},
   ): Promise<void> {
     if (options.signal?.aborted) return;
     this.arrivals.get(book.id)?.();
@@ -303,13 +303,15 @@ export class Bookshelf {
     const glow = new THREE.PointLight('#ffd98a', 3, 2.5, 2);
     mesh.add(glow);
     const target = this.slotTransform(book.shelfIndex, book.id);
-    const start = from.clone();
+    // Game may update this path on viewport resize without restarting the completion.
+    const flight = options.flight ?? { from: from.clone(), arcHeight: 2.4 };
+    const start = flight.from;
     const end = target.position.clone();
     const front = end.clone().add(new THREE.Vector3(0, 0.05, 0.9));
     const ctrl = start
       .clone()
       .lerp(front, 0.5)
-      .add(new THREE.Vector3(0, options.arcHeight ?? 2.4, 0));
+      .add(new THREE.Vector3(0, flight.arcHeight, 0));
     const curve = new THREE.QuadraticBezierCurve3(start, ctrl, front);
     let cancelled = false;
     const settle = () => {
@@ -337,9 +339,20 @@ export class Bookshelf {
     try {
       mesh.position.copy(start);
       mesh.scale.setScalar(0.01);
-      await stage(0.45, (k) => mesh.scale.setScalar(0.01 + k * 1.6), ease.outBack);
+      await stage(
+        0.45,
+        (k) => {
+          mesh.position.copy(flight.from);
+          mesh.scale.setScalar(0.01 + k * 1.6);
+        },
+        ease.outBack,
+      );
       if (cancelled) return;
       await stage(1.6, (k) => {
+        ctrl
+          .copy(flight.from)
+          .lerp(front, 0.5)
+          .add(new THREE.Vector3(0, flight.arcHeight, 0));
         mesh.position.copy(curve.getPoint(k));
         mesh.rotation.set(Math.sin(k * Math.PI) * 0.6, k * Math.PI * 4, Math.sin(k * Math.PI * 2) * 0.3);
         mesh.scale.setScalar(1.6 - k * 0.6);
