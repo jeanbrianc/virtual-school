@@ -322,6 +322,7 @@ export class Bookshelf {
       this.setCount(this.books.size);
     };
     const cancel = () => {
+      if (cancelled) return;
       cancelled = true;
       settle();
       if (this.arrivals.get(book.id) === cancel) this.arrivals.delete(book.id);

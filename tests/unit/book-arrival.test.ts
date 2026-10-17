@@ -141,6 +141,23 @@ it('repeated arrival reuses a stable mesh and cancellation/reload stops stale mo
   assert.deepEqual(reload.root.getObjectByName(`book:${b.id}`)!.position, destination);
 });
 
+it('a later abort cannot overwrite the newer transform applied by setBooks', async () => {
+  const tweens = new Tweens();
+  const shelf = new Bookshelf(tweens, 'Sample');
+  const controller = new AbortController();
+  const old = book(25);
+  const flight = shelf.flyBookIn(old, teacher, () => {}, { signal: controller.signal });
+  await pump(tweens, 8);
+  const updated = { ...old, shelfIndex: 26 };
+  shelf.setBooks([updated]);
+  const expected = shelf.slotTransform(updated.shelfIndex, updated.id).position;
+  controller.abort();
+  assert.deepEqual(shelf.root.getObjectByName(`book:${old.id}`)!.position, expected);
+  await pump(tweens);
+  await flight;
+  assert.deepEqual(shelf.root.getObjectByName(`book:${old.id}`)!.position, expected);
+});
+
 it('overflow settles in the same rotated stack pose after flight, cancellation and reload', async () => {
   const tweens = new Tweens();
   const shelf = new Bookshelf(tweens, 'Sample');

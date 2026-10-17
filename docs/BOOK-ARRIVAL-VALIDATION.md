@@ -50,7 +50,7 @@ Run locally with:
     npm run test:e2e -- tests/e2e/book-arrival.spec.ts --project=desktop
     npm run test:e2e -- tests/e2e/book-arrival.spec.ts --project=phone
 
-The final local aggregate check passed all 249 tests, typecheck, lint and the
+The final local aggregate check passed all 250 tests, typecheck, lint and the
 production build. This environment has no Playwright-managed Chromium runtime;
 the installed system Chromium also fails before test execution on sandbox-denied
 Unix sockets. Local browser results are not represented as passes. Browser status and reviewed
