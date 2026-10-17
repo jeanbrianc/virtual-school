@@ -138,6 +138,8 @@ async function loadSample(page: Page, sound = false) {
       value: {
         getVoices: () => [],
         cancel() {},
+        addEventListener() {},
+        removeEventListener() {},
         speak() {
           throw new Error('Voice is unavailable in this synthetic test');
         },
@@ -282,6 +284,7 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
   expect((await records(page)).lessons).toHaveLength(1);
   await page.goto(`${APP}#/parent/curriculum/art.rhythm-copy`);
   await unlockParent(page);
+  await page.getByLabel('Viewing learner').selectOption('child_izzy');
   await expect(page.getByText(/Copied beat-and-pause intervals/).first()).toBeVisible();
   await screenshot(page, info, 'parent-copy-evidence');
   await page.goto(`${APP}#/`);
@@ -294,6 +297,7 @@ test('untimed recognition, hints, four beats chosen by parent, and existing teac
   await loadSample(page);
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
+  await page.getByLabel('Viewing learner').selectOption('child_izzy');
   await page.getByLabel('Beats per pattern for Sample', { exact: true }).selectOption('4');
   await page.getByRole('button', { name: 'Save music setting' }).click();
   await expect(page.getByText('Saved for the next music visit.')).toBeVisible();
@@ -366,6 +370,7 @@ test('audio fallback, mute mid-play, blur, skip, Escape, reload and focus restor
   expect((await records(page)).lessons).toHaveLength(0);
   await context.setOffline(false);
   await page.reload();
+  await waitForPlayable(page);
   await talkTo(page, 'milo');
   await page.getByRole('button', { name: 'Tap a rhythm', exact: true }).click();
   await page.getByTestId('rhythm-tap').focus();
