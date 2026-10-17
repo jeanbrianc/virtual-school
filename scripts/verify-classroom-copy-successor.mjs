@@ -1,4 +1,4 @@
-// One reviewed successor only. This never treats the baseline talk failures as passes.
+// A pinned validation successor. Recorded baseline failures never become passes.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -13,20 +13,54 @@ const save = (name, data) => {
   mkdirSync('test-results', { recursive: true });
   writeFileSync(`test-results/${name}.json`, JSON.stringify(data, null, 2));
 };
-// Diagnostic execution only. Baseline reuse still fails closed; this is not release acceptance.
-const focus = ['talk'];
+const focus = [
+  'seating',
+  'talk',
+  'safety-containment',
+  'helper-voice',
+  'hoot-mobile',
+  'story-conversations',
+  'voice',
+  'core-loop',
+  'combined-classroom-release',
+  'conversation-privacy-parent',
+  'delete-learning-records',
+  'circuit',
+  'sync',
+];
+const seatingScenarios = [
+  { scenario: 'inventory', title: 'all eleven seats have real reachable taps, framed personalized poses and safe stand exits' },
+  { scenario: 'cancellation', title: 'seating cancels cleanly for taps, keys, repeated approaches, switching, resize and room or child travel' },
+  { scenario: 'restyling', title: 'locked nook cannot be seated by ID; unlocking, relocking and avatar restyling clear reading safely' },
+];
+// Separate long seating scenarios without dropping, retrying, or renaming a test.
+assert.deepEqual(
+  [...git('show', 'HEAD:tests/e2e/seating.spec.ts').matchAll(/test\('([^']+)'/g)].map((m) => m[1]).sort(),
+  seatingScenarios.map((s) => s.title).sort(),
+  'Every authored seating scenario must have exactly one matrix slot per device',
+);
+const matrix = focus.flatMap((suite) =>
+  (suite === 'seating' ? seatingScenarios : [{ scenario: 'all', title: '' }]).flatMap((slot) =>
+    ['desktop', 'phone'].map((project) => ({ suite, project, ...slot })),
+  ),
+);
 const allowed = [
   'src/domain/types.ts',
   'src/ui/parent/pages/AvatarPage.tsx',
+  'src/ui/child/ChildMode.tsx',
+  'src/voice/SpeechService.ts',
   'tests/unit/conversation-privacy.test.ts',
+  'tests/unit/child-speech-probe.test.ts',
+  'tests/unit/speech-input-lifecycle.test.ts',
   'tests/e2e/conversation-privacy-parent.spec.ts',
   'tests/e2e/talk.spec.ts',
+  'tests/e2e/seating.spec.ts',
   '.github/workflows/all-classroom-release-browser.yml',
   '.github/workflows/seating-browser.yml',
   'scripts/verify-classroom-copy-successor.mjs',
 ];
 
-if (process.argv[2] === 'source') {
+if (process.argv[2] === 'source' || process.argv[2] === 'matrix') {
   const changed = git('diff', '--name-only', baseline.tree, 'HEAD').split('\n').filter(Boolean);
   assert(
     changed.every((file) => allowed.includes(file)),
@@ -35,12 +69,19 @@ if (process.argv[2] === 'source') {
   const runtime = {
     'src/domain/types.ts': ['6d49e1e1756ce0dfd092b88b54e5cd546fa0157a', '3f40e05769be6f2d9a886ab6da26e1a396e6eb61'],
     'src/ui/parent/pages/AvatarPage.tsx': ['9292f9439e9e25afb412bd9f1a6f3b3942570a79', '13e065706db4f32436fcc143c028110c7086e6f0'],
+    'src/voice/SpeechService.ts': ['f000b375843790ae48f4497b27e6f88d961db160', '25f49e5e7c62c7332cc0c15554f2dac573975786'],
+    'src/ui/child/ChildMode.tsx': ['bfb1a8baa0bba52a163e1f4235c0a9ae625a923e', 'd4323c926d2e6a495ff1edfee87401ccafb1e709'],
   };
   assert.deepEqual(changed.filter((file) => file.startsWith('src/')).sort(), Object.keys(runtime).sort());
   for (const [file, [before, after]] of Object.entries(runtime)) {
     assert.equal(git('rev-parse', `${baseline.tree}:${file}`), before, file);
-    assert.equal(git('rev-parse', `HEAD:${file}`), after, `Only the exact reviewed notice/comment bytes are allowed: ${file}`);
+    assert.equal(git('rev-parse', `HEAD:${file}`), after, `Only the exact independently reviewed runtime bytes are allowed: ${file}`);
   }
+  assert.equal(
+    git('rev-parse', 'HEAD:tests/e2e/seating.spec.ts'),
+    '8eef4c14867307bb5f6ae14ac6fcfc3e5f27f39a',
+    'Only the reviewed camera-convergence test fixture is allowed',
+  );
   const protectedPaths = [
     'src/engine',
     'src/ui/child',
@@ -53,15 +94,45 @@ if (process.argv[2] === 'source') {
     'src/domain/music',
     'scripts/ai-helper',
     'infra',
-    'tests/e2e/seating.spec.ts',
     'tests/e2e/combined-classroom-release.spec.ts',
   ];
   const sourceProof = protectedPaths.map((path) => {
     const before = git('rev-parse', `${baseline.tree}:${path}`),
       after = git('rev-parse', `HEAD:${path}`);
-    assert.equal(after, before, path);
-    return { path, before, after };
+    const reviewedChanges = Object.keys(runtime).filter((file) => file.startsWith(path + '/'));
+    if (!reviewedChanges.length) {
+      assert.equal(after, before, path);
+      return { path, before, after, byteIdenticalTree: true };
+    }
+    const files = (ref) =>
+      git('ls-tree', '-r', '--name-only', `${ref}:${path}`)
+        .split('\n')
+        .filter(Boolean)
+        .map((file) => `${path}/${file}`);
+    assert.deepEqual(files(baseline.tree), files('HEAD'), `Protected subtree inventory changed: ${path}`);
+    const unchanged = files('HEAD')
+      .filter((file) => !reviewedChanges.includes(file))
+      .map((file) => {
+        const oldBlob = git('rev-parse', `${baseline.tree}:${file}`),
+          newBlob = git('rev-parse', `HEAD:${file}`);
+        assert.equal(newBlob, oldBlob, file);
+        return { file, blob: newBlob };
+      });
+    return {
+      path,
+      before,
+      after,
+      byteIdenticalTree: false,
+      reviewedChanges: reviewedChanges.map((file) => ({ file, before: runtime[file][0], after: runtime[file][1] })),
+      unchanged,
+    };
   });
+  if (process.argv[2] === 'matrix') {
+    assert.equal(git('rev-parse', 'HEAD'), process.env.RELEASE_HEAD_SHA, 'Matrix must use the actual reviewed PR head');
+    if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(matrix)}\n`);
+    console.log(JSON.stringify({ head: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}'), matrix }));
+    process.exit(0);
+  }
   // Rebuild the exact baseline with the same locked dependencies and build tools.
   const oldRoot = mkdtempSync(join(dirname(process.cwd()), '.classroom-baseline-'));
   execFileSync('tar', ['-x', '-C', oldRoot], { input: execFileSync('git', ['archive', baseline.tree], { maxBuffer: 32 * 1024 * 1024 }) });
@@ -101,9 +172,12 @@ if (process.argv[2] === 'source') {
       const same = bytes[0].equals(bytes[1]);
       const sameCodeExceptAssetReferences = normalize(bytes[0].toString(), 0) === normalize(bytes[1].toString(), 1);
       const isNotice = old.meta.entryPoint === 'src/ui/parent/pages/AvatarPage.tsx';
-      assert(same || sameCodeExceptAssetReferences || isNotice, `Unrelated emitted code changed: ${old.file}`);
-      if (Object.keys(old.meta.inputs).some((p) => /src\/(engine|ui\/child|sync|data|services|audio|voice)\//.test(p)))
-        assert(same, `Protected executable module must remain byte-identical: ${old.file}`);
+      const reviewedSpeechModule = Object.keys(old.meta.inputs).some((file) =>
+        ['src/ui/child/ChildMode.tsx', 'src/voice/SpeechService.ts'].some((source) => file === source || file.endsWith('/' + source)),
+      );
+      assert(same || sameCodeExceptAssetReferences || isNotice || reviewedSpeechModule, `Unrelated emitted code changed: ${old.file}`);
+      if (!reviewedSpeechModule && Object.keys(old.meta.inputs).some((p) => /src\/(engine|ui\/child|sync|data|services|audio|voice)\//.test(p)))
+        assert(same || sameCodeExceptAssetReferences, `Protected executable code changed beyond known asset references: ${old.file}`);
       bundles.push({
         build: dir,
         entry: old.meta.entryPoint ?? null,
@@ -114,6 +188,7 @@ if (process.argv[2] === 'source') {
         byteIdentical: same,
         sameCodeExceptAssetReferences,
         reviewedNoticeModule: isNotice,
+        reviewedSpeechModule,
       });
     }
   }
@@ -125,10 +200,11 @@ if (process.argv[2] === 'source') {
     bundles,
     focusedSuites: focus,
     projects: ['desktop', 'phone'],
-    totalJobs: focus.length * 2,
+    totalJobs: matrix.length,
+    matrix,
   };
   save('successor-boundaries', proof);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `suites=${JSON.stringify(focus)}\n`);
+  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${JSON.stringify(matrix)}\n`);
   console.log(
     JSON.stringify({
       baseline,
@@ -159,7 +235,7 @@ if (process.argv[2] === 'source') {
     console.log(`Waiting for exact baseline ${baseline.run}: ${run.status}`);
     await new Promise((resolve) => setTimeout(resolve, 60_000));
   } while (true);
-  assert.equal(run.conclusion, 'failure', 'Only the two recorded talk failures are expected');
+  assert.equal(run.conclusion, 'failure', 'Only the three recorded talk/seating failures are expected');
   const jobs = (await api(`actions/runs/${baseline.run}/jobs?per_page=100`)).jobs;
   const suites = git('ls-tree', '--name-only', `${baseline.tree}:tests/e2e`)
     .split('\n')
@@ -170,6 +246,7 @@ if (process.argv[2] === 'source') {
   const expectedFailures = new Map([
     ['Combined / talk / desktop', 117501157665],
     ['Combined / talk / phone', 117501157723],
+    ['Combined / seating / desktop', 117501154239],
   ]);
   const passing = [];
   for (const suite of suites)
@@ -193,24 +270,27 @@ if (process.argv[2] === 'source') {
       }
     }
   assert.equal(jobs.find((j) => j.name === 'checks-and-matrix')?.conclusion, 'success');
-  assert.equal(passing.length, 64);
+  assert.equal(passing.length, 63);
   const artifacts = (await api(`actions/runs/${baseline.run}/artifacts?per_page=100`)).artifacts;
-  assert.equal(artifacts.length, 64);
-  for (const suite of suites.filter((s) => s !== 'talk'))
-    for (const project of ['desktop', 'phone'])
+  assert.equal(artifacts.length, 63);
+  for (const suite of suites)
+    for (const project of ['desktop', 'phone']) {
+      if (expectedFailures.has(`Combined / ${suite} / ${project}`)) continue;
       assert.equal(
         artifacts.filter((a) => a.name === `all-classroom-${suite}-${project}-${baseline.head}` && !a.expired && a.digest?.startsWith('sha256:')).length,
         1,
       );
+    }
   save('baseline-reuse', {
     baseline,
     successor: { head: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}') },
     runConclusion: run.conclusion,
     passingPairs: passing,
-    knownFailedTalkJobs: [...expectedFailures].map(([name, id]) => ({ name, id })),
+    knownFailedJobs: [...expectedFailures].map(([name, id]) => ({ name, id })),
     requiredSuccessorTalk: true,
+    requiredSuccessorSeating: true,
     jobs,
     artifacts,
   });
-  console.log('64 baseline pairs verified; two talk failures remain failures and require corrected successor execution.');
-} else throw new Error('Expected source or baseline verification mode');
+  console.log('63 baseline pairs verified; two talk failures and one desktop seating failure remain failures and require successor execution.');
+} else throw new Error('Expected matrix, source or baseline verification mode');

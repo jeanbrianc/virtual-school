@@ -12,18 +12,37 @@ concurrency:
   group: all-classroom-release-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: true
 jobs:
-  checks-and-matrix:
+  source-pin-and-matrix:
     if: github.head_ref == 'codex/all-implemented-classroom-release' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     outputs:
-      suites: ${{ steps.matrix.outputs.suites }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-          fetch-depth: 3
+          fetch-depth: 4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify exact source pins and enumerate every browser slot
+        id: matrix
+        run: node scripts/verify-classroom-copy-successor.mjs matrix
+        env:
+          RELEASE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+  checks-and-matrix:
+    if: github.head_ref == 'codex/all-implemented-classroom-release' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -34,8 +53,7 @@ jobs:
         run: npm run check
       - run: npm run build:lambda
       - run: node scripts/build.mjs --e2e
-      - name: Verify exact source/build boundaries and select the two talk diagnostics
-        id: matrix
+      - name: Verify exact reviewed source and emitted-module boundaries
         run: node scripts/verify-classroom-copy-successor.mjs source
       - name: Record source and emitted-module boundary proof
         uses: actions/upload-artifact@v4
@@ -52,11 +70,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-          fetch-depth: 3
+          fetch-depth: 4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Require 64 exact baseline passes and record the two known talk failures
+      - name: Require 63 exact baseline passes and record all three known failures
         run: node scripts/verify-classroom-copy-successor.mjs baseline
         env:
           GH_TOKEN: ${{ github.token }}
@@ -67,8 +85,8 @@ jobs:
           if-no-files-found: error
 
   browser:
-    needs: checks-and-matrix
-    name: Combined / ${{ matrix.suite }} / ${{ matrix.project }}
+    needs: source-pin-and-matrix
+    name: Combined / ${{ matrix.suite }} / ${{ matrix.project }}${{ matrix.scenario != 'all' && format(' / {0}', matrix.scenario) || '' }}
     runs-on: ubuntu-latest
     # Software-rendered seating captures need measured extra headroom, without relaxing assertions.
     timeout-minutes: ${{ matrix.suite == 'seating' && 55 || 45 }}
@@ -77,13 +95,14 @@ jobs:
       max-parallel: 16
       matrix:
         # Put both devices of the longest/highest-risk suites at the front of the queue.
-        suite: ${{ fromJSON(needs.checks-and-matrix.outputs.suites) }}
-        project: [desktop, phone]
+        include: ${{ fromJSON(needs.source-pin-and-matrix.outputs.matrix) }}
     env:
       CI: 'true'
       RELEASE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       RELEASE_SUITE: ${{ matrix.suite }}
       RELEASE_PROJECT: ${{ matrix.project }}
+      RELEASE_SCENARIO: ${{ matrix.scenario }}
+      RELEASE_TITLE: ${{ matrix.title }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,6 +123,8 @@ jobs:
             tree: git('rev-parse', 'HEAD^{tree}'),
             suite: process.env.RELEASE_SUITE,
             project: process.env.RELEASE_PROJECT,
+            scenario: process.env.RELEASE_SCENARIO,
+            title: process.env.RELEASE_TITLE,
             browser: 'chromium',
             device: process.env.RELEASE_PROJECT === 'phone' ? 'Pixel 7' : 'Desktop Chrome (1100x720)',
             config: 'playwright.release.config.ts',
@@ -125,17 +146,25 @@ jobs:
         timeout-minutes: 2
       - name: Prove this suite is selected on this actual device project
         run: |
-          npx playwright test --config=playwright.release.config.ts "tests/e2e/$RELEASE_SUITE.spec.ts" --project="$RELEASE_PROJECT" --list --reporter=json > test-results/collection.json
+          args=()
+          if [ -n "$RELEASE_TITLE" ]; then args=(--grep "$RELEASE_TITLE$"); fi
+          npx playwright test --config=playwright.release.config.ts "tests/e2e/$RELEASE_SUITE.spec.ts" --project="$RELEASE_PROJECT" "${args[@]}" --list --reporter=json > test-results/collection.json
           node --input-type=module <<'NODE'
           import { readFileSync } from 'node:fs';
           const report = JSON.parse(readFileSync('test-results/collection.json', 'utf8'));
-          const tests = (suites) => suites.flatMap((suite) => [...(suite.specs ?? []).flatMap((spec) => spec.tests ?? []), ...tests(suite.suites ?? [])]);
+          const tests = (suites) => suites.flatMap((suite) => [...(suite.specs ?? []).flatMap((spec) => (spec.tests ?? []).map((test) => ({ ...test, title: spec.title }))), ...tests(suite.suites ?? [])]);
           const selected = tests(report.suites ?? []);
           if (!selected.length || selected.some((test) => test.projectName !== process.env.RELEASE_PROJECT)) throw new Error('Missing or incorrect device collection');
+          if (process.env.RELEASE_SUITE === 'seating') {
+            if (!process.env.RELEASE_TITLE || selected.length !== 1 || selected[0].title !== process.env.RELEASE_TITLE) throw new Error('Seating slot must select its one exact authored scenario');
+          } else if (process.env.RELEASE_TITLE || process.env.RELEASE_SCENARIO !== 'all') throw new Error('Unexpected filtering of a non-seating suite');
           console.log(`${selected.length} tests collected for ${process.env.RELEASE_SUITE} on ${process.env.RELEASE_PROJECT}`);
           NODE
       - name: Run the synthetic combined-candidate browser suite
-        run: npx playwright test --config=playwright.release.config.ts "tests/e2e/$RELEASE_SUITE.spec.ts" --project="$RELEASE_PROJECT"
+        run: |
+          args=()
+          if [ -n "$RELEASE_TITLE" ]; then args=(--grep "$RELEASE_TITLE$"); fi
+          npx playwright test --config=playwright.release.config.ts "tests/e2e/$RELEASE_SUITE.spec.ts" --project="$RELEASE_PROJECT" "${args[@]}"
         timeout-minutes: ${{ matrix.suite == 'seating' && 45 || 35 }}
       - name: Reject missing execution, skipped tests, flaky results, or failures
         if: always()
@@ -158,7 +187,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: all-classroom-${{ matrix.suite }}-${{ matrix.project }}-${{ github.event.pull_request.head.sha }}
+          name: all-classroom-${{ matrix.suite }}-${{ matrix.project }}${{ matrix.scenario != 'all' && format('-{0}', matrix.scenario) || '' }}-${{ github.event.pull_request.head.sha }}
           path: |
             test-results/**/*.png
             test-results/**/*.json

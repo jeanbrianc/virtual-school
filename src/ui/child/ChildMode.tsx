@@ -74,7 +74,50 @@ import { TeacherActivityChooser } from './flows/TeacherActivityChooser';
 import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
 import { MIC_NEEDS_GROWNUP, MIC_NO_BROWSER_SUPPORT, type MicSetup, type TalkKit } from './Talk';
 import { useChildWorld, type ChildWorldData } from './useChildWorld';
-import type { TalkAvailability } from '../../voice/SpeechService';
+import type { TalkAvailability, TalkMode } from '../../voice/SpeechService';
+
+/** Mounted setup owns its completed answer while delayed database notifications catch up. */
+export function useChildSpeechProbe(talkMode: TalkMode) {
+  const { ctx, speechIn } = useServices();
+  const family = browserFamily(navigator.userAgent);
+  const probe = useLiveQuery(() => getSpeechProbe(ctx), [], ['meta']);
+  const probingRef = useRef(false);
+  const [probing, setProbing] = useState(false);
+  const [completed, setCompleted] = useState<{ family: string; answer: OnDeviceAnswer } | null>(null);
+  useEffect(() => {
+    // A marker left "pending" by an earlier page means asking crashed the tab: remember that.
+    if (probe?.answer === 'pending' && !probingRef.current && completed?.family !== family) void settleInterruptedProbe(ctx);
+  }, [ctx, probe, completed, family]);
+  const known: OnDeviceAnswer = probing ? 'unknown' : completed?.family === family ? completed.answer : knownOnDevice(probe, family);
+  const knownRef = useRef<OnDeviceAnswer>(known);
+  if (!probingRef.current) knownRef.current = known;
+  const modeRef = useRef(talkMode);
+  modeRef.current = talkMode;
+  const prepare = useCallback(async (): Promise<MicSetup> => {
+    probingRef.current = true;
+    setProbing(true);
+    setCompleted(null);
+    try {
+      let k = await runSpeechProbe(ctx, family, () => speechIn.probe());
+      if (k === 'downloadable' || k === 'downloading') {
+        await speechIn.install();
+        k = await runSpeechProbe(ctx, family, () => speechIn.probe());
+      }
+      knownRef.current = k;
+      setCompleted({ family, answer: k });
+      const state = speechIn.check(modeRef.current, k).state;
+      return state === 'ready' ? 'ready' : state === 'needs-download' || state === 'downloading' ? 'downloading' : 'unsupported';
+    } catch {
+      knownRef.current = 'unavailable';
+      setCompleted({ family, answer: 'unavailable' });
+      return 'unsupported';
+    } finally {
+      probingRef.current = false;
+      setProbing(false);
+    }
+  }, [ctx, family, speechIn]);
+  return { family, known, knownRef, modeRef, prepare };
+}
 
 type Overlay =
   | { kind: 'activities'; teacher: TeacherId; returnTo: { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number } }
@@ -196,19 +239,7 @@ export function ChildMode({ childId }: { childId: string }) {
   // setup (asks the browser about on-device listening behind a crash marker —
   // see domain/talk.ts — and downloads the voice pack if needed).
   const talkMode = household?.settings.talkMode ?? 'off';
-  const family = browserFamily(navigator.userAgent);
-  const probe = useLiveQuery(() => getSpeechProbe(ctx), [], ['meta']);
-  const probingRef = useRef(false);
-  const [probing, setProbing] = useState(false);
-  useEffect(() => {
-    // A marker left "pending" by an earlier page means asking crashed the tab: remember that.
-    if (probe?.answer === 'pending' && !probingRef.current) void settleInterruptedProbe(ctx);
-  }, [ctx, probe]);
-  const known: OnDeviceAnswer = probing ? 'unknown' : knownOnDevice(probe, family);
-  const knownRef = useRef<OnDeviceAnswer>(known);
-  if (!probingRef.current) knownRef.current = known;
-  const modeRef = useRef(talkMode);
-  modeRef.current = talkMode;
+  const { family, known, knownRef, modeRef, prepare } = useChildSpeechProbe(talkMode);
   const micState: TalkAvailability = services.speechIn.check(talkMode, known);
   const ai = household?.settings.teacherAi;
   const books = data?.records.books;
@@ -228,25 +259,6 @@ export function ChildMode({ childId }: { childId: string }) {
         : micState.state === 'unsupported'
           ? MIC_NEEDS_GROWNUP
           : null;
-    const prepare = async (): Promise<MicSetup> => {
-      probingRef.current = true;
-      setProbing(true);
-      try {
-        let k = await runSpeechProbe(ctx, family, () => speechIn.probe());
-        if (k === 'downloadable' || k === 'downloading') {
-          await speechIn.install();
-          k = await runSpeechProbe(ctx, family, () => speechIn.probe());
-        }
-        knownRef.current = k;
-        const state = speechIn.check(modeRef.current, k).state;
-        return state === 'ready' ? 'ready' : state === 'needs-download' || state === 'downloading' ? 'downloading' : 'unsupported';
-      } catch {
-        return 'unsupported';
-      } finally {
-        probingRef.current = false;
-        setProbing(false);
-      }
-    };
     return {
       mic:
         talkMode === 'off'
@@ -277,7 +289,7 @@ export function ChildMode({ childId }: { childId: string }) {
       autoSpeaks: speech.auto,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [micState.state, micState.onDevice, known, talkMode, family, ai?.enabled, ai?.endpoint, ai?.consentToSend, books, speech, services, ctx]);
+  }, [micState.state, micState.onDevice, known, talkMode, family, ai?.enabled, ai?.endpoint, ai?.consentToSend, books, speech, services, ctx, prepare]);
 
   // ── Discovery (first day) ───────────────────────────────────────────────
   useEffect(() => {

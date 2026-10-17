@@ -91,6 +91,42 @@ async function frames(page: Page, count = 6) {
     { timeout: 120_000 },
   );
 }
+/** A rendered frame budget alone does not prove the damped seated camera has settled. */
+async function settledFloorCamera(page: Page) {
+  type Sample = { frame: number; world: number[]; projection: number[] };
+  let previous: Sample | undefined;
+  let stableFrames = 0;
+  let samples = 0;
+  let maxDelta = Infinity;
+  await expect
+    .poll(
+      async () => {
+        const current = await page.evaluate(() => {
+          const g = window.__izzy!.game() as unknown as SeatingGame;
+          return {
+            frame: g.renderer.info.render.frame,
+            world: g.rig.camera.matrixWorld.toArray(),
+            projection: g.rig.camera.projectionMatrix.toArray(),
+          };
+        });
+        if (previous?.frame === current.frame) return false;
+        samples++;
+        maxDelta = previous
+          ? Math.max(
+              ...current.world.map((value, i) => Math.abs(value - previous!.world[i]!)),
+              ...current.projection.map((value, i) => Math.abs(value - previous!.projection[i]!)),
+            )
+          : Infinity;
+        stableFrames = maxDelta < 0.00001 ? stableFrames + 1 : 0;
+        previous = current;
+        return stableFrames >= 3;
+      },
+      { timeout: 180_000, message: 'Seated floor-pick camera must converge across three distinct rendered frames' },
+    )
+    .toBe(true);
+  return { samples, stableFrames, maxDelta, final: previous };
+}
+
 async function ready(page: Page) {
   await expect(page.getByTestId('child-mode')).toHaveClass(/\bready\b/, { timeout: 300_000 });
   await page.waitForFunction(
@@ -305,12 +341,17 @@ test('seating cancels cleanly for taps, keys, repeated approaches, switching, re
   await page.evaluate(() => (window.__izzy!.game() as unknown as SeatingGame).interactById('seat-nook-couch'));
   await expectSeated(page, couch);
 
-  // Find an honest empty-floor target in the current seated view, then tap it.
-  const point = await page.evaluate(() => {
+  // Find an honest empty-floor target in the settled seated view, then tap it.
+  // Fifteen updates can leave spotlight damping at 0.9889 and move the sole
+  // desktop candidate across a navigation boundary. Wait for convergence, not a sleep.
+  const convergence = await settledFloorCamera(page);
+  const scan = await page.evaluate(() => {
     const g = window.__izzy!.game() as unknown as SeatingGame;
     const canvas = document.querySelector('canvas.game-canvas')!;
     const b = canvas.getBoundingClientRect();
     const unreachable: { x: number; z: number; reason: string }[] = [];
+    const rejected: { nx: number; ny: number; x?: number; z?: number; reason: string }[] = [];
+    const diagnostics = { viewport: { x: b.x, y: b.y, width: b.width, height: b.height }, camera: g.rig.camera.matrixWorld.toArray(), rejected, unreachable };
     // Scan the actual view rather than assuming a tiny world-space patch is visible.
     for (const ny of [-0.4, -0.55, -0.7, -0.25, -0.1])
       for (const nx of [-0.6, 0.6, -0.4, 0.4, -0.8, 0.8, 0]) {
@@ -318,30 +359,42 @@ test('seating cancels cleanly for taps, keys, repeated approaches, switching, re
         const floor = g.interaction.pickFloor(p, g.rig.camera);
         const sx = b.left + ((nx + 1) * b.width) / 2;
         const sy = b.top + ((1 - ny) * b.height) / 2;
-        if (
-          !floor ||
-          floor.distanceTo(g.player.seated!.exit) < 0.6 ||
-          g.world.structure.collisions.blocked(floor.x, floor.z, 0.32) ||
-          g.interaction.pick(p, g.rig.camera) ||
-          document.elementFromPoint(sx, sy) !== canvas
-        )
+        const reason = !floor
+          ? 'no floor ray'
+          : floor.distanceTo(g.player.seated!.exit) < 0.6
+            ? 'too close to stand exit'
+            : g.world.structure.collisions.blocked(floor.x, floor.z, 0.32)
+              ? 'collision blocked'
+              : g.interaction.pick(p, g.rig.camera)
+                ? 'interactable hit'
+                : document.elementFromPoint(sx, sy) !== canvas
+                  ? 'canvas covered by UI'
+                  : null;
+        if (reason || !floor) {
+          rejected.push({ nx, ny, ...(floor ? { x: floor.x, z: floor.z } : {}), reason: reason ?? 'no floor ray' });
           continue;
+        }
         // Collision-clear floor can still be an isolated pocket behind furniture.
         // Require the ordinary navigation graph to reach this exact destination.
         const path = g.player.nav.findPath(g.player.seated!.exit, floor);
         const end = path?.at(-1);
         if (!end || Math.hypot(end.x - floor.x, end.z - floor.z) > 0.1) {
-          unreachable.push({ x: floor.x, z: floor.z, reason: !path ? 'no connected path' : 'path ends elsewhere' });
+          const reason = !path ? 'no connected path' : 'path ends elsewhere';
+          unreachable.push({ x: floor.x, z: floor.z, reason });
+          rejected.push({ nx, ny, x: floor.x, z: floor.z, reason });
           continue;
         }
-        return { x: sx, y: sy, floorX: floor.x, floorZ: floor.z, exit: g.player.seated!.exit.toArray(), path, unreachable };
+        return { point: { x: sx, y: sy, floorX: floor.x, floorZ: floor.z, exit: g.player.seated!.exit.toArray(), path, unreachable }, diagnostics };
       }
-    return null;
+    return { point: null, diagnostics };
   });
-  expect(point).not.toBeNull();
+  const point = scan.point;
+  const proof = { ...point, convergence, diagnostics: scan.diagnostics };
   const proofPath = info.outputPath('floor-target-navigation-proof.json');
-  writeFileSync(proofPath, JSON.stringify(point, null, 2));
+  writeFileSync(proofPath, JSON.stringify(proof, null, 2));
   await info.attach('floor-target-navigation-proof', { path: proofPath, contentType: 'application/json' });
+  if (!point) console.log('Synthetic floor-target diagnostics:', JSON.stringify(proof));
+  expect(point).not.toBeNull();
   if (isMobile) await page.touchscreen.tap(point!.x, point!.y);
   else await page.mouse.click(point!.x, point!.y);
   await expectStanding(page);

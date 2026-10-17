@@ -302,6 +302,7 @@ const ERRORS: Record<string, ListenError> = {
  */
 export class BrowserSpeechInput implements SpeechInput {
   private active: Recognition | null = null;
+  private listenGeneration = 0;
 
   constructor(private readonly win: Window | undefined = typeof window === 'undefined' ? undefined : window) {}
 
@@ -358,28 +359,48 @@ export class BrowserSpeechInput implements SpeechInput {
     const avail = this.check(mode, known);
     if (!Ctor || avail.state !== 'ready') return { result: null, error: 'unavailable' };
     this.stop();
-    // Listen to a real microphone when the default isn't one she can use (an iPhone's
-    // Continuity mic) or a parent picked one: the recognizer takes a track (Chrome 133+).
+    const generation = this.listenGeneration;
+    const current = () => generation === this.listenGeneration;
+    const aborted = (): ListenOutcome => ({ result: null, error: 'aborted' });
+    // Enumeration and microphone acquisition may finish after the UI stopped or
+    // replaced this listen. Only its current owner may start or retry recognition.
     const devices = this.win?.navigator?.mediaDevices ?? null;
-    const mic = typeof devices?.enumerateDevices === 'function' ? await resolveMicrophone(opts.microphone, devices) : null;
     let stream: MediaStream | null = null;
-    if (mic && devices) {
-      try {
-        stream = await openMicrophone(mic.deviceId, devices);
-      } catch {
-        stream = null; // fall back to the browser's own choice
-      }
-    }
-    const track = stream?.getAudioTracks()[0] ?? null;
     try {
+      const mic = typeof devices?.enumerateDevices === 'function' ? await resolveMicrophone(opts.microphone, devices) : null;
+      if (!current()) return aborted();
+      if (mic && devices) {
+        try {
+          stream = await openMicrophone(mic.deviceId, {
+            enumerateDevices: () => devices.enumerateDevices(),
+            getUserMedia: (constraints) => {
+              // openMicrophone may fall back after a delayed device error. A
+              // canceled request must not open another microphone during that retry.
+              if (!current()) return Promise.reject(Object.assign(new Error('Listening canceled'), { name: 'AbortError' }));
+              return devices.getUserMedia(constraints);
+            },
+          });
+        } catch {
+          stream = null; // fall back to the browser's own choice only while current
+        }
+      }
+      if (!current()) return aborted();
+      const track = stream?.getAudioTracks()[0] ?? null;
       let out = await this.run(Ctor, avail.onDevice, lang, opts, true, track);
       // Some builds reject phrase lists; try once more without them.
-      if (out.error === 'aborted' && out.retryWithoutPhrases) out = await this.run(Ctor, avail.onDevice, lang, opts, false, track);
+      if (out.error === 'aborted' && out.retryWithoutPhrases) {
+        if (!current()) return aborted();
+        out = await this.run(Ctor, avail.onDevice, lang, opts, false, track);
+      }
       // A recognizer that can't listen to a chosen microphone: use its default one.
-      if (track && out.trackRejected) out = await this.run(Ctor, avail.onDevice, lang, opts, true, null);
+      if (track && out.trackRejected) {
+        if (!current()) return aborted();
+        out = await this.run(Ctor, avail.onDevice, lang, opts, true, null);
+      }
       const { retryWithoutPhrases: _r, trackRejected: _t, ...result } = out;
       return result;
     } finally {
+      // Includes a stream delivered after cancellation, before recognition began.
       stream?.getTracks().forEach((t) => t.stop());
     }
   }
@@ -459,6 +480,9 @@ export class BrowserSpeechInput implements SpeechInput {
   }
 
   stop(): void {
+    this.listenGeneration++;
+    // Keep an already-running recognizer's final result delivery on normal Stop.
+    // The generation only invalidates pending starts and fallback attempts.
     this.active?.stop();
   }
 }
