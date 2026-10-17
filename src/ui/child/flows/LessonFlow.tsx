@@ -395,7 +395,7 @@ export function LessonFlow(props: LessonFlowProps) {
                     className="btn"
                     data-testid="pattern-return-matching"
                     onClick={() => {
-                      if (!active.current) return;
+                      if (!active.current || run !== runRef.current || run.isComplete) return;
                       startedAt.current = new Date().toISOString();
                       seed.current = hashString(startedAt.current + lesson.id);
                       transcript.current = [];

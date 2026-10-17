@@ -226,3 +226,19 @@ test('final answered challenge requires the completed save-and-matching action r
   assert.equal(h.saves.length, 1);
   assert.equal(h.tree.root.findByType(PatternProgressionStage).props.matching, true);
 });
+
+test('stale return-to-matching callback cannot replace a completed or replacement run', async (t) => {
+  const h = await harness(t);
+  await h.pick('challenge');
+  const staleReturn = h.tree.root.findByProps({ 'data-testid': 'pattern-return-matching' }).props.onClick;
+  await h.complete();
+  await act(async () => staleReturn());
+  assert.ok(h.choices().props.items.some((c: { id: string }) => c.id === 'match'));
+  assert.equal(h.saves.length, 0);
+  await h.pick('replay');
+  await h.answer();
+  await act(async () => staleReturn());
+  assert.equal(h.tree.root.findByProps({ className: 'lesson-progress' }).props['aria-label'], 'Round 2 of 4');
+  assert.equal(h.tree.root.findByType(PatternProgressionStage).props.matching, false);
+  assert.equal(h.saves.length, 1);
+});
