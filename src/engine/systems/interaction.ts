@@ -84,6 +84,7 @@ export class InteractionSystem {
   hovered: InteractableDef | null = null;
   private raycaster = new THREE.Raycaster();
   private time = 0;
+  private viewportHeight = 720;
   private fresh = new Set<string>();
 
   constructor(private readonly defs: InteractableDef[]) {
@@ -154,6 +155,11 @@ export class InteractionSystem {
     return this.defs.find((d) => d.id === id);
   }
 
+  /** A held touch may only commit the same currently available seat. */
+  canCommitSeatPress(def: InteractableDef): boolean {
+    return !!def.seat && def.enabled && this.byId(def.id) === def && !this.hiddenMarkers.has(def.id) && !!this.markers.get(def.id)?.sprite.visible;
+  }
+
   /** Nearest enabled interactable whose radius contains the player. */
   computeFocus(player: THREE.Vector3): InteractableDef | null {
     let best: InteractableDef | null = null;
@@ -170,6 +176,32 @@ export class InteractionSystem {
   }
 
   pick(ndc: THREE.Vector2, camera: THREE.Camera): InteractableDef | null {
+    // Seat bubbles get a 48 CSS-pixel target independent of phone resolution.
+    // Prefer the nearest visible bubble so adjacent classroom chairs stay distinct.
+    let nearest: InteractableDef | null = null;
+    let distance = Infinity;
+    const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
+    for (const d of this.defs) {
+      const marker = this.markers.get(d.id)?.sprite;
+      if (!d.seat || !d.enabled || !marker?.visible) continue;
+      const projected = marker.position.clone().project(camera);
+      if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1) continue;
+      const depth = -marker.position.clone().applyMatrix4(camera.matrixWorldInverse).z;
+      const spritePixels =
+        camera instanceof THREE.PerspectiveCamera
+          ? (marker.scale.x * this.viewportHeight) / (2 * Math.max(0.001, depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)))
+          : 66;
+      // iconTexture paints its circle eight texture pixels above the sprite center.
+      const circleY = projected.y + (((spritePixels * 8) / 192) * 2) / this.viewportHeight;
+      const pixels = (Math.hypot((projected.x - ndc.x) * aspect, circleY - ndc.y) * this.viewportHeight) / 2;
+      const paintedRadius = (spritePixels * 70) / 192;
+      // Six CSS pixels cover the painted stroke and normal finger imprecision.
+      if (pixels <= Math.max(24, paintedRadius) + 6 && pixels < distance) {
+        nearest = d;
+        distance = pixels;
+      }
+    }
+    if (nearest) return nearest;
     this.raycaster.setFromCamera(ndc, camera);
     const hits = this.raycaster.intersectObjects(this.proxies, false);
     for (const h of hits) {
@@ -191,7 +223,8 @@ export class InteractionSystem {
     this.dest.visible = true;
   }
 
-  update(dt: number, player: THREE.Vector3): void {
+  update(dt: number, player: THREE.Vector3, camera?: THREE.PerspectiveCamera, viewportHeight = 720): void {
+    this.viewportHeight = viewportHeight;
     this.time += dt;
     for (const d of this.defs) {
       const m = this.markers.get(d.id);
@@ -204,11 +237,17 @@ export class InteractionSystem {
       // marker nearby; discovered objects only when close.
       m.sprite.visible =
         !this.hiddenMarkers.has(d.id) && d.enabled && (isFocus || (fresh ? dist < 22 : d.kind === 'teacher' ? near : near && dist < d.radius + 2.5));
-      const bob = Math.sin(this.time * (fresh ? 3.4 : 2.6) + m.phase) * (fresh ? 0.16 : 0.1);
-      m.sprite.position.set(m.base.x, m.base.y + bob + (isFocus ? 0.15 : 0), m.base.z);
+      const bob = d.seat ? 0 : Math.sin(this.time * (fresh ? 3.4 : 2.6) + m.phase) * (fresh ? 0.16 : 0.1);
+      m.sprite.position.set(m.base.x, m.base.y + bob + (!d.seat && isFocus ? 0.15 : 0), m.base.z);
       const pulse = fresh ? 1 + Math.sin(this.time * 3 + m.phase) * 0.06 : 1;
-      const target = (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : fresh ? 1.3 * pulse : 1);
-      const s = m.sprite.scale.x + (target - m.sprite.scale.x) * Math.min(1, dt * 10);
+      // Seats are stable touch targets, not moving/focus-lifting decorations.
+      const target = d.seat ? 0.5 : (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : fresh ? 1.3 * pulse : 1);
+      let minimum = 0;
+      if (d.seat && camera) {
+        const depth = -m.sprite.position.clone().applyMatrix4(camera.matrixWorldInverse).z;
+        minimum = (66 * 2 * Math.max(0, depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / Math.max(1, viewportHeight);
+      }
+      const s = Math.max(minimum, m.sprite.scale.x + (target - m.sprite.scale.x) * Math.min(1, dt * 10));
       m.sprite.scale.setScalar(s);
       (m.sprite.material as THREE.SpriteMaterial).opacity = isFocus ? 1 : 0.85;
     }

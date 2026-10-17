@@ -1,4 +1,5 @@
 import { CHILD_SCOPED_TABLES } from '../data/schema';
+import type { WriteOp } from '../data/storage/types';
 import { DEFAULT_AVATAR } from '../domain/avatar';
 import { effectiveLevel } from '../domain/mastery/masteryEngine';
 import { generateReport } from '../domain/reports/reportGenerator';
@@ -201,9 +202,18 @@ export async function exportChildData(ctx: ServiceContext, childId: string): Pro
   return JSON.stringify({ exportedAt: nowIso(ctx), format: 'izzys-classroom/v1', child, ...tables }, null, 2);
 }
 
+/** Reset learning history and photos while keeping the profile and avatar appearance. */
 export async function deleteChildData(ctx: ServiceContext, childId: string): Promise<void> {
-  const ops = [];
-  for (const name of [...CHILD_SCOPED_TABLES, 'media' as const]) {
+  const ops: WriteOp[] = [];
+  const media = await ctx.repos.media.where('childId', childId);
+  const deletedMediaIds = new Set(media.map((row) => row.id));
+  for (const avatar of await ctx.repos.avatars.where('childId', childId)) {
+    if (avatar.inspirationMediaId && deletedMediaIds.has(avatar.inspirationMediaId)) {
+      const { inspirationMediaId: _removedPhoto, ...appearance } = avatar;
+      ops.push({ table: 'avatars', type: 'put', value: { ...appearance, updatedAt: nowIso(ctx) } });
+    }
+  }
+  for (const name of [...CHILD_SCOPED_TABLES.filter((table) => table !== 'avatars'), 'media' as const]) {
     const rows = (await ctx.repos.db.table<{ id: string; key?: string }>(name).where('childId', childId)) as { id: string }[];
     for (const row of rows) ops.push({ table: name, type: 'delete' as const, key: row.id });
   }

@@ -115,6 +115,8 @@ export interface Child {
   circuit?: { move: import('./play/circuit').DanceMoveId; name?: string }[];
   /** How many times she has done the whole circuit, 1 to 10. */
   circuitsDone?: number;
+  /** Deliberate parent choice. Music starts with two beats and never infers ability from timing. */
+  rhythmBeatCount?: 2 | 3 | 4;
   isDemo?: boolean;
 }
 
@@ -352,7 +354,7 @@ export interface ProblemAttemptRecord {
   prompt: string;
   responses: string[];
   scaffolds: string[];
-  outcome: 'independent' | 'supported' | 'not_yet' | 'skipped';
+  outcome: 'independent' | 'supported' | 'not_yet' | 'skipped' | 'model_only';
 }
 
 export interface LessonAttempt {

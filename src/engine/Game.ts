@@ -31,6 +31,7 @@ import { InteractionSystem } from './systems/interaction';
 import { PlayerController } from './systems/player';
 import { SchoolWorld } from './world/SchoolWorld';
 import type { ShelfBook } from './world/bookshelf';
+import { seatedCamera } from './world/seats';
 import type { InteractableDef } from './world/types';
 
 export interface FocusInfo {
@@ -44,6 +45,7 @@ export interface GameCallbacks {
   onFocus(info: FocusInfo | null): void;
   onInteract(id: string): void;
   onBack?(): void;
+  onSeated?(label: string | null): void;
   /** She landed on number n of the rug's dance circuit (her move has just started). */
   onStation?(n: number): void;
 }
@@ -118,14 +120,17 @@ export class Game {
   private input = new InputManager();
   private interaction: InteractionSystem;
   private player: PlayerController;
+  private pendingSeat: string | null = null;
+  private seatCamera: { yaw: number; pitch: number; distance: number } | null = null;
   private avatar: AvatarModel;
   private pets = new Map<PetId, PetModel>();
   private activePets: PetId[] = [];
   private sun: THREE.DirectionalLight;
   private resizeObserver: ResizeObserver;
   private disposed = false;
+  private renderSuspensions = new Set<symbol>();
   private lastFocusId: string | null = null;
-  private pointerDown: { x: number; y: number; moved: number; id: number; button: number } | null = null;
+  private pointerDown: { x: number; y: number; moved: number; id: number; button: number; seat: InteractableDef | null; seatAllowed: boolean } | null = null;
   private quality: GraphicsQuality;
   private maxFps = Number(new URLSearchParams(window.location.search).get('maxfps') ?? 0) || 0;
   private cinematicDepth = 0;
@@ -227,6 +232,22 @@ export class Game {
 
     const rect = opts.container.getBoundingClientRect();
     this.rig = new CameraRig(Math.max(1, rect.width) / Math.max(1, rect.height), this.tweens);
+    this.player.onSeatChange = (seat) => {
+      if (seat) {
+        this.seatCamera ??= { yaw: this.rig.yaw, pitch: this.rig.pitch, distance: this.rig.distance };
+        Object.assign(this.rig, seatedCamera(seat));
+        this.rig.spotlight = true;
+        const def = this.world.interactables.find((d) => d.seat === seat);
+        for (const item of this.world.interactables) if (item.seat) this.interaction.hideMarker(item.id, item.seat === seat);
+        this.opts.callbacks.onSeated?.(seat.reading ? 'Reading on the garden couch' : (def?.label.replace(/^Sit /, 'Sitting ') ?? 'Sitting'));
+      } else {
+        if (this.seatCamera) Object.assign(this.rig, this.seatCamera);
+        this.seatCamera = null;
+        for (const item of this.world.interactables) if (item.seat) this.interaction.hideMarker(item.id, false);
+        this.rig.spotlight = false;
+        this.opts.callbacks.onSeated?.(null);
+      }
+    };
     this.setupComposer();
     this.resize();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -285,15 +306,27 @@ export class Game {
 
   private attachPointer(canvas: HTMLCanvasElement) {
     canvas.addEventListener('pointerdown', (e) => {
+      if (this.pointerDown?.seat && this.pointerDown.id !== e.pointerId) return;
       this.opts.audio.unlock();
       canvas.focus({ preventScroll: true });
-      this.pointerDown = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId, button: e.button };
+      const seatAllowed = this.input.enabled && this.cinematicDepth === 0 && !this.disposed;
+      const target = seatAllowed ? this.interaction.pick(this.ndc(e), this.rig.camera) : null;
+      this.pointerDown = {
+        x: e.clientX,
+        y: e.clientY,
+        moved: 0,
+        id: e.pointerId,
+        button: e.button,
+        seat: target && this.interaction.canCommitSeatPress(target) ? target : null,
+        seatAllowed,
+      };
     });
     canvas.addEventListener('pointermove', (e) => {
       if (this.pointerDown && e.pointerId === this.pointerDown.id) {
         const dx = e.clientX - this.pointerDown.x;
         const dy = e.clientY - this.pointerDown.y;
         this.pointerDown.moved += Math.abs(dx) + Math.abs(dy);
+        if (this.pointerDown.moved > INTERACTION.clickDragThreshold) this.pointerDown.seat = null;
         if (this.pointerDown.moved > INTERACTION.clickDragThreshold && !this.rig.inCinematic) {
           this.rig.orbit(-dx * CAMERA.dragSensitivity, dy * CAMERA.dragSensitivity * 0.6);
         }
@@ -309,17 +342,26 @@ export class Game {
     });
     const up = (e: PointerEvent) => {
       const down = this.pointerDown;
+      if (down?.seat && down.id !== e.pointerId) return;
       this.pointerDown = null;
       if (!down || down.moved > INTERACTION.clickDragThreshold || !this.input.enabled || this.cinematicDepth > 0) return;
+      // Keep the furniture the finger actually pressed, even if the camera settles
+      // during a slow touch. A replaced, disabled or cancelled target cannot commit.
+      if (down.seat && (this.disposed || !this.interaction.canCommitSeatPress(down.seat))) return;
+      const ndc = this.ndc(e);
+      if (!down.seatAllowed && this.interaction.pick(ndc, this.rig.camera)?.seat) return;
       this.input.lastDevice = 'pointer';
-      this.handleTap(this.ndc(e));
+      this.handleTap(ndc, down.seat);
     };
     canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', () => (this.pointerDown = null));
+    canvas.addEventListener('pointercancel', (e) => {
+      if (!this.pointerDown?.seat || this.pointerDown.id === e.pointerId) this.pointerDown = null;
+    });
     canvas.addEventListener(
       'wheel',
       (e) => {
         e.preventDefault();
+        if (e.deltaY && this.pointerDown?.seat) this.pointerDown = null;
         if (!this.rig.inCinematic) this.rig.zoom(e.deltaY * CAMERA.wheelSensitivity);
       },
       { passive: false },
@@ -331,8 +373,9 @@ export class Game {
     return new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
   }
 
-  private handleTap(ndc: THREE.Vector2) {
-    const hit = this.interaction.pick(ndc, this.rig.camera);
+  private handleTap(ndc: THREE.Vector2, pressedSeat: InteractableDef | null = null) {
+    this.standUp();
+    const hit = pressedSeat ?? this.interaction.pick(ndc, this.rig.camera);
     const p = hit ? null : this.interaction.pickFloor(ndc, this.rig.camera);
     if (this.avatar.performing) {
       // Mid-move: remember the tap and go when she's done.
@@ -344,6 +387,7 @@ export class Game {
   }
 
   private walkToPoint(p: THREE.Vector3) {
+    this.standUp();
     const tile = this.world.danceMat.tileAt(p.x, p.z);
     if (tile !== null && tile === this.matTile) {
       // Tapping the number she's already on: do that move again.
@@ -361,6 +405,26 @@ export class Game {
 
   /** Walks to an interactable (if needed) and activates it. */
   goInteract(def: InteractableDef): void {
+    if (!def.enabled || this.disposed) return;
+    // Existing lesson proxies intentionally greet/walk to their teacher after blocking input.
+    if (def.seat && (!this.input.enabled || this.cinematicDepth > 0)) return;
+    this.standUp();
+    if (def.seat) {
+      this.pendingSeat = def.id;
+      const arrive = () => {
+        if (this.pendingSeat !== def.id || !def.enabled || !this.input.enabled || this.disposed) return;
+        this.pendingSeat = null;
+        this.walkGoal = null;
+        if (this.player.position.distanceTo(def.approach) > 0.45) return;
+        if (this.player.sit(def.seat!)) this.opts.audio.play(def.seat!.reading ? 'pageFlip' : 'pop');
+      };
+      if (this.player.position.distanceTo(def.approach) <= 0.45) arrive();
+      else if (this.player.walkTo(def.approach.x, def.approach.z, arrive)) {
+        this.walkGoal = { x: def.approach.x, z: def.approach.z };
+        this.interaction.showDestination(def.approach);
+      } else this.pendingSeat = null;
+      return;
+    }
     const dist = Math.hypot(def.position.x - this.player.position.x, def.position.z - this.player.position.z);
     const activate = () => {
       this.player.faceToward(def.position);
@@ -376,6 +440,7 @@ export class Game {
   }
 
   private activate(def: InteractableDef) {
+    if (this.pointerDown?.seat) this.pointerDown = null;
     this.opts.audio.play('pop');
     if (def.kind === 'teacher') {
       this.world.teachers.get(def.id as TeacherId)?.greet();
@@ -386,8 +451,25 @@ export class Game {
   }
 
   interactById(id: string): void {
+    if (id === 'stand-up') {
+      this.standUp();
+      return;
+    }
     const def = this.interaction.byId(id);
     if (def) this.goInteract(def);
+  }
+
+  /** Ends active and pending seating before any competing movement or activity. */
+  standUp(): void {
+    if (this.pointerDown?.seat) this.pointerDown = null;
+    this.afterMove = null;
+    if (this.pendingSeat) this.player.stop();
+    this.pendingSeat = null;
+    this.player.stand();
+  }
+
+  get seated(): boolean {
+    return this.player.seated !== null;
   }
 
   private frame() {
@@ -409,13 +491,17 @@ export class Game {
     // Cinematics follow wall-clock time even when frames are slow.
     this.tweens.update(Math.min(0.5, realDt));
     const intents = this.input.poll();
+    // Deliberate camera gestures end a held seat press; passive settling does not.
+    if ((intents.cameraYaw || intents.cameraZoom) && this.pointerDown?.seat) this.pointerDown = null;
     if (!this.rig.inCinematic) {
       this.rig.orbit(intents.cameraYaw * CAMERA.keyOrbitSpeed * dt, 0);
       if (intents.cameraZoom) this.rig.zoom(intents.cameraZoom * dt * 6);
     }
     let move: { x: number; z: number } | null = null;
     const performing = this.avatar.performing;
+    if (intents.moveX || intents.moveY) this.standUp();
     if (this.input.enabled && this.cinematicDepth === 0 && !performing && (intents.moveX || intents.moveY)) {
+      this.standUp();
       const { forward, right } = this.rig.moveBasis();
       const v = forward.multiplyScalar(intents.moveY).add(right.multiplyScalar(intents.moveX));
       move = { x: v.x, z: v.z };
@@ -429,21 +515,29 @@ export class Game {
     }
 
     // Focus + interaction.
-    const focus = this.input.enabled && this.cinematicDepth === 0 ? this.interaction.computeFocus(this.player.position) : null;
-    this.interaction.focused = focus;
+    const nearby = this.input.enabled && this.cinematicDepth === 0 ? this.interaction.computeFocus(this.player.position) : null;
+    const focus: FocusInfo | null = this.seated ? { id: 'stand-up', label: 'Stand up', icon: '🚶', kind: 'seat' } : nearby;
+    this.interaction.focused = this.seated ? null : nearby;
     if ((focus?.id ?? null) !== this.lastFocusId) {
       this.lastFocusId = focus?.id ?? null;
       this.opts.callbacks.onFocus(focus ? { id: focus.id, label: focus.label, icon: focus.icon, kind: focus.kind } : null);
       if (focus) this.opts.audio.play('hover', { volume: 1.2 });
     }
     if (this.input.consumeInteract() && this.cinematicDepth === 0 && !this.avatar.performing) {
-      if (focus) this.activate(focus);
+      if (this.seated) this.standUp();
+      else if (nearby?.seat) this.goInteract(nearby);
+      else if (nearby) this.activate(nearby);
       // Space / A on a number: that move again.
       else if (this.input.enabled && this.matTile !== null) this.station(this.matTile);
     }
-    if (this.input.consumeBack()) this.opts.callbacks.onBack?.();
+    if (this.input.consumeBack()) {
+      if (this.pointerDown?.seat) this.pointerDown = null;
+      this.afterMove = null;
+      if (this.seated || this.pendingSeat) this.standUp();
+      else this.opts.callbacks.onBack?.();
+    }
 
-    this.interaction.update(dt, this.player.position);
+    this.interaction.update(dt, this.player.position, this.rig.camera, this.opts.container.clientHeight);
     this.world.update(dt, this.player.position);
     let slot = 0;
     for (const id of this.activePets) this.pets.get(id)?.update(dt, this.player.position, this.player.yaw, slot++);
@@ -451,8 +545,23 @@ export class Game {
     this.rig.update(dt, this.player.position);
     this.world.structure.updateCutaways(this.rig.forward, dt, this.player.position);
 
+    this.drawFrame(dt);
+  }
+
+  private drawFrame(dt: number): void {
+    if (this.renderSuspensions.size) return;
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.rig.camera);
+  }
+
+  /** A DOM-only activity can own a draw pause without stopping world/camera updates. */
+  suspendRendering(): () => void {
+    const owner = Symbol('render-suspension');
+    this.renderSuspensions.add(owner);
+    // A lease restores the prior state and is safe under repeated effect cleanup.
+    return () => {
+      this.renderSuspensions.delete(owner);
+    };
   }
 
   // ─── Dance circuit ──────────────────────────────────────────────────────
@@ -487,6 +596,7 @@ export class Game {
    * Resolves when she's standing again.
    */
   performMove(move: DanceMoveId, at?: THREE.Vector3): Promise<void> {
+    this.standUp();
     this.player.stop();
     this.walkGoal = null;
     if (at) this.player.settleAt(at.x, at.z);
@@ -553,11 +663,13 @@ export class Game {
 
   /** Puts her straight onto rug number n (tests and demos); the number reacts next frame. */
   stepOn(n: number): void {
+    this.standUp();
     const c = this.world.danceMat.center(n);
     this.player.teleport(c.x, c.z);
   }
 
   resize(): void {
+    this.standUp();
     const { clientWidth: w, clientHeight: h } = this.opts.container;
     if (w === 0 || h === 0) return;
     this.renderer.setSize(w, h, false);
@@ -588,8 +700,11 @@ export class Game {
   // ─── Public API ──────────────────────────────────────────────────────────
 
   async applyWorld(state: WorldState, books: ShelfBook[], animate = false): Promise<void> {
-    await this.world.apply(state, books, animate);
     this.world.setInteractableEnabled('nook', !state.readingNookOpen);
+    if (!state.readingNookOpen && (this.player.seated?.requiresNook || this.pendingSeat?.startsWith('seat-nook-'))) this.standUp();
+    for (const def of this.world.interactables) if (def.seat?.requiresNook) def.enabled = state.readingNookOpen;
+    if (!state.readingNookOpen && this.player.position.x < LAYOUT.nook.maxX) this.teleport(LAYOUT.nook.maxX + 1.2, LAYOUT.nook.doorZ);
+    await this.world.apply(state, books, animate);
     // The nature table only exists once it has been earned.
     this.world.setInteractableEnabled('nature', state.natureTable);
     this.syncPets(state.pets as PetId[]);
@@ -626,12 +741,16 @@ export class Game {
   }
 
   setAvatar(cfg: AvatarConfig): void {
+    this.standUp();
     this.avatar.setConfig(cfg);
   }
 
   setInputEnabled(enabled: boolean): void {
     this.input.enabled = enabled;
-    if (!enabled) this.player.stop();
+    if (!enabled) {
+      this.standUp();
+      this.player.stop();
+    }
   }
 
   get inputDevice(): InputManager['lastDevice'] {
@@ -640,6 +759,7 @@ export class Game {
 
   /** Frames a teacher and Izzy for a conversation. */
   async focusTeacher(id: TeacherId): Promise<void> {
+    this.standUp();
     this.cancelBookArrival();
     if (this.disposed) return;
     this.interaction.hideMarker(id, true);
@@ -660,6 +780,7 @@ export class Game {
   }
 
   async focusAlphabet(letter: string | null, found: string[] = []): Promise<void> {
+    this.standUp();
     this.cancelBookArrival();
     if (this.disposed) return;
     this.interaction.hideMarker('alphabet', true);
@@ -681,6 +802,7 @@ export class Game {
   }
 
   async releaseCamera(): Promise<void> {
+    this.standUp();
     this.cancelBookArrival();
     if (this.disposed) return;
     this.interaction.hideMarker('alphabet', false);
@@ -724,6 +846,7 @@ export class Game {
   }
 
   async celebrateBook(book: ShelfBook): Promise<void> {
+    this.standUp();
     this.cancelBookArrival();
     if (this.disposed) return;
     const arrival = { book, controller: new AbortController(), plan: this.bookArrivalShot(book), phase: 'pan' as 'pan' | 'flight' | 'landed' };
@@ -760,6 +883,7 @@ export class Game {
 
   /** Shows newly unlocked rewards in the world with a camera visit. */
   async revealUnlocks(rewardIds: string[], state: WorldState, books: ShelfBook[], fallbackShot?: string): Promise<void> {
+    this.standUp();
     this.cancelBookArrival();
     if (this.disposed) return;
     this.cinematicDepth++;
@@ -823,11 +947,13 @@ export class Game {
   }
 
   teleport(x: number, z: number): void {
+    this.standUp();
     this.player.teleport(x, z);
     this.rig.snapTo(this.player.position);
   }
 
   teleportTo(interactId: string): void {
+    this.standUp();
     const def = this.interaction.byId(interactId);
     if (def) {
       this.player.teleport(def.approach.x, def.approach.z);
@@ -840,6 +966,7 @@ export class Game {
   }
 
   dispose(): void {
+    this.standUp();
     this.disposed = true;
     this.cancelBookArrival();
     this.renderer.setAnimationLoop(null);

@@ -52,13 +52,24 @@ import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
 import { GlobeFlow } from './flows/GlobeFlow';
 import { recordPractice } from '../../services/practiceService';
+import { routineSpeech } from './flows/routineSpeech';
+import { RoutineFlow } from './flows/RoutineFlow';
+import { recordRoutine } from '../../services/routineService';
+import { RhythmFlow } from './flows/RhythmFlow';
+import { recordRhythm } from '../../services/rhythmService';
 import { KeyboardFlow } from './flows/KeyboardFlow';
 import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
+import { WeatherFlow } from './flows/WeatherFlow';
+import { weatherSpeech } from '../../voice/weatherSpeech';
+import { recordWeatherLesson } from '../../services/weatherService';
 import { LessonFlow } from './flows/LessonFlow';
 import { BASE_TEN_ID } from '../../domain/lessons/baseTen';
 import { recordBaseTen } from '../../services/baseTenService';
 import { BaseTenFlow } from './flows/BaseTenFlow';
+import { ARITHMETIC_ID } from '../../domain/lessons/baseTenArithmetic';
+import { recordArithmetic } from '../../services/arithmeticService';
+import { ArithmeticFlow } from './flows/ArithmeticFlow';
 import { TeacherActivityChooser } from './flows/TeacherActivityChooser';
 import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
 import { MIC_NEEDS_GROWNUP, MIC_NO_BROWSER_SUPPORT, type MicSetup, type TalkKit } from './Talk';
@@ -69,6 +80,8 @@ type Overlay =
   | { kind: 'activities'; teacher: TeacherId; returnTo: { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number } }
   | { kind: 'globe' }
   | { kind: 'keyboard' }
+  | { kind: 'routine' }
+  | { kind: 'rhythm' }
   | { kind: 'hoot' }
   | { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number }
   | { kind: 'shelf' }
@@ -120,10 +133,12 @@ export function ChildMode({ childId }: { childId: string }) {
   const preview = useStore(appStore, (s) => s.preview);
   const host = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game | null>(null);
+  const suspendRhythmBackground = useCallback(() => gameRef.current?.suspendRendering() ?? (() => {}), []);
   const dataRef = useRef<ChildWorldData | null>(null);
   dataRef.current = data;
   const [ready, setReady] = useState(false);
   const [focus, setFocus] = useState<FocusInfo | null>(null);
+  const [seatedLabel, setSeatedLabel] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const overlayRef = useRef<Overlay>(null);
   overlayRef.current = overlay;
@@ -169,6 +184,11 @@ export function ChildMode({ childId }: { childId: string }) {
       },
     }),
     [services.speechOut, readAloud, naturalVoices],
+  );
+
+  const skySpeech = useMemo(
+    () => weatherSpeech(services.speechOut, readAloud, household?.settings.audio.muted ?? false, household?.settings.audio.voice ?? 1),
+    [services.speechOut, readAloud, household?.settings.audio.muted, household?.settings.audio.voice],
   );
 
   // ── Talking to teachers (speech-to-text + conversation) ─────────────────
@@ -431,11 +451,25 @@ export function ChildMode({ childId }: { childId: string }) {
       }
       const registeredTeacher = teacherForInteraction(id);
       const activity = registeredTeacher ? TEACHER_REGISTRY[registeredTeacher].activity : undefined;
+      if (activity?.kind === 'rhythm' && registeredTeacher) {
+        game.setInputEnabled(false);
+        void game.focusTeacher(registeredTeacher);
+        services.speechOut.cancel();
+        setOverlay({ kind: 'rhythm' });
+        return;
+      }
       if (activity?.kind === 'reading') {
         teacherForSpeech.current = 'hoot';
         game.setInputEnabled(false);
         void game.focusTeacher('hoot');
         setOverlay({ kind: 'hoot' });
+        return;
+      }
+      if (registeredTeacher && activity?.kind === 'routine') {
+        teacherForSpeech.current = registeredTeacher;
+        game.setInputEnabled(false);
+        void game.focusTeacher(registeredTeacher);
+        setOverlay({ kind: 'routine' });
         return;
       }
       if (registeredTeacher && activity?.kind === 'lesson') {
@@ -535,11 +569,12 @@ export function ChildMode({ childId }: { childId: string }) {
       childName: data.child.name,
       callbacks: {
         onFocus: (f) => setFocus(f),
+        onSeated: setSeatedLabel,
         onInteract: (id) => void handleInteract(id),
         onStation: (n) => stationRef.current(n),
         onBack: () => {
           const o = overlayRef.current;
-          if (o && o.kind !== 'celebrate' && o.kind !== 'hoot' && o.kind !== 'lesson' && o.kind !== 'keyboard') setOverlay(null);
+          if (o && o.kind !== 'celebrate' && o.kind !== 'hoot' && o.kind !== 'lesson' && o.kind !== 'keyboard' && o.kind !== 'routine') setOverlay(null);
         },
       },
     }).then(async (game) => {
@@ -986,10 +1021,13 @@ export function ChildMode({ childId }: { childId: string }) {
             </div>
           )}
 
+          <span className="sr-only" role="status" aria-live="polite">
+            {seatedLabel ?? ''}
+          </span>
           {focus && !overlay && !busy && (
             <button
               type="button"
-              className={`interact-prompt ${focusIsNew ? 'fresh' : ''}`}
+              className={`interact-prompt ${focusIsNew ? 'fresh' : ''} ${focus.kind === 'seat' ? 'seat-prompt' : ''}`}
               onClick={() => gameRef.current?.interactById(focus.id)}
               data-testid="interact-prompt"
             >
@@ -1005,6 +1043,33 @@ export function ChildMode({ childId }: { childId: string }) {
 
           {overlay?.kind === 'activities' && (
             <TeacherActivityChooser teacher={overlay.teacher} speech={speech} onPick={chooseActivity} onClose={() => setOverlay(overlay.returnTo)} />
+          )}
+          {overlay?.kind === 'routine' && (
+            <RoutineFlow
+              key={childId}
+              childId={childId}
+              speech={routineSpeech(services.speechOut, { auto: readAloud, muted, volume: household?.settings.audio.voice ?? 1 })}
+              onClose={closeSheet}
+              onSave={async (run) => {
+                await recordRoutine(ctx, childId, run);
+                await reload();
+              }}
+            />
+          )}
+          {overlay?.kind === 'rhythm' && (
+            <RhythmFlow
+              key={childId}
+              childId={childId}
+              suspendBackground={suspendRhythmBackground}
+              {...(data.child.rhythmBeatCount ? { beats: data.child.rhythmBeatCount } : {})}
+              muted={muted}
+              volume={data.household.settings.audio.master * data.household.settings.audio.effects}
+              onClose={closeSheet}
+              onSave={async (run) => {
+                await recordRhythm(ctx, childId, run);
+                await reload();
+              }}
+            />
           )}
           {overlay?.kind === 'keyboard' && (
             <KeyboardFlow
@@ -1064,7 +1129,34 @@ export function ChildMode({ childId }: { childId: string }) {
               onChooseActivity={() => setOverlay({ kind: 'activities', teacher: 'digit', returnTo: overlay })}
             />
           )}
-          {overlay?.kind === 'lesson' && overlay.lessonId !== BASE_TEN_ID && (
+          {overlay?.kind === 'lesson' && overlay.lessonId === 'weather-pictures' && (
+            <WeatherFlow
+              key={`weather:${childId}`}
+              childId={childId}
+              speech={skySpeech}
+              onSave={async (run, startedAt) => {
+                await recordWeatherLesson(ctx, childId, run, startedAt, []);
+                await reload();
+              }}
+              onClose={closeSheet}
+              onChooseActivity={() => setOverlay({ kind: 'activities', teacher: 'nova', returnTo: overlay })}
+            />
+          )}
+          {overlay?.kind === 'lesson' && overlay.lessonId === ARITHMETIC_ID && (
+            <ArithmeticFlow
+              key={`${childId}:${overlay.lessonId}`}
+              childId={childId}
+              mastery={data.records.mastery}
+              parentPin={data.household.settings.parentPin}
+              onSave={async (progress) => {
+                await recordArithmetic(ctx, childId, progress);
+                await reload();
+              }}
+              onClose={closeSheet}
+              onChooseActivity={() => setOverlay({ kind: 'activities', teacher: 'digit', returnTo: overlay })}
+            />
+          )}
+          {overlay?.kind === 'lesson' && overlay.lessonId !== 'weather-pictures' && overlay.lessonId !== BASE_TEN_ID && overlay.lessonId !== ARITHMETIC_ID && (
             <LessonFlow
               key={`${overlay.teacher}:${overlay.lessonId}`}
               {...(teacherActivities(overlay.teacher).length > 1

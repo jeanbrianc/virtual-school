@@ -1,10 +1,12 @@
 import { expect, test } from 'playwright/test';
 import { APP, unlockParent } from './helpers';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
 
 test('school menu stays reachable on narrow phones and opens the parent studio', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
+  await useSyntheticHousehold(page);
   await page.goto(`${APP}#/`);
-  await page.getByTestId('enter-izzy').click();
+  await page.getByTestId('enter-sample').click();
   await expect(page.getByTestId('hud-grownups')).toBeVisible({ timeout: 300_000 });
   await page.getByTestId('discover-ok').click();
   for (const width of [320, 375, 412, 667]) {
@@ -22,8 +24,10 @@ test('school menu stays reachable on narrow phones and opens the parent studio',
   await page.setViewportSize({ width: 320, height: 740 });
   await page.getByTestId('hud-grownups').click();
   await unlockParent(page);
-  await expect(page.getByRole('heading', { name: /Today with Izzy/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Today with Sample/ })).toBeVisible();
   await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByRole('link', { name: 'Settings & privacy', exact: true }).click();
   await expect(page.getByTestId('sync-card')).toBeVisible();
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

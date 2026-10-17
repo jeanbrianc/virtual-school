@@ -1,6 +1,12 @@
 import type { DomainId } from '../curriculum/types';
 
-export type TeacherActivity = { kind: 'reading' } | { kind: 'lesson'; lessonId: string } | { kind: 'keyboard' } | { kind: 'globe' };
+export type TeacherActivity =
+  | { kind: 'reading' }
+  | { kind: 'lesson'; lessonId: string }
+  | { kind: 'keyboard' }
+  | { kind: 'globe' }
+  | { kind: 'routine' }
+  | { kind: 'rhythm' };
 
 export interface TeacherActivityChoice {
   /** Stable route key, never a label or user-supplied lesson ID. */
@@ -16,7 +22,7 @@ export interface TeacherRegistration {
   local: { questions: readonly string[]; shares: readonly string[]; likes: string; unclear: string };
   activity: TeacherActivity;
   activities: readonly TeacherActivityChoice[];
-  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox'; icon: string };
+  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox' | 'turtle' | 'otter'; icon: string };
   room: string;
   startLabel: string;
   completionIcon: string;
@@ -68,6 +74,13 @@ export const TEACHER_REGISTRY = {
         icon: '🔢',
         activity: { kind: 'lesson', lessonId: 'base-ten-mission' },
       },
+      {
+        id: 'base-ten-arithmetic',
+        label: 'Base-ten Workshop',
+        description: 'Optional grown-up choice: join or take away tens and ones.',
+        icon: '🧰',
+        activity: { kind: 'lesson', lessonId: 'base-ten-arithmetic' },
+      },
     ],
     scene: { x: 8.3, z: 4.4, model: 'robot', icon: '🤖' },
     room: 'the math corner, where you rescue moon rocks by counting, adding and sharing',
@@ -86,9 +99,16 @@ export const TEACHER_REGISTRY = {
         icon: '🎨',
         activity: { kind: 'lesson', lessonId: 'patterns-shapes' },
       },
+      {
+        id: 'pattern-progression',
+        label: 'Pattern playground',
+        description: 'Choose matching or AB, AAB, ABB and ABC patterns.',
+        icon: '🔷',
+        activity: { kind: 'lesson', lessonId: 'pattern-progression' },
+      },
     ],
     scene: { x: -3.6, z: 4.4, model: 'fox', icon: '🎨' },
-    room: 'the shape studio, where you copy and extend patterns and make a design',
+    room: 'the shape studio, where you match shapes, choose the next shape in a pattern and make a design',
     startLabel: 'Let’s make shapes!',
     completionIcon: '🎨',
     celebration: { icon: '🎨', anchor: 'pippa', message: 'Pippa enjoyed exploring shapes with you!' },
@@ -96,7 +116,31 @@ export const TEACHER_REGISTRY = {
       questions: ['A pattern repeats a little group of shapes. What shapes can you notice?', 'You can try a different shape and see how your design changes.'],
       shares: ['Tell me about the shapes you chose!', 'You can make a design in your own way.'],
       likes: 'You love {likes}? Let’s imagine a shape design about it!',
-      unclear: 'Shall we copy a shape pattern or make a design?',
+      unclear: 'Shall we match shapes, continue a pattern or make a design?',
+    },
+  },
+  tavi: {
+    domains: ['lifeSkills', 'reasoning'],
+    activity: { kind: 'routine' },
+    activities: [
+      {
+        id: 'everyday-sequencing',
+        label: 'What comes next?',
+        description: 'Arrange pretend picture steps in an order that works.',
+        icon: '🐢',
+        activity: { kind: 'routine' },
+      },
+    ],
+    scene: { x: 3.6, z: 5.8, model: 'turtle', icon: '🐢' },
+    room: 'the picture-steps corner, where fictional art and toy routines can have more than one valid order',
+    startLabel: 'Let’s try two pictures!',
+    completionIcon: '🐢',
+    celebration: { icon: '🐢', anchor: 'pippa', message: 'You explored some pretend picture steps with Tavi.' },
+    local: {
+      questions: ['Which picture needs to come first in our pretend task?', 'Sometimes two steps can happen in either order. Let’s look at the pictures.'],
+      shares: ['We can try your picture order and see if it works.', 'Take your time. You can ask for a hint or a smaller task.'],
+      likes: 'You like {likes}? We can imagine a pretend picture task together.',
+      unclear: 'Shall we arrange two pretend picture steps?',
     },
   },
   nova: {
@@ -126,6 +170,13 @@ export const TEACHER_REGISTRY = {
         icon: '🌱',
         activity: { kind: 'lesson', lessonId: 'life-cycle' },
       },
+      {
+        id: 'weather-pictures',
+        label: 'Sky picture detectives',
+        description: 'Match sky pictures and compare made-up weather charts.',
+        icon: '🌦️',
+        activity: { kind: 'lesson', lessonId: 'weather-pictures' },
+      },
       { id: 'globe', label: 'Globe adventure', description: 'Explore US states or world countries.', icon: '🌎', activity: { kind: 'globe' } },
     ],
     scene: { x: 8.2, z: -5.4, model: 'panda', icon: '🔬' },
@@ -133,6 +184,30 @@ export const TEACHER_REGISTRY = {
     startLabel: 'Let’s investigate!',
     completionIcon: '💧',
     celebration: { icon: '🔬', anchor: 'aquarium', message: 'Nova added a new fish friend to the aquarium to thank you!' },
+  },
+  milo: {
+    domains: ['creativity'],
+    activity: { kind: 'rhythm' },
+    activities: [
+      {
+        id: 'rhythm-garden',
+        label: 'Beats and little pauses',
+        description: 'Copy gentle beats or match pictures without timing.',
+        icon: '🥁',
+        activity: { kind: 'rhythm' },
+      },
+    ],
+    scene: { x: -4.8, z: -6.8, model: 'otter', icon: '🥁' },
+    room: 'the music garden, where you explore original beat-and-pause patterns at a comfortable pace',
+    startLabel: 'Explore a rhythm',
+    completionIcon: '🥁',
+    celebration: { icon: '🥁', anchor: 'pippa', message: 'You explored beats and pauses with Milo.' },
+    local: {
+      questions: ['A rhythm can have beats with short or long pauses. Shall we watch one?', 'We can explore a beat with pictures or taps.'],
+      shares: ['Every way of joining in is welcome.', 'Tell a grown-up about a sound you noticed.'],
+      likes: 'You like {likes}? You can imagine a gentle beat about it.',
+      unclear: 'We can watch a pattern, copy it, or choose matching pictures.',
+    },
   },
 } as const satisfies Record<string, TeacherRegistration>;
 export type TeacherId = keyof typeof TEACHER_REGISTRY;

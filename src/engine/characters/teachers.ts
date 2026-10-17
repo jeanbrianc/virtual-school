@@ -447,7 +447,71 @@ class Pippa extends BaseTeacher {
   }
 }
 
+class Tavi extends BaseTeacher {
+  id = 'tavi' as const;
+  headHeight = 1.75;
+  constructor(yaw: number) {
+    super(yaw);
+    const shell = mat('#356f6b'),
+      skin = mat('#a4d4cb'),
+      dark = mat('#233f42');
+    this.body.add(
+      sphere(0.48, shell, 0, 0.9, -0.08),
+      sphere(0.28, skin, 0, 1.52, 0.12),
+      sphere(0.04, dark, -0.1, 1.57, 0.36),
+      sphere(0.04, dark, 0.1, 1.57, 0.36),
+      sphere(0.16, skin, -0.24, 0.32, 0.1),
+      sphere(0.16, skin, 0.24, 0.32, 0.1),
+      sphere(0.13, skin, -0.48, 0.95, 0.1),
+      sphere(0.13, skin, 0.48, 0.95, 0.1),
+      rbox(0.52, 0.48, 0.08, 0.06, mat('#e9bb61'), 0, 0.95, 0.38),
+    );
+    for (let i = 0; i < 3; i++) this.body.add(rbox(0.11, 0.14, 0.02, 0.01, mat('#fffdf6'), -0.15 + i * 0.15, 0.96, 0.43));
+  }
+  update(dt: number, lookAt: THREE.Vector3 | null): void {
+    this.turnToward(dt, lookAt);
+  }
+}
+
+class Milo extends BaseTeacher {
+  id = 'milo' as const;
+  headHeight = 1.95;
+  constructor(yaw: number) {
+    super(yaw);
+    const fur = mat('#74618c'),
+      cream = mat('#fff1da'),
+      dark = mat('#302c3a'),
+      gold = mat('#f4cf75');
+    const torso = sphere(0.38, fur, 0, 0.94, 0);
+    torso.scale.y = 1.35;
+    const tail = sphere(0.23, fur, 0, 0.33, -0.38);
+    tail.scale.set(0.7, 0.7, 2.0);
+    this.body.add(
+      torso,
+      tail,
+      sphere(0.34, fur, 0, 1.66, 0),
+      sphere(0.13, fur, -0.3, 1.87, 0),
+      sphere(0.13, fur, 0.3, 1.87, 0),
+      sphere(0.22, cream, 0, 1.53, 0.23),
+      sphere(0.06, dark, 0, 1.61, 0.42),
+      sphere(0.04, dark, -0.13, 1.75, 0.29),
+      sphere(0.04, dark, 0.13, 1.75, 0.29),
+      sphere(0.13, fur, -0.2, 0.23, 0.13),
+      sphere(0.13, fur, 0.2, 0.23, 0.13),
+      sphere(0.13, fur, -0.37, 1.1, 0.24),
+      sphere(0.13, fur, 0.37, 1.1, 0.24),
+      cyl(0.3, 0.23, 0.34, gold, 0, 0.95, 0.4),
+      cyl(0.31, 0.31, 0.03, cream, 0, 1.13, 0.4),
+    );
+  }
+  update(dt: number, lookAt: THREE.Vector3 | null) {
+    this.turnToward(dt, lookAt);
+  }
+}
+
 const MODEL_FACTORIES: Record<TeacherRegistration['scene']['model'], (yaw: number) => TeacherModel> = {
+  turtle: (yaw) => new Tavi(yaw),
+  otter: (yaw) => new Milo(yaw),
   fox: (yaw) => new Pippa(yaw),
   owl: (yaw) => new Hoot(yaw),
   robot: (yaw) => new Digit(yaw),

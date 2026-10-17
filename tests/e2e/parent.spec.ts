@@ -4,26 +4,29 @@
  */
 import { expect, test } from 'playwright/test';
 import { APP, unlockParent } from './helpers';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
 
 test('log a learning moment, unlock the greenhouse, generate a family report', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
 
   // Start from the labeled sample history (a parent's explicit choice).
+  await useSyntheticHousehold(page);
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
   await page.getByTestId('load-sample').click();
   await page.getByTestId('confirm-reset').click();
   await expect(page.getByText('Sample data loaded')).toBeVisible();
+  await useSyntheticHousehold(page);
   await page.goto(`${APP}#/parent/today`);
-  await expect(page.getByRole('heading', { name: /Today with Izzy/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Today with Sample/ })).toBeVisible();
   await expect(page.getByText(/sample demo data/)).toBeVisible();
 
   // Natural-language entry from the Today composer.
   await page
     .getByTestId('today-composer')
     .fill(
-      'We planted bean seeds in cups and put one in the dark closet to compare. Izzy predicted the one in the dark would not grow and watered them herself.',
+      'We planted bean seeds in cups and put one in the dark closet to compare. Sample predicted the one in the dark would not grow and watered them herself.',
     );
   await page.getByTestId('today-interpret').click();
   await expect(page.getByTestId('review')).toBeVisible();
@@ -64,3 +67,5 @@ test('log a learning moment, unlock the greenhouse, generate a family report', a
   }
   expect(errors, errors.join('\n')).toEqual([]);
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

@@ -1,0 +1,152 @@
+/* The legacy Shape Studio has a teacher-wide two-column grid. This optional
+   playground owns a single-column layout so no choice is clipped on phones. */
+.dialogue[data-teacher='pippa'] .lesson-play[data-pattern-lab='true'] {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+.dialogue[data-teacher='pippa'] .lesson-play[data-pattern-lab='true'] > * {
+  min-width: 0;
+}
+.pattern-levels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.pattern-level,
+.pattern-playground-choice {
+  border: 3px solid #c6d6d3;
+  background: #fffdf7;
+  color: #26304f;
+  border-radius: 18px;
+  min-height: 104px;
+  padding: 12px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+.pattern-level {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.pattern-level-pictures {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.pattern-level-pictures .shape-picture {
+  width: 30px;
+  height: 30px;
+}
+.pattern-playground-stage {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+}
+.pattern-little-group {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px;
+  border: 2px dashed #9baba9;
+  border-radius: 14px;
+  background: #fffdf7;
+}
+.pattern-token,
+.pattern-token .shape-picture,
+.pattern-worked-model .shape-picture {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+.pattern-gap {
+  text-align: center;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 48px;
+}
+.pattern-playground-choices {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+.pattern-playground-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  max-width: 170px;
+  min-width: 0;
+  min-height: 120px;
+  gap: 8px;
+  padding: 10px 4px;
+}
+.pattern-playground-choice .shape-picture {
+  width: 64px;
+  height: 64px;
+}
+.pattern-playground-choice.pattern-selected {
+  border-color: #188462;
+  background: #e4f7e9;
+}
+.pattern-playground-choice.pattern-supported {
+  border-style: dashed;
+  border-color: #7466b2;
+}
+.pattern-level:focus-visible,
+.pattern-playground-choice:focus-visible,
+.pattern-controls button:focus-visible {
+  outline: 4px solid #3448ac;
+  outline-offset: 3px;
+}
+.pattern-playground-choice:disabled {
+  cursor: default;
+}
+.pattern-worked-model {
+  background: #f4f0ff;
+  border: 2px solid #9c8dcc;
+  border-radius: 18px;
+  padding: 12px;
+  margin-top: 12px;
+  text-align: center;
+}
+.pattern-worked-model .pattern-little-group {
+  width: fit-content;
+  margin: auto;
+}
+.pattern-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pattern-controls .btn,
+.pattern-next {
+  min-height: 48px;
+}
+.pattern-next {
+  display: block;
+  margin: 14px auto;
+}
+.pattern-ceiling {
+  max-width: 48ch;
+  margin: 14px auto;
+}
+@media (max-width: 520px) {
+  .pattern-levels {
+    grid-template-columns: 1fr;
+  }
+  .pattern-level {
+    min-height: 72px;
+  }
+  .pattern-playground-stage {
+    gap: 8px;
+  }
+}

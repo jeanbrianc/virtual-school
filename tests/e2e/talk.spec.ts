@@ -6,6 +6,7 @@
  */
 import { expect, test } from 'playwright/test';
 import { APP, dismissCelebrations, enterSchool, talkTo, unlockParent } from './helpers';
+import { captureSyntheticSuccess, useSyntheticHousehold } from './synthetic-household';
 
 declare global {
   interface Window {
@@ -55,16 +56,17 @@ test.beforeEach(async ({ page }) => {
     w.SpeechRecognition = FakeRecognition;
     w.webkitSpeechRecognition = FakeRecognition;
   });
+  await useSyntheticHousehold(page);
 });
 
-test('she tells Hoot about a book out loud and it goes on her shelf', async ({ page }) => {
+test('she tells Hoot about a book out loud and it goes on her shelf', async ({ page, isMobile }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click(); // "Meet Professor Hoot"
-  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Izzy', { timeout: 120_000 });
+  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Sample', { timeout: 120_000 });
 
   // Tap the microphone and talk. The first tap sets up on-device listening
   // (the simulated browser needs its voice pack downloaded first).
@@ -103,7 +105,8 @@ test('she tells Hoot about a book out loud and it goes on her shelf', async ({ p
   await page.getByRole('button', { name: 'I’ve talked with her' }).click();
   await expect(page.getByTestId('teacher-notes')).toHaveCount(0);
 
-  // Every word is visible to parents, with spoken lines marked.
+  // Saved transcript turns are visible to parents, with spoken lines marked.
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByTestId('nav-conversations').click();
   await page.locator('.convo-head').last().click();
   await expect(page.locator('.transcript')).toContainText('i read daddy the goodnight leelanau book');
@@ -121,3 +124,5 @@ test('she tells Hoot about a book out loud and it goes on her shelf', async ({ p
     errors.join('\n'),
   ).toEqual([]);
 });
+
+test.afterEach(async ({ page }, info) => captureSyntheticSuccess(page, info));

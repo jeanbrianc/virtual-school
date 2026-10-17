@@ -1,0 +1,48 @@
+name: Conversation privacy browser regressions
+on:
+  pull_request:
+    paths:
+      - 'src/ui/parent/pages/ConversationsPage.tsx'
+      - 'tests/unit/conversation-privacy.test.ts'
+      - 'tests/e2e/conversation-privacy-parent.spec.ts'
+      - 'tests/e2e/synthetic-household.ts'
+      - 'tests/e2e/helpers.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/conversation-privacy-browser.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
+permissions:
+  contents: read
+concurrency:
+  group: conversation-privacy-browser-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check Teacher talk on desktop and Pixel 7
+        run: npm run test:e2e -- tests/e2e/conversation-privacy-parent.spec.ts --project=${{ matrix.project }}
+      - name: Save synthetic screenshots and failure traces
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
+        uses: actions/upload-artifact@v4
+        with:
+          name: conversation-privacy-${{ matrix.project }}-${{ github.sha }}
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
+          retention-days: 7
+          if-no-files-found: warn

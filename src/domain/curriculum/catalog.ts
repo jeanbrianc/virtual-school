@@ -153,6 +153,31 @@ function defineSkills(input: Record<string, SkillInput>): Skill[] {
 }
 
 export const SKILLS: Skill[] = defineSkills({
+  'sci.weather-picture-match': {
+    strand: 'sci.earthSpace',
+    name: 'Weather picture-and-label matching',
+    can: 'match a schematic sky picture and label to the same pictured detail',
+    childName: 'Sky Picture Noticer',
+    difficulty: 0,
+    standards: [family('Picture-and-label matching only; not real weather observation, explanation, or prediction.')],
+    lessons: ['weather-pictures'],
+    idea: 'With a grown-up, describe the sky safely through a window.',
+  },
+  'sci.weather-chart-compare': {
+    strand: 'sci.earthSpace',
+    name: 'Fictional weather picture-chart comparison',
+    can: 'choose the repeated or more frequent symbol in a short fictional weather picture chart',
+    childName: 'Picture Chart Detective',
+    difficulty: 1,
+    standards: [
+      ngss(
+        'K-ESS2-1',
+        'Partial practice comparing media-based picture records with small whole-number counts; not local observation, forecasting, or full standard mastery.',
+      ),
+    ],
+    lessons: ['weather-pictures'],
+    idea: 'With a grown-up, make a real window-weather chart over several days and talk about the observations.',
+  },
   'sci.life-picture-match': {
     strand: 'sci.life',
     name: 'Life-cycle picture-and-label matching',
@@ -625,6 +650,36 @@ export const SKILLS: Skill[] = defineSkills({
     lessons: ['base-ten-mission'],
     idea: 'Bundle straws into tens. Build a number with bundles and loose straws, then explain how the digits match.',
   },
+  'math.add-100-no-regroup-answer': {
+    strand: 'math.baseTen',
+    name: 'Choose two-digit addition answers without regrouping (within 100)',
+    can: 'choose the sum of two two-digit numbers without regrouping, with base-ten operand representations',
+    childName: 'Join Tens and Ones',
+    difficulty: 3,
+    prereq: ['math.decompose-20-99', 'math.add-20'],
+    standards: [
+      family(
+        'Choose a two-digit arithmetic answer without regrouping, with base-ten operands. This narrow observation does not establish manipulation or algorithm mastery.',
+      ),
+    ],
+    lessons: ['base-ten-arithmetic'],
+    idea: 'Join two amounts using bundles of ten straws and loose ones. Ask the child to explain the joining. Answer choice alone does not show how they calculated.',
+  },
+  'math.subtract-100-no-regroup-answer': {
+    strand: 'math.baseTen',
+    name: 'Choose two-digit subtraction answers without regrouping (within 100)',
+    can: 'choose the difference of two two-digit numbers without regrouping, with base-ten operand representations',
+    childName: 'Take Away Tens and Ones',
+    difficulty: 3,
+    prereq: ['math.decompose-20-99', 'math.sub-10'],
+    standards: [
+      family(
+        'Choose a two-digit arithmetic answer without regrouping, with base-ten operands. This narrow observation does not establish manipulation or algorithm mastery.',
+      ),
+    ],
+    lessons: ['base-ten-arithmetic'],
+    idea: 'Build a starting amount, then take away whole tens and loose ones. Watch and record the child’s explanation separately from an app answer choice.',
+  },
   'math.place-value': {
     strand: 'math.baseTen',
     name: 'Tens and ones',
@@ -914,6 +969,46 @@ export const SKILLS: Skill[] = defineSkills({
     lessons: ['patterns-shapes'],
     idea: 'Make a circle-triangle pattern with paper shapes and choose what comes next.',
   },
+  'reason.pattern-continue-ab': {
+    strand: 'reason.logic',
+    name: 'Next-shape continuation of AB patterns',
+    can: 'choose one next shape in a pictured repeating AB pattern',
+    childName: 'AB Pattern Explorer',
+    difficulty: 0,
+    standards: [family('Choose one next shape in a repeating AB pattern with visible grouped repeats; does not assess copying or describing the rule.')],
+    lessons: ['pattern-progression'],
+    idea: 'Arrange paper shapes in a repeating AB group and choose one next shape.',
+  },
+  'reason.pattern-continue-aab': {
+    strand: 'reason.logic',
+    name: 'Next-shape continuation of AAB patterns',
+    can: 'choose one next shape in a pictured repeating AAB pattern',
+    childName: 'AAB Pattern Explorer',
+    difficulty: 1,
+    standards: [family('Choose one next shape in a repeating AAB pattern with visible grouped repeats; does not assess copying or describing the rule.')],
+    lessons: ['pattern-progression'],
+    idea: 'Arrange paper shapes in a repeating AAB group and choose one next shape.',
+  },
+  'reason.pattern-continue-abb': {
+    strand: 'reason.logic',
+    name: 'Next-shape continuation of ABB patterns',
+    can: 'choose one next shape in a pictured repeating ABB pattern',
+    childName: 'ABB Pattern Explorer',
+    difficulty: 1,
+    standards: [family('Choose one next shape in a repeating ABB pattern with visible grouped repeats; does not assess copying or describing the rule.')],
+    lessons: ['pattern-progression'],
+    idea: 'Arrange paper shapes in a repeating ABB group and choose one next shape.',
+  },
+  'reason.pattern-continue-abc': {
+    strand: 'reason.logic',
+    name: 'Next-shape continuation of ABC patterns',
+    can: 'choose one next shape in a pictured repeating ABC pattern',
+    childName: 'ABC Pattern Explorer',
+    difficulty: 1,
+    standards: [family('Choose one next shape in a repeating ABC pattern with visible grouped repeats; does not assess copying or describing the rule.')],
+    lessons: ['pattern-progression'],
+    idea: 'Arrange paper shapes in a repeating ABC group and choose one next shape.',
+  },
   'art.shape-design': {
     strand: 'create.art',
     name: 'Original shape design',
@@ -925,6 +1020,34 @@ export const SKILLS: Skill[] = defineSkills({
     idea: 'Arrange paper shapes freely and describe the design together.',
   },
   // ── Reasoning ───────────────────────────────────────────────────────────
+  'reason.routine-constraints': {
+    strand: 'reason.logic',
+    name: 'Fictional picture precedence',
+    can: 'arrange two to four picture cards within stated before-and-after constraints',
+    childName: 'Picture Steps',
+    difficulty: 0,
+    standards: [
+      family(
+        'Follow explicit precedence in a fictional picture task; independent steps may have multiple valid orders. Not evidence of reading, verbal explanation, or general sequencing mastery.',
+      ),
+    ],
+    lessons: ['everyday-sequencing'],
+    idea: 'Try a different pretend card order and discuss which steps can change places.',
+  },
+  'life.fictional-routine': {
+    strand: 'life.home',
+    name: 'Planning a fictional picture routine',
+    can: 'plan a short fictional art-box or toy-bag picture routine within stated constraints',
+    childName: 'Pretend Plans',
+    difficulty: 0,
+    standards: [
+      family(
+        'Order low-risk fictional picture actions. This does not assess actual household routines, independence in chores, cultural habits, self-care, or motor skill.',
+      ),
+    ],
+    lessons: ['everyday-sequencing'],
+    idea: 'Describe a pretend picture plan together without judging how anyone does things at home.',
+  },
   'reason.sequencing': {
     strand: 'reason.logic',
     name: 'Sequencing',
@@ -1047,6 +1170,34 @@ export const SKILLS: Skill[] = defineSkills({
     topics: ['art'],
     standards: [arts('VA:Cr2.1.1', 'Explore uses of materials and tools to create works of art or design.')],
     idea: 'Build a cardboard-box castle and decorate it.',
+  },
+  'art.rhythm-copy': {
+    strand: 'create.performing',
+    name: 'Copy a short beat-and-pause pattern',
+    can: 'copy two to four beat intervals at a comfortable pace',
+    childName: 'Beats and pauses',
+    difficulty: 0,
+    lessons: ['rhythm-garden'],
+    standards: [
+      family(
+        'Narrow music observation: copy a short original interval pattern with generous timing tolerance. Does not establish steady-beat, instrument, listening, or general music proficiency.',
+      ),
+    ],
+    idea: 'Take turns making gentle two-beat patterns with a comfortable short or long pause.',
+  },
+  'art.rhythm-recognize': {
+    strand: 'create.performing',
+    name: 'Match beat-and-pause pictures',
+    can: 'match a visual beat-and-pause pattern without timing',
+    childName: 'Pattern pictures',
+    difficulty: 0,
+    lessons: ['rhythm-garden'],
+    standards: [
+      family(
+        'Narrow visual recognition of beat-and-pause diagrams. Separate from timed rhythm reproduction, auditory discrimination, reading, and mathematics.',
+      ),
+    ],
+    idea: 'Arrange two large beat cards with a short or long gap, then choose the matching picture.',
   },
   'art.music': {
     strand: 'create.performing',

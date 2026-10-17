@@ -8,6 +8,10 @@ on:
       - 'src/ui/child/ChildMode.tsx'
       - 'tests/e2e/activity-chooser.spec.ts'
       - '.github/workflows/activity-chooser.yml'
+# Only explicit sanitized captures may be uploaded by the combined release/main.
+env:
+  PLAYWRIGHT_SAFE_ARTIFACTS: ${{ (github.head_ref == 'codex/all-implemented-classroom-release' || github.ref == 'refs/heads/main') && 'true' || 'false' }}
+
 permissions:
   contents: read
 jobs:
@@ -26,8 +30,10 @@ jobs:
       - run: node scripts/build.mjs --e2e
       - run: npx playwright test tests/e2e/activity-chooser.spec.ts tests/e2e/teacher-registry.spec.ts --project=desktop
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && (env.PLAYWRIGHT_SAFE_ARTIFACTS != 'true' || success())
         with:
           name: activity-chooser-browser-results
-          path: test-results/
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
           if-no-files-found: ignore

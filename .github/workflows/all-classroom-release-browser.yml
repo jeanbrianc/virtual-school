@@ -1,0 +1,144 @@
+name: All classroom release validation
+
+# Validation only. The only eligible source is the combined release branch.
+# No push or dispatch trigger, deployment, secrets, or write permissions.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: all-classroom-release-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  checks-and-matrix:
+    if: github.head_ref == 'codex/all-implemented-classroom-release' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      suites: ${{ steps.matrix.outputs.suites }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        timeout-minutes: 5
+      - name: Check the exact combined candidate
+        run: npm run check
+      - run: npm run build:lambda
+      - name: Discover every E2E suite with no phone exclusions
+        id: matrix
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync, readdirSync } from 'node:fs';
+          const suites = readdirSync('tests/e2e').filter((name) => name.endsWith('.spec.ts')).map((name) => name.slice(0, -8)).sort();
+          if (!suites.length || suites.some((name) => !/^[a-z0-9-]+$/.test(name))) throw new Error('Missing or invalid E2E suite names');
+          for (const required of ['combined-classroom-release', 'pattern-progression', 'delete-learning-records', 'tavi-routines', 'milo-rhythm', 'conversation-privacy-parent', 'nova-weather', 'base-ten-arithmetic', 'seating']) {
+            if (!suites.includes(required)) throw new Error(`Missing implemented feature suite: ${required}`);
+          }
+          appendFileSync(process.env.GITHUB_OUTPUT, `suites=${JSON.stringify(suites)}\n`);
+          console.log(JSON.stringify({ suites, projects: ['desktop', 'phone'], totalJobs: suites.length * 2 }, null, 2));
+          NODE
+  browser:
+    needs: checks-and-matrix
+    name: Combined / ${{ matrix.suite }} / ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        project: [desktop, phone]
+        suite: ${{ fromJSON(needs.checks-and-matrix.outputs.suites) }}
+    env:
+      CI: 'true'
+      RELEASE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      RELEASE_SUITE: ${{ matrix.suite }}
+      RELEASE_PROJECT: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Record and verify exact candidate identity
+        run: |
+          mkdir -p test-results
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+          const actualHead = git('rev-parse', 'HEAD');
+          if (actualHead !== process.env.RELEASE_HEAD_SHA) throw new Error('Checkout is not the recorded PR head');
+          const evidence = {
+            expectedHead: process.env.RELEASE_HEAD_SHA,
+            actualHead,
+            tree: git('rev-parse', 'HEAD^{tree}'),
+            suite: process.env.RELEASE_SUITE,
+            project: process.env.RELEASE_PROJECT,
+            browser: 'chromium',
+            device: process.env.RELEASE_PROJECT === 'phone' ? 'Pixel 7' : 'Desktop Chrome (1100x720)',
+            config: 'playwright.release.config.ts',
+            runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+          };
+          writeFileSync('test-results/candidate.json', JSON.stringify(evidence, null, 2));
+          console.log(JSON.stringify(evidence, null, 2));
+          NODE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        timeout-minutes: 5
+      - run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+      - run: node scripts/build.mjs --e2e
+        timeout-minutes: 2
+      - name: Prove this suite is selected on this actual device project
+        run: |
+          npx playwright test --config=playwright.release.config.ts "tests/e2e/$RELEASE_SUITE.spec.ts" --project="$RELEASE_PROJECT" --list --reporter=json > test-results/collection.json
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('test-results/collection.json', 'utf8'));
+          const tests = (suites) => suites.flatMap((suite) => [...(suite.specs ?? []).flatMap((spec) => spec.tests ?? []), ...tests(suite.suites ?? [])]);
+          const selected = tests(report.suites ?? []);
+          if (!selected.length || selected.some((test) => test.projectName !== process.env.RELEASE_PROJECT)) throw new Error('Missing or incorrect device collection');
+          console.log(`${selected.length} tests collected for ${process.env.RELEASE_SUITE} on ${process.env.RELEASE_PROJECT}`);
+          NODE
+      - name: Run the synthetic combined-candidate browser suite
+        run: npx playwright test --config=playwright.release.config.ts "tests/e2e/$RELEASE_SUITE.spec.ts" --project="$RELEASE_PROJECT"
+        timeout-minutes: 35
+      - name: Reject missing execution, skipped tests, flaky results, or failures
+        if: always()
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const report = JSON.parse(readFileSync('test-results/results.json', 'utf8'));
+          const collect = (suites) => suites.flatMap((suite) => [...(suite.specs ?? []).flatMap((spec) => (spec.tests ?? []).map((test) => ({ ...test, specId: spec.id }))), ...collect(suite.suites ?? [])]);
+          const tests = collect(report.suites ?? []);
+          const collected = collect(JSON.parse(readFileSync('test-results/collection.json', 'utf8')).suites ?? []);
+          const identities = (items) => items.map((test) => `${test.specId}:${test.projectName}`).sort();
+          const selectionMatches = JSON.stringify(identities(tests)) === JSON.stringify(identities(collected));
+          const failed = tests.filter((test) => test.projectName !== process.env.RELEASE_PROJECT || test.status !== 'expected' || test.expectedStatus !== 'passed' || test.results.length !== 1 || test.results[0].status !== 'passed');
+          const evidence = { collected: collected.length, executed: tests.length, selectionMatches, rejected: failed.length, stats: report.stats, errors: report.errors ?? [] };
+          writeFileSync('test-results/execution-guard.json', JSON.stringify(evidence, null, 2));
+          if (!tests.length || !selectionMatches || failed.length || (report.errors ?? []).length) throw new Error('Every collected test must execute once and pass on its assigned device, with no skips or flaky retries');
+          console.log(JSON.stringify(evidence, null, 2));
+          NODE
+      - name: Keep only successful generic screenshots and JSON evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-classroom-${{ matrix.suite }}-${{ matrix.project }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            test-results/**/*.png
+            test-results/**/*.json
+            !test-results/**/trace.zip
+            !test-results/**/error-context.md
+          retention-days: 7
+          if-no-files-found: error

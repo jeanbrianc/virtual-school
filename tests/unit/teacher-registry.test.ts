@@ -19,7 +19,7 @@ import { createTeacher } from '../../src/engine/characters/teachers';
 import { parseSpeakInput } from '../../scripts/ai-helper/openai';
 
 it('every stable teacher has a complete profile, curriculum activity, local voice and scene', () => {
-  assert.deepEqual(TEACHER_IDS, ['hoot', 'digit', 'pippa', 'nova']);
+  assert.deepEqual(TEACHER_IDS, ['hoot', 'digit', 'pippa', 'tavi', 'nova', 'milo']);
   assert.equal(new Set(TEACHER_IDS).size, TEACHER_IDS.length);
   for (const id of TEACHER_IDS) {
     const r = TEACHER_REGISTRY[id],
@@ -29,7 +29,14 @@ it('every stable teacher has a complete profile, curriculum activity, local voic
     assert.ok(p.voice.rate > 0);
     assert.ok(p.naturalVoice.voice);
     assert.equal(teacherForInteraction(id), id);
-    const lessonId = r.activity.kind === 'lesson' ? r.activity.lessonId : 'story-chat';
+    const lessonId =
+      r.activity.kind === 'lesson'
+        ? r.activity.lessonId
+        : r.activity.kind === 'routine'
+          ? 'everyday-sequencing'
+          : r.activity.kind === 'rhythm'
+            ? 'rhythm-garden'
+            : 'story-chat';
     if (r.activity.kind === 'lesson') assert.equal(getLesson(lessonId)?.teacherId, id);
     const skills = skillsForLesson(lessonId);
     assert.ok(skills.length);
@@ -58,7 +65,7 @@ it('unknown, retired and prototype IDs are rejected or shown safely; existing sa
     assert.throws(() => createTeacher(id as TeacherId, 0), /Unknown teacher/);
     assert.match(localTeacherReply({ teacherId: id as TeacherId, childName: 'Learner', utterance: 'Hello', history: [], books: [] }).reply, /grown-up/);
   }
-  for (const id of ['hoot', 'digit', 'pippa', 'nova']) {
+  for (const id of ['hoot', 'digit', 'pippa', 'tavi', 'nova']) {
     assert.equal(isTeacherId(id), true);
     assert.equal(teacherDisplayName(id), TEACHERS[id as TeacherId].name);
   }
@@ -66,9 +73,11 @@ it('unknown, retired and prototype IDs are rejected or shown safely; existing sa
 
 it('shared activity choices preserve defaults and reject cross-teacher or unknown route keys', () => {
   const defaults = {
+    milo: { kind: 'rhythm' },
     hoot: { kind: 'reading' },
     digit: { kind: 'lesson', lessonId: 'moon-rocks' },
     pippa: { kind: 'lesson', lessonId: 'patterns-shapes' },
+    tavi: { kind: 'routine' },
     nova: { kind: 'lesson', lessonId: 'sink-float' },
   };
   for (const teacher of TEACHER_IDS) {

@@ -1,9 +1,13 @@
+import './styles/routine.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { createAppServices, ServicesProvider } from './app/services';
 import './styles/base.css';
 import './styles/child.css';
+import './styles/rhythm.css';
 import './styles/life-cycle.css';
+import './styles/pattern-progression.css';
+import './styles/weather.css';
 import './styles/parent.css';
 import './styles/showcase.css';
 

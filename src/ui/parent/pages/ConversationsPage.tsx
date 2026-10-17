@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { getSkill } from '../../../domain/curriculum';
 import { LESSON_TITLES } from '../../../domain/lessons/registry';
+import { isAllowedHelperUrl } from '../../../domain/teachers/chatRemote';
 import { isTeacherId } from '../../../domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../../domain/teachers/teachers';
 import type { LessonAttempt, TeacherInteraction } from '../../../domain/types';
@@ -9,37 +10,62 @@ import { TeacherPortrait } from '../../child/TeacherPortrait';
 import { Card, EmptyState, PageHeader } from '../components';
 import type { ParentData } from '../ParentApp';
 
-const OUTCOME_LABEL: Record<string, string> = { independent: 'On her own', supported: 'With a hint', not_yet: 'Not yet' };
+const OUTCOME_LABEL: Record<string, string> = {
+  independent: 'On her own',
+  supported: 'With a hint',
+  not_yet: 'Not yet',
+  skipped: 'Skipped',
+  model_only: 'Viewed model · ungraded',
+};
 
 function time(ts: string): string {
   return new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-/**
- * Full transparency: every conversation the child has with a teacher is
- * stored locally and shown here, word for word.
- */
+/** Prefer the stable per-run link; retain temporal matching only for legacy interactions. */
+export function findConversationLesson(lessons: LessonAttempt[], interaction: TeacherInteraction): LessonAttempt | undefined {
+  const sameOwner = (lesson: LessonAttempt) => lesson.childId === interaction.childId && lesson.teacherId === interaction.teacherId;
+  const exact = lessons.find((lesson) => sameOwner(lesson) && `${lesson.id}:talk` === interaction.id);
+  if (exact) return exact;
+  // A partially synced modern run must not display a different run's evidence.
+  if (interaction.id.startsWith('base-ten-arithmetic:') || interaction.id.startsWith('base-ten:')) return undefined;
+  return lessons.find((lesson) => sameOwner(lesson) && Math.abs(Date.parse(lesson.completedAt) - Date.parse(interaction.endedAt)) < 5 * 60_000);
+}
+
+/** Saved teacher conversations and activity summaries available to the parent. */
 export function ConversationsPage({ data }: { data: ParentData }) {
   const { records, child } = data;
+  const ai = data.household.settings.teacherAi;
+  const aiChatOn = ai.enabled && ai.consentToSend && isAllowedHelperUrl(ai.endpoint);
   const [teacher, setTeacher] = useState<'all' | TeacherId>('all');
   const [open, setOpen] = useState<string | null>(null);
   const items = useMemo(
     () => [...records.interactions].filter((i) => teacher === 'all' || i.teacherId === teacher).sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     [records.interactions, teacher],
   );
-  const lessonFor = (i: TeacherInteraction): LessonAttempt | undefined =>
-    records.lessons.find((l) => l.teacherId === i.teacherId && Math.abs(Date.parse(l.completedAt) - Date.parse(i.endedAt)) < 5 * 60_000);
+  const lessonFor = (i: TeacherInteraction) => findConversationLesson(records.lessons, i);
 
   return (
     <div className="page">
       <PageHeader
         title="Teacher talk"
-        subtitle={`Every conversation ${child.name} has with her teachers, word for word. Stored only on this device. ${
-          data.household.settings.teacherAi.enabled && data.household.settings.teacherAi.consentToSend
-            ? 'AI teachers are on: what she says to a teacher is sent (as text) through your AI helper to its AI service (OpenAI or Anthropic) to write the reply — those replies are marked “AI”.'
-            : 'Teachers answer on this device — nothing is sent anywhere.'
-        }`}
+        subtitle={`Saved conversations and activity summaries for ${child.name}. Some activities save summaries rather than every line.`}
       />
+      <Card>
+        <div className="small" data-testid="conversation-privacy">
+          <p>Saved records are stored in this browser. They may also be included in family sync when enabled, or in exports you make.</p>
+          <p>
+            <strong>Optional AI chat: {aiChatOn ? 'on' : 'off'}.</strong>{' '}
+            {aiChatOn
+              ? 'For AI replies, your helper and its AI service receive text: the learner’s first name, current message, recent conversation turns and book titles. AI replies are marked “AI”.'
+              : 'Built-in chat replies run on this device.'}
+          </p>
+          <p>
+            Voice and microphone sharing are controlled separately and may send text or audio to other services. Review them in{' '}
+            <a href="#/parent/settings">Settings &amp; privacy</a>.
+          </p>
+        </div>
+      </Card>
       <div className="toolbar">
         <div className="chip-row">
           <button type="button" className={`chip ${teacher === 'all' ? 'active' : ''}`} onClick={() => setTeacher('all')}>
@@ -106,24 +132,30 @@ export function ConversationsPage({ data }: { data: ParentData }) {
                         <h3 className="mini-head">
                           Problem by problem · started at level {lesson.startTier + 1}, ended at level {lesson.endTier + 1}
                         </h3>
-                        <table className="data-table">
+                        <table className="data-table" role="table">
                           <thead>
                             <tr>
-                              <th>Prompt</th>
-                              <th>Skill</th>
-                              <th>Her answers</th>
-                              <th>Help given</th>
-                              <th>Result</th>
+                              <th scope="col">Prompt</th>
+                              <th scope="col">Skill</th>
+                              <th scope="col">Her answers</th>
+                              <th scope="col">Help given</th>
+                              <th scope="col">Result</th>
                             </tr>
                           </thead>
                           <tbody>
                             {lesson.problems.map((p, k) => (
                               <tr key={k}>
-                                <td>{p.prompt}</td>
-                                <td className="small">{getSkill(p.skillId)?.name ?? p.skillId}</td>
-                                <td className="small">{p.responses.join(' → ')}</td>
-                                <td className="small">{p.scaffolds.length ? p.scaffolds.join('; ') : '—'}</td>
-                                <td>
+                                <td data-label="Prompt">{p.prompt}</td>
+                                <td className="small" data-label="Skill">
+                                  {getSkill(p.skillId)?.name ?? p.skillId}
+                                </td>
+                                <td className="small" data-label="Answers">
+                                  {p.responses.length ? p.responses.join(' → ') : 'No answer attempted'}
+                                </td>
+                                <td className="small" data-label="Help given">
+                                  {p.scaffolds.length ? p.scaffolds.join('; ') : '—'}
+                                </td>
+                                <td data-label="Result">
                                   <span className={`indep indep-${p.outcome === 'not_yet' ? 'assisted' : p.outcome}`}>{OUTCOME_LABEL[p.outcome]}</span>
                                 </td>
                               </tr>
