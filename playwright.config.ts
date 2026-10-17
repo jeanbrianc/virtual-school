@@ -28,7 +28,7 @@ export default defineConfig({
   },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'], viewport: { width: 1100, height: 720 } } },
-    { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /(parent|reading-nook)\.spec\.ts/ },
+    { name: 'phone', use: { ...devices['Pixel 7'] }, testMatch: /(parent|reading-nook|safety-containment)\.spec\.ts/ },
   ],
   webServer: {
     command: 'node scripts/preview.mjs --e2e',

@@ -4,10 +4,23 @@
  * chat service (on-device, or an AI teacher when a parent turned it on).
  */
 import { useEffect, useRef, useState } from 'react';
-import { EMPTY_TOPIC, nextTopic, type ChatTopic, type ChatTurn, type TeacherChatReply, type TeacherChatService } from '../../domain/teachers/chat';
+import {
+  EMPTY_TOPIC,
+  keepTeacherChatLocal,
+  localTeacherReply,
+  nextTopic,
+  recognizedSafetyText,
+  type ChatTopic,
+  type ChatTurn,
+  type TeacherChatReply,
+  type TeacherChatRequest,
+  type TeacherChatService,
+  type TeacherConversationPrivacy,
+} from '../../domain/teachers/chat';
 import type { TeacherId } from '../../domain/teachers/teachers';
 import type { BookStatus, TranscriptLine } from '../../domain/types';
 import type { ListenError, ListenOutcome } from '../../voice/SpeechService';
+import type { Speech } from './DialogueShell';
 import { Icon } from '../shared/Icon';
 
 /** What first-time setup found: ready to listen, still downloading the voice pack, or not possible here. */
@@ -38,7 +51,9 @@ export interface TalkKit {
   chat: TeacherChatService;
   phrases: string[];
   /** Says a reply out loud when she used her voice (even if read-aloud is off). */
-  speakReply(text: string): void;
+  speakReply(text: string, options?: { localOnly: boolean }): void;
+  /** Cancel helper audio/cache work when this conversation becomes local-only. */
+  stopSpeaking?(): void;
   /** Whether lines are already read aloud automatically. */
   autoSpeaks: boolean;
 }
@@ -268,7 +283,7 @@ export function useTeacherTalk(opts: {
   kit: TalkKit;
   /** The conversation so far (the flow's transcript). */
   transcript: () => TranscriptLine[];
-  log: (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via']) => void;
+  log: (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via'], localOnly?: true) => void;
   /** A flow transition invalidates its outstanding chat replies. */
   generation?: () => number;
 }) {
@@ -277,19 +292,35 @@ export function useTeacherTalk(opts: {
   const [thinking, setThinking] = useState(false);
   const [lastReply, setLastReply] = useState<TeacherChatReply | null>(null);
   const notes = useRef<string[]>([]);
+  const privacy = useRef<TeacherConversationPrivacy>({ localOnly: false });
+  const containmentNotified = useRef(false);
+  const contain = () => {
+    privacy.current.localOnly = true;
+    if (containmentNotified.current) return;
+    containmentNotified.current = true;
+    opts.kit.stopSpeaking?.();
+    if (!opts.transcript().some((line) => line.localOnly)) {
+      opts.log('system', 'Teacher replies for this conversation use built-in responses.', undefined, true);
+    }
+  };
   const active = useRef(true);
   const generation = useRef(0);
+  const context = useRef({ teacher: opts.teacher, childName: opts.childName });
+  context.current = { teacher: opts.teacher, childName: opts.childName };
   useEffect(() => {
     active.current = true;
     return () => {
       active.current = false;
       generation.current++;
+      opts.kit.stopSpeaking?.();
     };
   }, []);
   const reset = () => {
     generation.current++;
+    opts.kit.stopSpeaking?.();
     topicRef.current = EMPTY_TOPIC;
-    notes.current = [];
+    // Retained transcript and parent notes belong to this flow, not its current topic.
+    // In particular, Back/reset must not erase a safety note or reopen remote context.
     setTopic(EMPTY_TOPIC);
     setThinking(false);
     setLastReply(null);
@@ -298,34 +329,50 @@ export function useTeacherTalk(opts: {
   const send = async (text: string, via?: 'voice' | 'typed'): Promise<TeacherChatReply> => {
     const token = generation.current;
     const flowToken = opts.generation?.();
-    const history: ChatTurn[] = opts
-      .transcript()
+    const current = () =>
+      active.current &&
+      generation.current === token &&
+      opts.generation?.() === flowToken &&
+      context.current.teacher === opts.teacher &&
+      context.current.childName === opts.childName;
+    const retained = opts.transcript();
+    if (retained.some((line) => line.localOnly)) contain();
+    const history: ChatTurn[] = retained
       .filter((l) => l.speaker !== 'system')
-      .slice(-8)
-      .map((l) => ({ speaker: l.speaker === 'teacher' ? 'teacher' : 'child', text: l.text }));
-    opts.log('child', text, via);
+      .map((l) => ({ speaker: l.speaker === 'teacher' ? 'teacher' : 'child', text: l.text, ...(l.localOnly ? { localOnly: true as const } : {}) }));
+    const request: TeacherChatRequest = {
+      teacherId: opts.teacher,
+      childName: opts.childName,
+      utterance: text,
+      history,
+      books: opts.books,
+      privacy: privacy.current,
+      ...(topicRef.current.book ? { topic: topicRef.current.book } : {}),
+    };
+    const wasLocal = privacy.current.localOnly;
+    const localOnly = keepTeacherChatLocal(request, privacy.current);
+    if (localOnly && !wasLocal) contain();
+    opts.log('child', text, via, localOnly ? true : undefined);
     setThinking(true);
     let reply: TeacherChatReply;
     try {
-      reply = await opts.kit.chat.respond({
-        teacherId: opts.teacher,
-        childName: opts.childName,
-        utterance: text,
-        history,
-        books: opts.books,
-        ...(topicRef.current.book ? { topic: topicRef.current.book } : {}),
-      });
+      if (localOnly) {
+        reply = localTeacherReply(request);
+        // Record a recognized concern synchronously, even if Back/Close cancels its UI reply.
+        if (reply.parentNote) notes.current.push(reply.parentNote);
+      } else reply = await opts.kit.chat.respond(request);
     } catch (error) {
-      if (active.current && generation.current === token && opts.generation?.() === flowToken) setThinking(false);
+      if (current()) setThinking(false);
       throw error;
     }
-    if (!active.current || generation.current !== token || opts.generation?.() !== flowToken) return reply;
+    if (!current()) return reply;
     setThinking(false);
     topicRef.current = nextTopic(topicRef.current, reply);
     setTopic(topicRef.current);
-    if (reply.parentNote) notes.current.push(reply.parentNote);
+    if (!localOnly && reply.parentNote) notes.current.push(reply.parentNote);
+    if (!wasLocal && (privacy.current.localOnly || reply.intent === 'safety' || reply.parentNote)) contain();
     setLastReply(reply);
-    if (via === 'voice' && !opts.kit.autoSpeaks) opts.kit.speakReply(reply.reply);
+    if (via === 'voice' && !opts.kit.autoSpeaks) opts.kit.speakReply(reply.reply, { localOnly: privacy.current.localOnly });
     return reply;
   };
 
@@ -336,5 +383,13 @@ export function useTeacherTalk(opts: {
     setTopic(topicRef.current);
   };
 
-  return { send, reset, markFinished, topic, thinking, lastReply, notes: notes.current };
+  /** Read the live latch at playback time, including Replay and queued flow callbacks. */
+  const guardSpeech = (speech: Speech): Speech => ({
+    ...speech,
+    speak: (text, options) => {
+      if (opts.transcript().some((line) => line.localOnly || recognizedSafetyText(line.text))) contain();
+      speech.speak(text, { localOnly: options?.localOnly || privacy.current.localOnly });
+    },
+  });
+  return { send, reset, markFinished, topic, thinking, lastReply, notes: notes.current, guardSpeech };
 }

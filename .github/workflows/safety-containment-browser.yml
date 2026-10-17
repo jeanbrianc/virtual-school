@@ -1,0 +1,44 @@
+name: Safety containment browser checks
+on:
+  pull_request:
+    paths:
+      - 'src/domain/teachers/**'
+      - 'src/ui/child/**'
+      - 'src/voice/**'
+      - 'tests/unit/safety-containment.test.ts'
+      - 'tests/e2e/safety-containment.spec.ts'
+      - 'tests/e2e/synthetic-household.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/safety-containment-browser.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: safety-containment-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Verify synthetic chat and speech containment
+        run: npm run test:e2e -- --project=${{ matrix.project }} tests/e2e/safety-containment.spec.ts
+      - name: Save synthetic screenshots, request evidence and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-containment-${{ matrix.project }}-${{ github.sha }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: warn

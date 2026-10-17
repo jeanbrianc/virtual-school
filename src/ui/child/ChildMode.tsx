@@ -144,7 +144,7 @@ export function ChildMode({ childId }: { childId: string }) {
     () => ({
       canSpeak: services.speechOut.available || naturalVoices,
       auto: readAloud,
-      speak: (text: string) => {
+      speak: (text: string, options?: { localOnly: boolean }) => {
         const settings = dataRef.current?.household.settings;
         if (settings?.audio.muted) return;
         const teacher = teacherForSpeech.current;
@@ -158,6 +158,7 @@ export function ChildMode({ childId }: { childId: string }) {
           rate: v.rate,
           volume: settings?.audio.voice ?? 1,
           ...(settings?.voiceName ? { voiceName: settings.voiceName } : {}),
+          localOnly: options?.localOnly,
           ...(ai && naturalVoicesOn(ai) ? { natural: { endpoint: ai.endpoint, teacher } } : {}),
         });
       },
@@ -246,7 +247,8 @@ export function ChildMode({ childId }: { childId: string }) {
             },
       chat: services.teacherChat(dataRef.current?.household),
       phrases: talkPhrases(books ?? []),
-      speakReply: (text: string) => speech.speak(text),
+      speakReply: (text, options) => speech.speak(text, options),
+      stopSpeaking: () => speechOut.cancel(),
       autoSpeaks: speech.auto,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
