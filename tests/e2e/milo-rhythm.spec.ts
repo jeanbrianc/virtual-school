@@ -266,6 +266,7 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
     await page.waitForTimeout(round === 0 ? 800 : 2400);
     await activate(pad, info);
     await expect(page.getByText('You made a beat-and-pause pattern!', { exact: true })).toBeVisible();
+    if (round === 1) await screenshot(page, info, 'independent-copy-feedback');
     await finishRound(page, info, round);
   }
   await page.getByRole('button', { name: 'Save visit', exact: true }).dblclick();

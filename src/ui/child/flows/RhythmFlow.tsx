@@ -87,6 +87,7 @@ export function RhythmFlow({
   const saved = useRef(false);
   const closed = useRef(false);
   const finished = useRef(false);
+  const modelsPlayed = useRef(0);
   const pausedRef = useRef(false);
   const stateRef = useRef({ stage, round, supported, mode });
   stateRef.current = { stage, round, supported, mode };
@@ -153,6 +154,7 @@ export function RhythmFlow({
     run.current = makeRun(nextMode);
     setSave('idle');
     setSupported(false);
+    modelsPlayed.current = 0;
     setWatched(false);
     setPaused(false);
     pausedRef.current = false;
@@ -160,7 +162,11 @@ export function RhythmFlow({
     setStage(nextMode === 'copy' ? 'calibrate' : 'watch');
   };
   const play = async () => {
-    if (playing || pausedRef.current || closed.current) return;
+    if (playing || pausedRef.current || closed.current || saving.current || stateRef.current.stage !== 'watch') return;
+    // The first model is the stimulus. Any replay, including an interrupted
+    // model's restart, is extra exposure and conservatively records support.
+    if (modelsPlayed.current > 0) setSupported(true);
+    modelsPlayed.current++;
     const generation = ++epoch.current;
     setPlaying(true);
     setWatched(false);
@@ -474,6 +480,7 @@ export function RhythmFlow({
                     setWatched(false);
                     setMessage('');
                     if (round === 0) {
+                      modelsPlayed.current = 0;
                       setRound(1);
                       setStage('watch');
                     } else setStage('complete');

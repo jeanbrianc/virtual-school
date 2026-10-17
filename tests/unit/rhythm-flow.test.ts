@@ -16,7 +16,7 @@ Object.assign(globalThis, {
     removeEventListener: (key: string) => listeners.delete(key),
   },
 });
-async function harness(t: TestContext, save?: (r: RhythmRun) => Promise<void>) {
+async function harness(t: TestContext, save?: (r: RhythmRun) => Promise<void>, muted = true) {
   t.mock.method(RhythmPlayer.prototype, 'play', async () => ({ reliable: true, presentation: 'visual-only' as const }));
   let tree!: ReactTestRenderer;
   const saves: RhythmRun[] = [];
@@ -25,8 +25,8 @@ async function harness(t: TestContext, save?: (r: RhythmRun) => Promise<void>) {
     tree = create(
       createElement(RhythmFlow, {
         childId: 'sample',
-        muted: true,
-        volume: 0,
+        muted,
+        volume: muted ? 0 : 0.5,
         onSave:
           save ??
           (async (r) => {
@@ -156,6 +156,54 @@ test('native keyboard repeat/modified input cannot inflate a copy attempt', asyn
   assert.ok(h.saves[0]!.trials.every((x) => x.outcome === 'skipped' && x.input === 'none'));
 });
 
+for (const replay of ['none', 'watch', 'attempt', 'interrupted', 'blur', 'sound-change'] as const) {
+  test(`fresh copy evidence counts only the first stimulus as independent: ${replay}`, async (t) => {
+    const h = await harness(t, undefined, replay !== 'sound-change');
+    let now = 100;
+    t.mock.method(performance, 'now', () => now);
+    await h.click('Tap a rhythm');
+    await h.click('Skip warm-up');
+    await h.click('Play / watch pattern');
+    await h.click('Try together');
+    await h.click('Skip this pattern');
+    await h.click('Explore a fresh pattern');
+    if (replay === 'interrupted') {
+      t.mock.method(RhythmPlayer.prototype, 'play', async () => ({ reliable: false, presentation: 'visual-only' as const }));
+      await h.click('Play / watch pattern');
+      assert.equal(h.button('Try this pattern').props.disabled, true);
+      t.mock.method(RhythmPlayer.prototype, 'play', async () => ({ reliable: true, presentation: 'visual-only' as const }));
+    }
+    await h.click('Play / watch pattern');
+    if (replay === 'watch') await h.click('Replay pattern');
+    if (replay === 'blur') {
+      await act(async () => listeners.get('blur')!());
+      await h.click('Resume rhythm');
+      await h.click('Play / watch pattern');
+    }
+    if (replay === 'sound-change') {
+      assert.equal(h.tree.root.findByType('input').props.disabled, false);
+      await act(async () => h.tree.root.findByType('input').props.onChange({ target: { checked: true } }));
+      await h.click('Play / watch pattern');
+    }
+    await h.click('Try this pattern');
+    if (replay === 'attempt') {
+      await h.click('Replay the model with help');
+      await h.click('Play / watch pattern');
+      await h.click('Try this pattern');
+    }
+    const tap = async () => {
+      await act(async () => h.tree.root.findByProps({ 'data-testid': 'rhythm-tap' }).props.onClick({ detail: 0, timeStamp: now }));
+    };
+    await tap();
+    now += 2400;
+    await tap();
+    await h.click('Finish visit');
+    await h.click('Save visit');
+    assert.equal(h.saves[0]!.trials[1]!.outcome, 'matched');
+    assert.equal(h.saves[0]!.trials[1]!.supported, replay !== 'none');
+  });
+}
+
 test('final feedback protects completed work from stale alternate-mode and replay callbacks', async (t) => {
   let resolveSave!: () => void;
   const h = await harness(
@@ -167,6 +215,7 @@ test('final feedback protects completed work from stale alternate-mode and repla
   );
   await h.click('Tap a rhythm');
   await h.click('Skip warm-up');
+  const stalePlayback = h.button('Play / watch pattern').props.onClick;
   const staleAlternative = h.button('Choose pictures instead, no timing').props.onClick;
   await h.click('Play / watch pattern');
   await h.click('Try together');
@@ -178,6 +227,9 @@ test('final feedback protects completed work from stale alternate-mode and repla
   assert.equal(h.button('Choose pictures instead, no timing'), undefined);
   await act(async () => staleAlternative());
   assert.ok(h.button('Finish visit'));
+  await act(async () => stalePlayback());
+  assert.ok(h.button('Finish visit'));
+  assert.equal(h.button('Stop playback'), undefined);
   await h.click('Finish visit');
   const staleReplay = h.button('Play again').props.onClick;
   await act(async () => {
