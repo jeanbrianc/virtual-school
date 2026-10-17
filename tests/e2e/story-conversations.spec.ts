@@ -68,11 +68,11 @@ test('parent depth, source-checked questions, hint/skip/cancel and saved history
   await page.getByTestId('choice-finish').click();
   await page.getByTestId('new-book-title').fill('Tom Kitten');
   await page.getByTestId('suggest-tom-kitten').click();
-  await expect(page.getByTestId('dialogue-line')).toContainText('before the kittens play');
+  await expect(page.getByTestId('dialogue-line')).toContainText('Where do the kittens climb');
   expect(await page.getByTestId('dialogue-line').innerText()).not.toBe(firstPrompt);
   if (name === 'phone') await page.getByTestId('story-skip').tap();
   else await page.getByTestId('story-skip').click();
-  await expect(page.getByTestId('dialogue-line')).toContainText('Where do the kittens climb');
+  await expect(page.getByTestId('dialogue-line')).toContainText('before the kittens play');
   await page.getByRole('button', { name: 'Back to library' }).click();
   await page.getByTestId('dialogue-close').click();
   await talkTo(page, 'hoot');

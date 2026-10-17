@@ -78,6 +78,16 @@ test('parent depth, practiced skills, and exact recent IDs select deterministic 
   assert.equal(selectQuestions(tom, { depth: 'deeper' }, 0).length, 0);
 });
 
+test('fresh-question rotation also respects the newly practiced detail skill after reload', () => {
+  const detail = updateMasteryRecord(undefined, 'child', 'read.key-details', [ev('read.key-details', '2026-10-01', { independent: 1 })], '2026-10-01');
+  const inference = updateMasteryRecord(undefined, 'child', 'read.inference', [ev('read.inference', '2026-10-01', { supported: 1 })], '2026-10-01');
+  const next = selectQuestions(tom, { depth: 'deeper', mastery: [detail, inference], recentQuestionIds: ['tom-kitten.q3', 'tom-kitten.q1'] });
+  assert.deepEqual(
+    next.map((q) => q.id),
+    ['tom-kitten.q4', 'tom-kitten.q2'],
+  );
+});
+
 test('legacy adaptive depth respects proficiency and parent overrides', () => {
   const proficient = updateMasteryRecord(
     undefined,
