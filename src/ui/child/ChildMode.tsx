@@ -823,6 +823,7 @@ export function ChildMode({ childId }: { childId: string }) {
 
   const closeSheet = () => {
     setOverlay(null);
+    void gameRef.current?.releaseCamera();
     gameRef.current?.setInputEnabled(true);
   };
 

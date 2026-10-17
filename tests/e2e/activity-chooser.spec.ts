@@ -16,7 +16,8 @@ for (const viewport of [
       await expect(page.getByTestId('choice-go')).toBeVisible();
       await page.getByTestId('choose-teacher-activity').click();
       const chooser = page.getByTestId('teacher-activity-chooser');
-      await expect(chooser).toBeVisible();
+      await expect(chooser.getByRole('dialog')).toBeVisible();
+      await page.screenshot({ path: `test-results/teacher-chooser-${viewport.width}.png` });
       await expect(page.getByTestId('choice-sink-float')).toBeFocused();
       await page.getByTestId('choice-sink-float').press('Escape');
       await expect(chooser).toHaveCount(0);
@@ -26,6 +27,7 @@ for (const viewport of [
       else await page.getByTestId('choice-globe').press('Enter');
       await expect(page.getByRole('button', { name: 'US states', exact: false })).toBeVisible();
       await page.getByTestId('dialogue-close').click();
+      await page.waitForFunction(() => !(window.__izzy!.game() as unknown as { rig: { inCinematic: boolean } }).rig.inCinematic);
       await talkTo(page, 'nova');
       await page.getByTestId('choice-go').click();
       await expect(page.locator('.lesson-play')).toBeVisible();
