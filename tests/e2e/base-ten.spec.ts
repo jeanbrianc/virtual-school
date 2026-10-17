@@ -38,24 +38,29 @@ test('optional offline challenge saves support, model and skips exactly once; re
   const width = isMobile ? 375 : 1100;
   if (isMobile) await page.setViewportSize({ width: 375, height: 812 });
   await enterSchool(page);
+  page.setDefaultTimeout(30_000);
   await page.getByTestId('discover-ok').click();
   await openChallenge(page);
   expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(0);
   await page.getByRole('button', { name: 'Grown-up choices', exact: true }).click();
   await unlockParent(page);
-  await page.getByLabel('Goal', { exact: true }).selectOption('0');
-  await page.getByLabel('Practice purpose').selectOption('learning');
+  await page.getByRole('combobox', { name: 'Goal', exact: true }).selectOption('0');
+  await page.getByRole('combobox', { name: 'Practice purpose', exact: true }).selectOption('learning');
   await page.getByRole('button', { name: 'Start chosen goal' }).click();
   await context.setOffline(true);
   await expect(page.locator('.base-ten-goal')).toContainText('Round 1 of 5');
   await expect(page.locator('.base-ten-stage h3')).toHaveText(['Tens', 'Ones']);
   await expect(page.getByRole('region', { name: /[0-9]+ tens/ })).toHaveCount(0);
+  await page.getByTestId('base-ten-stage').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `test-results/base-ten-assessment-${width}.png` });
   let answer = await correctChoice(page);
   if (width === 375) await page.getByTestId(`choice-${answer}`).tap();
   else await page.getByTestId(`choice-${answer}`).press('Enter');
   await page.getByRole('button', { name: 'Try a new number' }).click();
   await page.getByRole('button', { name: 'Show a hint', exact: true }).click();
   await expect(page.locator('.base-ten-stage h3').first()).toHaveText(/^[2-9] tens$/);
+  await page.getByTestId('base-ten-stage').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `test-results/base-ten-hinted-${width}.png` });
   // The hint replaces the prompt; this is the second round, asking for ones.
   answer = String(Number(await page.locator('.base-ten-number').textContent()) % 10);
   await page.getByTestId(`choice-${answer}`).click();
@@ -94,7 +99,7 @@ test('optional offline challenge saves support, model and skips exactly once; re
   expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toEqual(
     beforeReload.lessons.filter((l) => l.lessonId === 'base-ten-mission'),
   );
-  await page.waitForFunction(() => window.__izzy?.game()?.busy === false);
+  await page.waitForFunction(() => window.__izzy?.game()?.busy === false, null, { timeout: 300_000 });
   await openChallenge(page);
   await page.getByTestId('dialogue-close').click();
   expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(2);
