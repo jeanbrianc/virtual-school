@@ -23,7 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 3
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -34,7 +34,7 @@ jobs:
         run: npm run check
       - run: npm run build:lambda
       - run: node scripts/build.mjs --e2e
-      - name: Verify exact copy-only boundaries and choose focused successor suites
+      - name: Verify exact source/build boundaries and select the two talk diagnostics
         id: matrix
         run: node scripts/verify-classroom-copy-successor.mjs source
       - name: Record source and emitted-module boundary proof
@@ -52,7 +52,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-          fetch-depth: 2
+          fetch-depth: 3
       - uses: actions/setup-node@v4
         with:
           node-version: 22

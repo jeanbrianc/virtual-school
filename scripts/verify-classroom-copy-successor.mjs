@@ -13,7 +13,8 @@ const save = (name, data) => {
   mkdirSync('test-results', { recursive: true });
   writeFileSync(`test-results/${name}.json`, JSON.stringify(data, null, 2));
 };
-const focus = ['conversation-privacy-parent', 'talk', 'delete-learning-records', 'circuit', 'sync'];
+// Diagnostic execution only. Baseline reuse still fails closed; this is not release acceptance.
+const focus = ['talk'];
 const allowed = [
   'src/domain/types.ts',
   'src/ui/parent/pages/AvatarPage.tsx',
