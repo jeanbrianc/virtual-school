@@ -15,6 +15,10 @@ jobs:
   place-value-browser:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,10 +29,10 @@ jobs:
       - run: npm run check
       - run: npx playwright install --with-deps chromium
       - run: node scripts/build.mjs --e2e
-      - run: npx playwright test tests/e2e/base-ten.spec.ts tests/e2e/activity-chooser.spec.ts tests/e2e/teacher-registry.spec.ts --project=desktop
+      - run: npx playwright test tests/e2e/base-ten.spec.ts tests/e2e/activity-chooser.spec.ts tests/e2e/teacher-registry.spec.ts --project=${{ matrix.project }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: place-value-browser-results
+          name: place-value-browser-results-${{ matrix.project }}
           path: test-results/
           if-no-files-found: ignore

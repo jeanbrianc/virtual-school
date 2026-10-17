@@ -146,29 +146,34 @@ export function BaseTenFlow({
     );
 
   const line = !session
-    ? 'A ten is one bundle of 10. Let’s explore how bundles and extra ones make a number. You can use straws or blocks beside you.'
+    ? 'One bundle of ten and three ones make 13. Try it with straws or blocks!'
     : complete
-      ? 'Your five rounds are saved. Tell a grown-up how a bundle of ten is different from one. Try a different number together another day.'
+      ? 'Saved! Show a grown-up your bundles. Try a new number another day.'
       : feedback || problem!.prompt;
   const blocked = saving || !!pending.current;
   const smaller = simpler && session ? baseTenProblem(session.seed, session.tier, round, true) : null;
+  const shownVisual = (smaller ?? problem)?.visual;
+  const assessmentVisual = shownVisual?.type === 'base-ten' ? { ...shownVisual, revealLabels: !!smaller || found || supports.current.length > 0 } : shownVisual;
   return (
     <DialogueShell teacher="digit" line={line} speech={speech} onClose={onClose} closeDisabled={saving} wide={!!session}>
       {!session && (
         <>
           <p className="base-ten-goal">Optional challenge: numbers 20–99.</p>
-          <LessonStage visual={{ type: 'base-ten', tens: 1, ones: 3, numeral: 13 }} seed={13} />
-          <p>Try it with real objects: tie 10 straws into one bundle and add 3 loose straws. One ten and 3 ones make 13. Now we can try a different number.</p>
-          <p className="base-ten-goal">
-            {entry.atCeiling
-              ? 'These goals are proficient. Review with varied examples; harder arithmetic is not part of this mission.'
-              : entry.ready
-                ? `Suggested goal: ${BASE_TEN_TIERS[entry.tier]!.label}.`
-                : 'Count and build numbers to 20 first. A grown-up can choose whether to try this challenge. Exploring here is review until then.'}
-          </p>
-          <p className="base-ten-goal">Review saves what you tried separately and does not advance new-skill mastery.</p>
+          <LessonStage visual={{ type: 'base-ten', tens: 1, ones: 3, numeral: 13, revealLabels: true }} seed={13} />
           {parentChoices ? (
             <div className="base-ten-parent" aria-label="Grown-up place-value choices">
+              <p>
+                Try it with real objects: tie 10 straws into one bundle and add 3 loose straws. One ten and 3 ones make 13. Now we can try a different number.
+              </p>
+              <p className="base-ten-goal">
+                {entry.atCeiling
+                  ? 'These goals are proficient. Review with varied examples; harder arithmetic is not part of this mission.'
+                  : entry.ready
+                    ? `Suggested goal: ${BASE_TEN_TIERS[entry.tier]!.label}.`
+                    : 'Count and build numbers to 20 first. A grown-up can choose whether to try this challenge. Exploring here is review until then.'}
+              </p>
+              <p className="base-ten-goal">Review saves what you tried separately and does not advance new-skill mastery.</p>
+
               <label>
                 Goal
                 <select value={chosenTier} onChange={(e) => setChosenTier(Number(e.target.value))}>
@@ -212,7 +217,7 @@ export function BaseTenFlow({
           <p className="base-ten-goal">
             {BASE_TEN_TIERS[session.tier]!.label} · {session.mode === 'review' ? 'review' : 'learning'} · Round {round + 1} of {BASE_TEN_ROUNDS}
           </p>
-          <LessonStage visual={(smaller ?? problem).visual} seed={session.seed + round} />
+          {assessmentVisual && <LessonStage visual={assessmentVisual} seed={session.seed + round} />}
           {smaller ? (
             <>
               <p>{smaller.model}</p>
@@ -280,11 +285,7 @@ export function BaseTenFlow({
       )}
       {session && complete && (
         <>
-          <p>
-            {session.mode === 'review'
-              ? 'Review observations saved separately.'
-              : 'Your work was saved for this goal. A new goal is suggested only after independent success across days.'}
-          </p>
+          <p>{session.mode === 'review' ? 'Your review is saved.' : 'Your work is saved.'}</p>
           <div className="base-ten-actions">
             <button type="button" className="btn" onClick={() => start(session.tier, 'review')}>
               Review this goal again

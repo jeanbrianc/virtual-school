@@ -6,11 +6,11 @@ Moon Rock Rescue remains the default route, with all seven tiers and every histo
 
 Three new reviewed objective IDs describe only the represented tasks:
 
-- `math.tens-ones-20-99`: identify tens and ones in numbers 20–99 with a labeled base-ten representation.
+- `math.tens-ones-20-99`: identify tens and ones in numbers 20–99 with a countable base-ten representation.
 - `math.compose-20-99`: compose 20–99 from displayed tens and ones.
 - `math.decompose-20-99`: choose the tens-and-ones decomposition of 20–99.
 
-All tasks retain a base-ten representation. “Independent” means correct on the first attempt without an additional hint, smaller example, retry, or worked answer; it does not claim abstract calculation or transfer without representations. Existing broad catalog skill `math.place-value` is not silently credited or replaced.
+All tasks retain countable base-ten bundles and units. First assessed attempts omit aggregate quantity labels from visible headings and accessible names; a reader cannot copy the requested tens/ones total. Hint, smaller-example and worked-model states reveal quantity labels and are recorded as supported or not yet. After a response is saved, feedback may label the quantities without retroactively changing the independent observation. “Independent” means correct on the first attempt without an additional hint, smaller example, retry, or worked answer; it does not claim abstract calculation or transfer without representations. Existing broad catalog skill `math.place-value` is not silently credited or replaced.
 
 ## Teaching sequence and entry
 

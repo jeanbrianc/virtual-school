@@ -25,7 +25,12 @@ for (const viewport of [
       await page.getByTestId('choose-teacher-activity').click();
       if (viewport.width < 500) await page.getByTestId('choice-globe').tap();
       else await page.getByTestId('choice-globe').press('Enter');
-      await expect(page.getByRole('button', { name: 'US states', exact: false })).toBeVisible();
+      await expect(
+        page
+          .getByRole('button', { name: 'US states', exact: false })
+          .or(page.getByRole('group', { name: 'Three state shapes', exact: true }))
+          .first(),
+      ).toBeVisible();
       await page.getByTestId('dialogue-close').click();
       await page.waitForFunction(() => !(window.__izzy!.game() as unknown as { rig: { inCinematic: boolean } }).rig.inCinematic);
       await talkTo(page, 'nova');

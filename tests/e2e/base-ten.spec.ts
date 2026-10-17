@@ -34,67 +34,68 @@ async function correctChoice(page: Page) {
   return String(line!.includes('How many tens') ? Math.floor(number / 10) : number % 10);
 }
 
-for (const width of [1100, 375])
-  test.describe(`${width}px place-value`, () => {
-    test.use({ viewport: { width, height: width === 375 ? 812 : 720 }, hasTouch: width === 375 });
-    test('optional offline challenge saves support, model and skips exactly once; review stays separate after reload', async ({ page, context }) => {
-      await enterSchool(page);
-      await page.getByTestId('discover-ok').click();
-      await openChallenge(page);
-      expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(0);
-      await page.getByRole('button', { name: 'Grown-up choices', exact: true }).click();
-      await unlockParent(page);
-      await page.getByLabel('Goal', { exact: true }).selectOption('0');
-      await page.getByLabel('Practice purpose').selectOption('learning');
-      await page.getByRole('button', { name: 'Start chosen goal' }).click();
-      await context.setOffline(true);
-      await expect(page.locator('.base-ten-goal')).toContainText('Round 1 of 5');
-      let answer = await correctChoice(page);
-      if (width === 375) await page.getByTestId(`choice-${answer}`).tap();
-      else await page.getByTestId(`choice-${answer}`).press('Enter');
-      await page.getByRole('button', { name: 'Try a new number' }).click();
-      await page.getByRole('button', { name: 'Show a hint', exact: true }).click();
-      // The hint replaces the prompt; this is the second round, asking for ones.
-      answer = String(Number(await page.locator('.base-ten-number').textContent()) % 10);
-      await page.getByTestId(`choice-${answer}`).click();
-      await page.getByRole('button', { name: 'Try a new number' }).click();
-      await page.getByRole('button', { name: 'Smaller example', exact: true }).click();
-      await expect(page.getByRole('button', { name: 'Back to my number' })).toBeVisible();
-      await page.getByRole('button', { name: 'Back to my number' }).click();
-      await page.getByRole('button', { name: 'Work it out together', exact: true }).click();
-      await page.getByRole('button', { name: 'Try a new number' }).click();
-      await page.getByRole('button', { name: 'Skip this round' }).click();
-      await page.getByRole('button', { name: 'Try a new number' }).click();
-      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
-      answer = await correctChoice(page);
-      await page.getByTestId(`choice-${answer}`).click();
-      await page.getByRole('button', { name: 'Finish mission' }).click();
-      const saved = await records(page);
-      const mission = saved.lessons.filter((l) => l.lessonId === 'base-ten-mission');
-      expect(mission).toHaveLength(1);
-      expect(mission[0]!.complete).toBe(true);
-      expect(mission[0]!.problems.map((p) => p.outcome)).toEqual(['independent', 'supported', 'not_yet', 'skipped', 'independent']);
-      const evidence = saved.evidence.filter((e) => e.source.id === mission[0]!.id);
-      expect(evidence).toHaveLength(4);
-      await page.getByRole('button', { name: 'Review this goal again' }).click();
-      await page.getByRole('button', { name: 'Skip this round' }).click();
-      await page.getByRole('button', { name: 'Try a new number' }).click();
-      if (width === 375) await page.setViewportSize({ width: 667, height: 375 });
-      await page.screenshot({ path: `test-results/base-ten-${width}.png` });
-      await page.getByTestId('dialogue-close').click();
-      const beforeReload = await records(page);
-      expect(beforeReload.lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(2);
-      const review = beforeReload.lessons.find((l) => l.practiceMode === 'review')!;
-      expect(review.complete).toBe(false);
-      expect(beforeReload.evidence.filter((e) => e.source.id === review.id)).toHaveLength(0);
-      await context.setOffline(false);
-      await page.reload();
-      expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toEqual(
-        beforeReload.lessons.filter((l) => l.lessonId === 'base-ten-mission'),
-      );
-      await page.waitForFunction(() => window.__izzy?.game()?.busy === false);
-      await openChallenge(page);
-      await page.getByTestId('dialogue-close').click();
-      expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(2);
-    });
-  });
+test('optional offline challenge saves support, model and skips exactly once; review stays separate after reload', async ({ page, context, isMobile }) => {
+  const width = isMobile ? 375 : 1100;
+  if (isMobile) await page.setViewportSize({ width: 375, height: 812 });
+  await enterSchool(page);
+  await page.getByTestId('discover-ok').click();
+  await openChallenge(page);
+  expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(0);
+  await page.getByRole('button', { name: 'Grown-up choices', exact: true }).click();
+  await unlockParent(page);
+  await page.getByLabel('Goal', { exact: true }).selectOption('0');
+  await page.getByLabel('Practice purpose').selectOption('learning');
+  await page.getByRole('button', { name: 'Start chosen goal' }).click();
+  await context.setOffline(true);
+  await expect(page.locator('.base-ten-goal')).toContainText('Round 1 of 5');
+  await expect(page.locator('.base-ten-stage h3')).toHaveText(['Tens', 'Ones']);
+  await expect(page.getByRole('region', { name: /[0-9]+ tens/ })).toHaveCount(0);
+  let answer = await correctChoice(page);
+  if (width === 375) await page.getByTestId(`choice-${answer}`).tap();
+  else await page.getByTestId(`choice-${answer}`).press('Enter');
+  await page.getByRole('button', { name: 'Try a new number' }).click();
+  await page.getByRole('button', { name: 'Show a hint', exact: true }).click();
+  await expect(page.locator('.base-ten-stage h3').first()).toHaveText(/^[2-9] tens$/);
+  // The hint replaces the prompt; this is the second round, asking for ones.
+  answer = String(Number(await page.locator('.base-ten-number').textContent()) % 10);
+  await page.getByTestId(`choice-${answer}`).click();
+  await page.getByRole('button', { name: 'Try a new number' }).click();
+  await page.getByRole('button', { name: 'Smaller example', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Back to my number' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to my number' }).click();
+  await page.getByRole('button', { name: 'Work it out together', exact: true }).click();
+  await page.getByRole('button', { name: 'Try a new number' }).click();
+  await page.getByRole('button', { name: 'Skip this round' }).click();
+  await page.getByRole('button', { name: 'Try a new number' }).click();
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  answer = await correctChoice(page);
+  await page.getByTestId(`choice-${answer}`).click();
+  await page.getByRole('button', { name: 'Finish mission' }).click();
+  const saved = await records(page);
+  const mission = saved.lessons.filter((l) => l.lessonId === 'base-ten-mission');
+  expect(mission).toHaveLength(1);
+  expect(mission[0]!.complete).toBe(true);
+  expect(mission[0]!.problems.map((p) => p.outcome)).toEqual(['independent', 'supported', 'not_yet', 'skipped', 'independent']);
+  const evidence = saved.evidence.filter((e) => e.source.id === mission[0]!.id);
+  expect(evidence).toHaveLength(4);
+  await page.getByRole('button', { name: 'Review this goal again' }).click();
+  await page.getByRole('button', { name: 'Skip this round' }).click();
+  await page.getByRole('button', { name: 'Try a new number' }).click();
+  if (width === 375) await page.setViewportSize({ width: 667, height: 375 });
+  await page.screenshot({ path: `test-results/base-ten-${width}.png` });
+  await page.getByTestId('dialogue-close').click();
+  const beforeReload = await records(page);
+  expect(beforeReload.lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(2);
+  const review = beforeReload.lessons.find((l) => l.practiceMode === 'review')!;
+  expect(review.complete).toBe(false);
+  expect(beforeReload.evidence.filter((e) => e.source.id === review.id)).toHaveLength(0);
+  await context.setOffline(false);
+  await page.reload();
+  expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toEqual(
+    beforeReload.lessons.filter((l) => l.lessonId === 'base-ten-mission'),
+  );
+  await page.waitForFunction(() => window.__izzy?.game()?.busy === false);
+  await openChallenge(page);
+  await page.getByTestId('dialogue-close').click();
+  expect((await records(page)).lessons.filter((l) => l.lessonId === 'base-ten-mission')).toHaveLength(2);
+});
