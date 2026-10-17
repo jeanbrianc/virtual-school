@@ -346,7 +346,7 @@ export interface ProblemAttemptRecord {
   prompt: string;
   responses: string[];
   scaffolds: string[];
-  outcome: 'independent' | 'supported' | 'not_yet' | 'skipped';
+  outcome: 'independent' | 'supported' | 'not_yet' | 'skipped' | 'model_only';
 }
 
 export interface LessonAttempt {

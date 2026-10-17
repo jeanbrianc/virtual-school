@@ -2720,3 +2720,60 @@ button.treasure {
   width: 100%;
   min-height: 44px;
 }
+
+/* Two broad operand trays; nothing tiny must be tapped. Arithmetic answers stay hidden until feedback. */
+.arithmetic-stage {
+  margin: 12px 0;
+}
+.arithmetic-equation {
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-weight: 800;
+  text-align: center;
+  margin: 6px 0 12px;
+}
+.arithmetic-operands {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.arithmetic-operands > section {
+  min-width: 0;
+  padding: 10px;
+  border: 2px solid #8faea6;
+  border-radius: 18px;
+  background: #f5fbf7;
+}
+.arithmetic-operands > section > h3 {
+  margin: 0;
+  text-align: center;
+}
+.arithmetic-operands .base-ten-parts {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.arithmetic-operands .base-ten-parts section {
+  padding: 8px;
+}
+.arithmetic-operands .base-ten-bundle {
+  min-width: 30px;
+}
+.arithmetic-operands .base-ten-one {
+  width: 25px;
+  height: 25px;
+}
+.arithmetic-result {
+  text-align: center;
+  font-weight: 800;
+}
+@media (max-width: 400px) {
+  .arithmetic-operands {
+    gap: 6px;
+  }
+  .arithmetic-operands > section {
+    padding: 5px;
+  }
+  .arithmetic-operands .base-ten-bundles,
+  .arithmetic-operands .base-ten-ones {
+    gap: 4px;
+  }
+}
