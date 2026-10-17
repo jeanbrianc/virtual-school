@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { expect, test } from 'playwright/test';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
 import { useSyntheticHousehold } from './synthetic-household';
@@ -148,8 +148,8 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   expect(await page.evaluate(() => (window as unknown as { safetyMicrophones: number }).safetyMicrophones)).toBe(0);
   expect(unexpected).toEqual([]);
   expect(errors).toEqual([]);
-  await info.attach('mocked-outbound-requests', {
-    body: JSON.stringify({ teacherRequests, voiceRequests, unexpected, providerCalls: 0, fixture: 'synthetic' }, null, 2),
-    contentType: 'application/json',
-  });
+  // A body-only attachment is not persisted by the CI list reporter on success.
+  const evidencePath = info.outputPath('mocked-outbound-requests.json');
+  writeFileSync(evidencePath, JSON.stringify({ teacherRequests, voiceRequests, unexpected, providerCalls: 0, fixture: 'synthetic' }, null, 2));
+  await info.attach('mocked-outbound-requests', { path: evidencePath, contentType: 'application/json' });
 });
