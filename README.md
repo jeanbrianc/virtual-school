@@ -1,14 +1,14 @@
-# Izzy's Virtual Classroom
+# Virtual Classroom
 
-A local-first 3D homeschool learning world for a young, advanced learner — plus a
+A local-first 3D learning world with guided activities — plus a
 parent studio for recordkeeping, curriculum tracking, portfolios and reports.
 
-- **Child mode** — an explorable, cozy 3D school. Izzy walks around (keyboard,
-  tap-to-walk, or a game controller), talks to her teachers (Professor Hoot for
+- **Child mode** — an explorable, cozy 3D school. A learner walks around (keyboard,
+  tap-to-walk, or a game controller), talks to the learner's teachers (Professor Hoot for
   reading, Digit for math, Nova for science and Pippa for shape play) — by tapping, typing, or just
-  saying it out loud — finishes real books that fly onto her own bookshelf, and
-  watches the school grow as she learns.
-- **Parent studio** — describe the day in plain English ("we baked bread and she
+  saying it out loud — finishes real books that fly onto a personal bookshelf, and
+  watches the school grow as the learner learns.
+- **Parent studio** — describe the day in plain English ("we baked bread and the learner
   measured 2 cups of flour…") and the app suggests skills and evidence for you
   to review. Mastery, curriculum, portfolio, reports, and a word-for-word log of
   every teacher conversation.
@@ -37,9 +37,9 @@ npm install          # installs pinned dependencies
 npm run dev          # http://127.0.0.1:5173 with live reload
 ```
 
-Open the app and tap **Izzy**. The first launch is a brand-new, empty school:
-no books, no history, nothing unlocked. Everything she can touch sparkles until
-she discovers it, and her teachers introduce themselves the first time they
+Open the app and select a learner profile. The first launch is a brand-new, empty school:
+no books, no history, nothing unlocked. Everything the learner can touch sparkles until
+the learner discovers it, and the learner's teachers introduce themselves the first time they
 meet. The **Grown-ups** button asks for the parent PIN — it starts as **1234**
 (change it in *Settings & privacy*).
 
@@ -49,13 +49,13 @@ sample data* replaces everything with a clearly labeled example history;
 
 ### Talking to teachers (and optional AI teachers)
 
-**Talk-to-text** is on by default in *on-device only* mode: Izzy taps the
-microphone and says “I read Daddy the Goodnight Leelanau book”; her words
-appear, Professor Hoot answers about *that* book, asks whether she read the
-whole thing, and offers **Put it on my shelf!** (the reading log notes “Izzy
-read it aloud to Daddy”). Current desktop Chrome recognizes speech entirely on
-the computer. The microphone button is always there (unless a parent turns
-talking off); Izzy's **first tap** sets it up — it asks the browser about
+**Talk-to-text** is on by default in *on-device only* mode. In a synthetic
+example, a learner says “I finished reading The Sample Kite with a grown-up.”
+The words appear, Professor Hoot asks about that book, confirms whether it was
+finished, and offers **Put it on my shelf!**. Reading-partner notes reflect the
+learner's answer. On supported desktop Chrome, speech can be recognized on the
+computer. The microphone button is available unless a parent turns talking off;
+the first tap checks support for
 on-device listening and downloads the voice pack if needed (a one-time ~60 MB
 download from the browser, so the first tap can take a minute), and Chrome asks
 once for microphone permission. *Settings & privacy → Talking to teachers* has
@@ -64,11 +64,11 @@ the same steps (**Check this browser**, **Download the voice pack**) plus
 on-device listening, so that question is only asked on a tap, behind a saved
 marker that remembers a crash. In browsers without on-device recognition (Safari,
 Firefox, older Chrome) either pick *Also allow the browser's speech service*
-(the browser maker — Apple or Google — then hears the audio) or she can type.
+(the browser maker — Apple or Google — then hears the audio) or the learner can type.
 
 **AI teachers** are off by default. The built-in teachers already understand
-book talk (which book, who she read with, finished or not) without any network.
-To let an AI model answer anything she says (and, with OpenAI, give the teachers
+book talk (which book, who the learner read with, finished or not) without any network.
+To let an AI model answer anything the learner says (and, with OpenAI, give the teachers
 natural voices and better listening):
 
 ```bash
@@ -80,7 +80,7 @@ Then *Settings & privacy → AI teachers*: **Check connection**, tick the consen
 box, and **Turn on AI teachers**. The key stays in `.env.local` on your computer
 (git-ignored) and never reaches the browser; the helper builds the teachers'
 instructions itself, only answers pages on this computer, and has a process-local request throttle
-(`AI_DAILY_LIMIT`, default 300 replies per warm helper). Parallel workers and
+(`AI_DAILY_LIMIT`, default 300 replies per day per warm helper). Parallel workers and
 cold starts have separate counters; this is not a deployment-wide usage total
 or a monetary spending cap. Provider billing and hosting costs are separate. See [Privacy & safety](#privacy--safety) for
 exactly what is sent.
@@ -96,23 +96,14 @@ their colors and numbered stations remain readable across graphics settings.
 
 ### Your own domain (AWS)
 
-`npm run deploy:aws` puts the school on your AWS account at
-**lms.brianjeanbuilds.com** — private S3 + CloudFront with HTTPS, a branded
-welcome page with a family sign-in in front of everything, and the AI teachers as a small Lambda at
-`/api` — for roughly the cost of the Route 53 zone you already have. After that,
-every push to `main` on GitHub deploys itself. Step by step:
-[docs/DEPLOY.md](docs/DEPLOY.md).
+The deployment scripts support private S3 hosting, CloudFront with HTTPS, a
+welcome page with sign-in, and an optional Lambda AI helper at `/api`. Configure
+the destination and review costs and permissions before deploying. The repository
+workflow deploys approved changes on `main`; pull-request builds do not deploy.
+See [docs/DEPLOY.md](docs/DEPLOY.md) for setup and operating constraints.
 
-GitHub's AWS deploy role matches this repository's immutable numeric owner and
-repository IDs plus the `main` branch. If copying the deployment to another
-repository, also set its `GITHUB_OWNER_ID` and `GITHUB_REPO_ID`; see the deploy guide.
-
-**Hosted copy.** The production build is also published as a private claude.ai
-artifact. It runs the same code with its own browser storage. That viewer blocks
-file downloads, the print dialog and the microphone, and can't reach the local
-AI helper — so talking out loud, AI teachers, report download/print and JSON
-export only work when you run the app locally (`npm run build && npm run preview`, or
-serve `dist/` from any static host).
+The deploy role binds the configured repository owner, repository ID and branch.
+A copied deployment needs its own configuration and authorization.
 
 ### All commands
 
@@ -145,12 +136,12 @@ Playwright needs a Chromium: `npx playwright install chromium` on a new machine
    Touching something the first time explains what it does (the empty
    bookshelf, Digit's launch pad, the locked greenhouse with its progress…); a
    🧭 counter tracks discoveries and finding everything earns a "School
-   Explorer" cheer. Books appear only when Izzy tells Hoot about them or a
+   Explorer" cheer. Books appear only when a learner tells Hoot about them or a
    parent adds them.
 1. **Talk to a teacher.** Every teacher conversation has a microphone and a
-   “type it” box. Hoot works out which book she means (her own list first,
+   “type it” box. Hoot works out which book the learner means (the learner's own list first,
    then a catalog of well-known titles — “frog and toad” → *Frog and Toad Are
-   Friends*), who she read with, and whether she finished; “yes” / “not yet”
+   Friends*), who the learner read with, and whether the learner finished; “yes” / “not yet”
    answers carry on about the same book, and the next step is always a big
    button (*Put it on my shelf!*, *Bookmark it!*). Digit and Nova chat before
    their lessons (“let's go!” starts one). Worries (“my tummy hurts”, “someone
@@ -159,11 +150,12 @@ Playwright needs a Chromium: `npx playwright install chromium` on a new machine
 1. **Enter school → walk → library → Professor Hoot.** Arrow keys/WASD, tap/click
    to walk (A* pathfinding around furniture), or a gamepad. Big glowing markers
    and a prompt show what's interactive.
-2. **Finish a book.** Pick a book from her list, or type a new title (she reads at a 3rd-grade level; matching titles are suggested). Hoot asks
-   1–3 comprehension questions — difficulty adapts to her reading level. A wrong
-   tap gets "Almost! Let's try another way." and a scaffold ladder (hint →
-   simpler stepping-stone → different explanation → modeled answer), never a
-   penalty. Then a feeling, a star rating and her favorite part.
+2. **Finish a book.** Pick a recorded book or type a new title; matching catalog
+   titles are suggested. For a recognized story, Hoot selects up to two authored
+   comprehension questions, guided by practiced reading skills rather than an
+   assumed grade. Incorrect attempts get gentle help without a penalty. Unknown
+   titles use feelings and favorite-part reflection instead of verified book-fact
+   questions. A star rating records the learner's opinion, not a skill score.
 3. **The book flies to the shelf** in a short cinematic; the HUD counter ticks
    up. At 10 books a second bookshelf rises; 25 opens a reading nook; 50 the grand
    library; 100 hatches Ember the Book Dragon.
@@ -177,7 +169,7 @@ Playwright needs a Chromium: `npx playwright install chromium` on a new machine
    with a hint), mastery changes and the full conversation transcript.
 7. **Natural-language entry** → review/edit each suggested skill, outcome and
    independence → save. Evidence, portfolio, books and reward progress update;
-   anything unlocked is celebrated next time she enters her school.
+   anything unlocked is celebrated next time the learner enters the learner's school.
 8. **Reports**: homeschool record (evidence, levels, standards) or family update
    (warm, photo-friendly, no jargon). Print/PDF, download as a self-contained
    `.html`, or copy text for an email.
@@ -185,8 +177,8 @@ Playwright needs a Chromium: `npx playwright install chromium` on a new machine
    open tabs stay in sync.
 
 **Dance & gym circuit.** The 1–10 numbers on the classroom rug are stations,
-like the circuits in her dance and gymnastics classes. Hopping onto a number
-(walking, tapping it, or Space on the one she's on) makes her avatar do that
+for a numbered movement circuit. Hopping onto a number
+(walking, tapping it, or Space on the one the learner's on) makes the learner's avatar do that
 number's move — a plié, bunny hops, a ☀️ sunshine twirl, a star jump, a
 curtsey, an arabesque, a cartwheel, a frog jump, a backflip and a ta-da by
 default, from 17 moves. Each number plays the next note up a scale. The
@@ -195,7 +187,7 @@ glowing ring and a bouncing star show the next number, a HUD counts 1 → 10,
 and finishing all ten in order gets confetti and is saved (`circuitsDone`).
 Digit calls out each station ("Three! Sunshine twirl! Next, number four!")
 when read-aloud is on. In the Parent Studio, **Avatar → Dance & gym circuit**
-picks the move for each number, what she calls it in class ("sunshine arms"),
+picks the move for each number, an optional display name (for example, "sunshine arms"),
 and previews any move on the avatar. The moves are procedural poses on the
 avatar rig (`engine/characters/moves.ts`), so they work with any outfit.
 
@@ -315,9 +307,9 @@ Common Core ELA (29) · Common Core Math (22 + practice) · NGSS performance
 expectations (18) and DCIs · National Core Arts Standards · CASEL · Head Start ELOF.
 
 Standards codes and grade labels are **parent-only** (enforced by lint for child
-UI). Capability is shown per domain and per strand — Izzy can be "advanced" in
+UI). Capability is shown per domain and per strand — a learner can be "advanced" in
 reading comprehension and "developing" in early math at the same time.
-Recommendations pick skills just beyond her demonstrated frontier whose
+Recommendations pick skills just beyond the learner's demonstrated frontier whose
 prerequisites are met, plus review for anything slipping.
 
 The book catalog contains 15 real children's books with **original**
@@ -346,8 +338,8 @@ on the device. To use an LLM:
      "system": "…instructions…",
      "schema": { "…JSON schema for the response…": true },
      "catalog": [{ "id": "read.retell", "domain": "reading", "name": "…", "can": "…" }],
-     "narrative": "Izzy read two chapters…",
-     "childFirstName": "Izzy",
+     "narrative": "Sample learner read two chapters…",
+     "childFirstName": "Sample",
      "today": "2026-09-26"
    }
    ```
@@ -377,7 +369,7 @@ return it from `createInterpretationService`.
 - **Output**: `SpeechOutput`; the default uses the browser's `speechSynthesis`
   with per-teacher pitch/rate and **only voices built into the computer**
   (network voices would send the text away). A speaker button reads any line;
-  "read aloud automatically" is a parent setting, and when she talks by voice
+  "read aloud automatically" is a parent setting, and when the learner talks by voice
   the teacher answers out loud. Text is always shown. The automatic voice
   prefers a clear US voice (never the joke/robot ones); a parent can choose
   another in *Settings → Voice*.
@@ -387,21 +379,20 @@ return it from `createInterpretationService`.
   `TEACHERS[…].naturalVoice`), plays the MP3, keeps lines in Cache Storage so
   repeats are free, and falls back to the built-in voice on any problem.
   Turned on in *Settings → Voice*; turning it off clears the saved lines.
-- **Her name, said right**: computer voices guess names from spelling
-  ("EYE-zee"). *Settings → Voice → How the voices say "Izzy"* saves a
-  respelling (`Child.sayName`, e.g. "Izzee", with *Hear it* and suggestions)
-  that `domain/pronounce.ts` swaps in **only for speech**; the screen, records
-  and AI teachers keep her real name. Renaming her clears it.
+- **Name pronunciation**: Settings can save a pronunciation respelling
+  (`Child.sayName`, with a preview) that `domain/pronounce.ts` uses only for
+  speech. The displayed name and records are unchanged. Renaming a profile
+  clears its pronunciation override.
 - **Input**: `SpeechInput` (`BrowserSpeechInput`) wraps the Web Speech API,
   on-device first: `SpeechRecognition.available/install` + `processLocally`
   (the `available()` probe runs only from Settings behind a crash marker —
   `domain/talk.ts`, `services/talkService.ts`; child mode reads the saved answer),
-  phrase biasing with her book titles, live words while she talks, and clear
+  phrase biasing with the learner's book titles, live words while the learner talks, and clear
   reasons when it can't listen. `talkMode` is `device` (default — never falls
   back to a cloud recognizer), `browser` (parent allows the browser's service
   when on-device isn't available), `helper` (the family's AI helper — OpenAI
   `gpt-transcribe`: `HelperListener` records only while the mic button is on,
-  stops after a short silence, and posts the clip to `/v1/listen` with her book
+  stops after a short silence, and posts the clip to `/v1/listen` with the learner's book
   titles as keyword hints) or `off`. `RoutingSpeechInput` picks the recognizer.
   **Which microphone** (`src/voice/microphones.ts`): a parent's choice in
   Settings, otherwise the default — except an iPhone/iPad Continuity mic, which
@@ -413,7 +404,7 @@ return it from `createInterpretationService`.
   `LocalTeacherChat` understands book talk on-device; `HttpTeacherChat`
   (`chatRemote.ts`) calls the family's helper and validates/sanitizes every
   reply, falling back to local on any problem. Worries are answered on-device
-  and never sent. Replies only *propose* actions; she confirms with a tap.
+  and never sent. Replies only *propose* actions; the learner confirms with a tap.
 - **AI helper** (`scripts/ai-helper/`): a small Node server on `127.0.0.1`
   (or the AWS Lambda behind the site) with no dependencies. It keeps the key —
   `OPENAI_API_KEY` (replies, voices, listening; used when set) or
@@ -473,22 +464,22 @@ font CDN is contacted.
   household; it does not authorize other households. No analytics, ads, trackers,
   social features or public child profiles. The preview server sends a strict CSP (connections only to itself,
   the local helper, or a parent-configured https endpoint).
-- **Talking**: by default her voice is recognized on the computer and the audio
+- **Talking**: by default the learner's voice is recognized on the computer and the audio
   is never recorded, stored or sent. Only if a parent picks *Also allow the
   browser's speech service* may the browser send audio to Google/Apple, or
-  *Your AI helper (OpenAI)* — then her clip (only while the mic is on) goes to
+  *Your AI helper (OpenAI)* — then the learner's clip (only while the mic is on) goes to
   the helper and OpenAI, which keeps no copy of transcription audio.
 - **AI teachers** (off by default, explicit consent): for each reply the helper
-  sends the AI service (OpenAI or Anthropic) her first name, what she said
-  (text), the last few lines of that conversation and her book titles (the
-  helper's instructions add that she's a young child who reads well above her
-  age) — never photos, birthdays, records or reports. Neither trains on API data
+  sends the AI service (OpenAI or Anthropic) the learner's first name, what the learner said
+  (text), the last few lines of that conversation and the learner's book titles (the
+  helper's instructions include fixed age/ability assumptions; these are not
+  assessments) — never photos, birthdays, records or reports. Neither trains on API data
   by default; OpenAI keeps reply and voice requests up to 30 days for abuse
   monitoring unless the organization has zero data retention, which OpenAI asks
   for before processing data of children under 13 (see docs/DEPLOY.md).
 - **Natural voices** (off by default, OpenAI): the teachers' lines are sent to be
   spoken; Settings discloses that the voices are AI-generated.
-  Safety rules live in the helper, replies are checked on-device before she
+  Safety rules live in the helper, replies are checked on-device before the learner
   sees them, worries are handled on-device and flagged for parents, and AI
   lines are marked in *Teacher talk*.
 - No child-facing external links (lint-enforced).
@@ -503,7 +494,7 @@ font CDN is contacted.
 
 ## Tests & quality checks
 
-- **Unit/component tests** — AWS hosting (the edge sign-in function: welcome page, session cookies, sign-out; stack wiring, the Lambda adapter refusing traffic that skipped CloudFront), talking to teachers (the user's own example sentence,
+- **Unit/component tests** — AWS hosting (the edge sign-in function: welcome page, session cookies, sign-out; stack wiring, the Lambda adapter refusing traffic that skipped CloudFront), talking to teachers (synthetic and regression utterances,
   catalog/own-book title matching, yes/not-yet follow-ups, worries → parent
   notes, reply sanitizing and AI output validation, the browser adapter's
   fallbacks and data minimization, prompt building, the helper's CORS/header/
@@ -519,14 +510,14 @@ font CDN is contacted.
   recommendations and per-domain profiles, reports (period filtering,
   family = no jargon), catalog integrity, and navigation/collision.
 - **E2E (Playwright)** — the first day in a brand-new school (welcome card →
-  meet Professor Hoot → finish her first book, *Charlotte's Web*, with
+  meet Professor Hoot → finish the learner's first book, *Charlotte's Web*, with
   scaffolding → it flies onto the empty shelf → Pip the Bookworm → reload
   persistence → parent sees evidence, transcript and the getting-started
   checklist); parent flow (load sample data → natural-language entry →
   review → greenhouse unlock → curriculum evidence → family report → museum and
   tour) on desktop **and** a phone viewport, including a no-horizontal-overflow
-  check; talking (a simulated on-device recognizer hears “i read daddy the
-  goodnight leelanau book” → Hoot answers about it → “yes the whole thing” →
+  check; talking (a simulated on-device recognizer receives a book-completion
+  utterance → Hoot answers about it → the learner confirms completion →
   onto the shelf → a typed worry reaches the parent's Today page → spoken
   lines marked in Teacher talk → Settings shows on-device ready and AI off).
 - **Lint** — layering, privacy (no external links in child UI, no trackers, no
@@ -558,8 +549,8 @@ so `npm install` reproduces them from npm on a normal machine.
   unusual wording. The optional LLM endpoint is the upgrade path.
 - On-device speech recognition needs a recent desktop Chrome (plus the one-time
   voice pack); elsewhere it's the browser's cloud service (parent opt-in) or
-  typing. Recognizers are tuned for adults, so a 3-year-old's words are
-  sometimes misheard — she always sees what was heard, and titles are matched
+  typing. Speech recognition can mishear young speakers. The transcript stays visible,
+  and titles are matched
   forgivingly.
 - Without AI teachers, the on-device teachers understand book talk and simple
   feelings/questions, and answer anything else with a friendly generic reply.
