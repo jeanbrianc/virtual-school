@@ -1,6 +1,8 @@
 import { expect, test, type Page } from 'playwright/test';
 import { APP, enterSchool, talkTo } from './helpers';
 
+test.use({ actionTimeout: 30_000 });
+
 // Every browser context is disposable local CI data. Keep review screenshots visibly synthetic.
 test.beforeEach(async ({ page }) => {
   await page.goto(`${APP}#/`);
@@ -37,6 +39,9 @@ test.beforeEach(async ({ page }) => {
       db.close();
     }
   });
+  // IndexedDB writes bypass React's live-query cache; force a document reload.
+  await page.reload();
+  await expect(page.getByTestId('enter-sample')).toBeVisible();
 });
 
 async function openGlobe(page: Page) {
