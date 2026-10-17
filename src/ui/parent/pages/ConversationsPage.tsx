@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { getSkill } from '../../../domain/curriculum';
 import { LESSON_TITLES } from '../../../domain/lessons/registry';
+import { isAllowedHelperUrl } from '../../../domain/teachers/chatRemote';
 import { isTeacherId } from '../../../domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../../domain/teachers/teachers';
 import type { LessonAttempt, TeacherInteraction } from '../../../domain/types';
@@ -15,12 +16,11 @@ function time(ts: string): string {
   return new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-/**
- * Full transparency: every conversation the child has with a teacher is
- * stored locally and shown here, word for word.
- */
+/** Saved teacher conversations and activity summaries available to the parent. */
 export function ConversationsPage({ data }: { data: ParentData }) {
   const { records, child } = data;
+  const ai = data.household.settings.teacherAi;
+  const aiChatOn = ai.enabled && ai.consentToSend && isAllowedHelperUrl(ai.endpoint);
   const [teacher, setTeacher] = useState<'all' | TeacherId>('all');
   const [open, setOpen] = useState<string | null>(null);
   const items = useMemo(
@@ -34,12 +34,23 @@ export function ConversationsPage({ data }: { data: ParentData }) {
     <div className="page">
       <PageHeader
         title="Teacher talk"
-        subtitle={`Every conversation ${child.name} has with her teachers, word for word. Stored only on this device. ${
-          data.household.settings.teacherAi.enabled && data.household.settings.teacherAi.consentToSend
-            ? 'AI teachers are on: what she says to a teacher is sent (as text) through your AI helper to its AI service (OpenAI or Anthropic) to write the reply — those replies are marked “AI”.'
-            : 'Teachers answer on this device — nothing is sent anywhere.'
-        }`}
+        subtitle={`Saved conversations and activity summaries for ${child.name}. Some activities save summaries rather than every line.`}
       />
+      <Card>
+        <div className="small" data-testid="conversation-privacy">
+          <p>Saved records are stored in this browser. They may also be included in family sync when enabled, or in exports you make.</p>
+          <p>
+            <strong>Optional AI chat: {aiChatOn ? 'on' : 'off'}.</strong>{' '}
+            {aiChatOn
+              ? 'For AI replies, your helper and its AI service receive text: the learner’s first name, current message, recent conversation turns and book titles. AI replies are marked “AI”.'
+              : 'Built-in chat replies run on this device.'}
+          </p>
+          <p>
+            Voice and microphone sharing are controlled separately and may send text or audio to other services. Review them in{' '}
+            <a href="#/parent/settings">Settings &amp; privacy</a>.
+          </p>
+        </div>
+      </Card>
       <div className="toolbar">
         <div className="chip-row">
           <button type="button" className={`chip ${teacher === 'all' ? 'active' : ''}`} onClick={() => setTeacher('all')}>
