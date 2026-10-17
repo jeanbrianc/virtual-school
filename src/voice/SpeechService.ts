@@ -18,6 +18,8 @@ export interface NaturalVoice {
 }
 
 export interface SpeakOptions {
+  /** Require a verified local browser voice; never fall back to the browser default. */
+  localOnly?: boolean;
   pitch?: number;
   rate?: number;
   volume?: number;
@@ -231,6 +233,10 @@ export class BrowserSpeechOutput implements SpeechOutput {
       u.volume = opts.volume ?? 1;
       const pick = this.voiceFor(opts.voiceName);
       const voice = pick && this.localVoices().find((v) => v.name === pick.name);
+      if (opts.localOnly && !voice) {
+        resolve();
+        return;
+      }
       if (voice) {
         u.voice = voice;
         u.lang = voice.lang;

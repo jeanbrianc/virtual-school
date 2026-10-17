@@ -55,6 +55,9 @@ import { recordPractice } from '../../services/practiceService';
 import { KeyboardFlow } from './flows/KeyboardFlow';
 import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
+import { WeatherFlow } from './flows/WeatherFlow';
+import { weatherSpeech } from '../../voice/weatherSpeech';
+import { recordWeatherLesson } from '../../services/weatherService';
 import { LessonFlow } from './flows/LessonFlow';
 import { TeacherActivityChooser } from './flows/TeacherActivityChooser';
 import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
@@ -165,6 +168,11 @@ export function ChildMode({ childId }: { childId: string }) {
       },
     }),
     [services.speechOut, readAloud, naturalVoices],
+  );
+
+  const skySpeech = useMemo(
+    () => weatherSpeech(services.speechOut, readAloud, household?.settings.audio.muted ?? false, household?.settings.audio.voice ?? 1),
+    [services.speechOut, readAloud, household?.settings.audio.muted, household?.settings.audio.voice],
   );
 
   // ── Talking to teachers (speech-to-text + conversation) ─────────────────
@@ -1042,7 +1050,20 @@ export function ChildMode({ childId }: { childId: string }) {
               talk={talkKit}
             />
           )}
-          {overlay?.kind === 'lesson' && (
+          {overlay?.kind === 'lesson' && overlay.lessonId === 'weather-pictures' && (
+            <WeatherFlow
+              key={`weather:${childId}`}
+              childId={childId}
+              speech={skySpeech}
+              onSave={async (run, startedAt) => {
+                await recordWeatherLesson(ctx, childId, run, startedAt, []);
+                await reload();
+              }}
+              onClose={closeSheet}
+              onChooseActivity={() => setOverlay({ kind: 'activities', teacher: 'nova', returnTo: overlay })}
+            />
+          )}
+          {overlay?.kind === 'lesson' && overlay.lessonId !== 'weather-pictures' && (
             <LessonFlow
               key={`${overlay.teacher}:${overlay.lessonId}`}
               {...(teacherActivities(overlay.teacher).length > 1
