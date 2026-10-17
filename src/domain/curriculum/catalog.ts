@@ -153,6 +153,31 @@ function defineSkills(input: Record<string, SkillInput>): Skill[] {
 }
 
 export const SKILLS: Skill[] = defineSkills({
+  'sci.weather-picture-match': {
+    strand: 'sci.earthSpace',
+    name: 'Weather picture-and-label matching',
+    can: 'match a schematic sky picture and label to the same pictured detail',
+    childName: 'Sky Picture Noticer',
+    difficulty: 0,
+    standards: [family('Picture-and-label matching only; not real weather observation, explanation, or prediction.')],
+    lessons: ['weather-pictures'],
+    idea: 'With a grown-up, describe the sky safely through a window.',
+  },
+  'sci.weather-chart-compare': {
+    strand: 'sci.earthSpace',
+    name: 'Fictional weather picture-chart comparison',
+    can: 'choose the repeated or more frequent symbol in a short fictional weather picture chart',
+    childName: 'Picture Chart Detective',
+    difficulty: 1,
+    standards: [
+      ngss(
+        'K-ESS2-1',
+        'Partial practice comparing media-based picture records with small whole-number counts; not local observation, forecasting, or full standard mastery.',
+      ),
+    ],
+    lessons: ['weather-pictures'],
+    idea: 'With a grown-up, make a real window-weather chart over several days and talk about the observations.',
+  },
   'sci.life-picture-match': {
     strand: 'sci.life',
     name: 'Life-cycle picture-and-label matching',

@@ -1,0 +1,46 @@
+name: Nova weather review
+on:
+  pull_request:
+    paths:
+      - 'src/domain/lessons/**'
+      - 'src/domain/teachers/registry.ts'
+      - 'src/domain/curriculum/catalog.ts'
+      - 'src/ui/child/flows/LessonFlow.tsx'
+      - 'src/ui/child/lesson/**'
+      - 'src/ui/child/ChildMode.tsx'
+      - 'src/styles/weather.css'
+      - 'src/voice/**'
+      - 'src/services/weatherService.ts'
+      - 'src/ui/child/flows/WeatherFlow.tsx'
+      - 'tests/unit/weather*.test.ts'
+      - 'tests/e2e/nova-weather.spec.ts'
+      - 'tests/e2e/synthetic-household.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/nova-weather.yml'
+permissions:
+  contents: read
+jobs:
+  weather-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- tests/e2e/nova-weather.spec.ts --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nova-weather-${{ matrix.project }}-${{ github.sha }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: warn

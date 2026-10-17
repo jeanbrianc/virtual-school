@@ -4,6 +4,7 @@ import { createAppServices, ServicesProvider } from './app/services';
 import './styles/base.css';
 import './styles/child.css';
 import './styles/life-cycle.css';
+import './styles/weather.css';
 import './styles/parent.css';
 import './styles/showcase.css';
 

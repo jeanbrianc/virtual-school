@@ -119,6 +119,13 @@ export const TEACHER_REGISTRY = {
         icon: '🌱',
         activity: { kind: 'lesson', lessonId: 'life-cycle' },
       },
+      {
+        id: 'weather-pictures',
+        label: 'Sky picture detectives',
+        description: 'Match sky pictures and compare made-up weather charts.',
+        icon: '🌦️',
+        activity: { kind: 'lesson', lessonId: 'weather-pictures' },
+      },
       { id: 'globe', label: 'Globe adventure', description: 'Explore US states or world countries.', icon: '🌎', activity: { kind: 'globe' } },
     ],
     scene: { x: 8.2, z: -5.4, model: 'panda', icon: '🔬' },

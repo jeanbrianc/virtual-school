@@ -1,0 +1,110 @@
+.weather-stage {
+  margin: 6px 0;
+  padding: 8px;
+  border-radius: 16px;
+  background: #f0f6fa;
+}
+.weather-stage > p,
+.weather-progress {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.weather-stage ol {
+  display: flex;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  gap: 6px;
+}
+.weather-stage li {
+  max-width: 160px;
+  min-width: 0;
+  flex: 1;
+  text-align: center;
+  border: 3px solid transparent;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+.weather-picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+}
+.weather-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.weather-choice {
+  min-height: 140px;
+  padding: 8px;
+  border: 3px solid #557995;
+  border-radius: 16px;
+  background: #fffdf5;
+  font: inherit;
+  color: #233e55;
+  cursor: pointer;
+}
+.weather-choice:focus-visible,
+.weather-play button:focus-visible {
+  outline: 4px solid #14559a;
+  outline-offset: 2px;
+}
+.weather-choice:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.weather-choice.weather-supported,
+.weather-stage li.weather-counted {
+  border: 3px dashed #946314;
+  background: #fff4cf;
+}
+.weather-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.weather-controls button {
+  flex: 1 1 auto;
+  min-height: 48px;
+}
+.weather-next,
+.weather-switch {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+}
+.weather-model {
+  padding: 8px;
+  margin-top: 8px;
+  border: 2px dashed #946314;
+  border-radius: 12px;
+}
+.weather-note,
+.weather-ceiling {
+  font-size: 0.9rem;
+}
+@media (max-width: 540px) {
+  .weather-stage li {
+    font-size: 0.7rem;
+  }
+  .weather-chart ol {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .weather-chart li {
+    max-width: none;
+  }
+  .weather-chart .weather-picture {
+    max-height: 70px;
+  }
+  .weather-choice {
+    min-height: 132px;
+    font-size: 0.85rem;
+    padding: 5px;
+  }
+}
