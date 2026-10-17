@@ -1,5 +1,8 @@
 import { expect, test, type Page } from 'playwright/test';
 import { enterSchool, talkTo, unlockParent } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
+
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
 
 async function openChallenge(page: Page) {
   await talkTo(page, 'digit');
@@ -37,7 +40,7 @@ async function correctChoice(page: Page) {
 test('optional offline challenge saves support, model and skips exactly once; review stays separate after reload', async ({ page, context, isMobile }) => {
   const width = isMobile ? 375 : 1100;
   if (isMobile) await page.setViewportSize({ width: 375, height: 812 });
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   page.setDefaultTimeout(30_000);
   await page.getByTestId('discover-ok').click();
   await openChallenge(page);
