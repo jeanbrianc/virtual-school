@@ -228,15 +228,22 @@ test('new teacher placement leaves existing teachers, globe, dance, keyboard and
     await page.waitForFunction(() => window.__izzy?.game()?.busy === false, null, { timeout: 180_000 });
   }
   await talkTo(page, 'globe');
+  const globeShapes = page.getByRole('group', { name: 'Three state shapes', exact: true });
+  await expect(page.getByTestId('discover-ok').or(globeShapes)).toBeVisible();
   if (await page.getByTestId('discover-ok').count()) {
     await page.getByTestId('discover-ok').click();
+    await page.waitForFunction(() => window.__izzy?.game()?.busy === false);
     await talkTo(page, 'globe');
   }
   await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(globeShapes).toBeVisible();
   await page.getByTestId('dialogue-close').click();
+  await page.waitForFunction(() => window.__izzy?.game()?.busy === false);
   await talkTo(page, 'alphabet');
+  await expect(page.getByTestId('discover-ok').or(page.getByTestId('keyboard-trail'))).toBeVisible();
   if (await page.getByTestId('discover-ok').count()) {
     await page.getByTestId('discover-ok').click();
+    await page.waitForFunction(() => window.__izzy?.game()?.busy === false);
     await talkTo(page, 'alphabet');
   }
   await expect(page.getByTestId('keyboard-trail')).toBeVisible();
@@ -245,9 +252,13 @@ test('new teacher placement leaves existing teachers, globe, dance, keyboard and
   await expect(page.getByTestId('circuit-hud')).toBeVisible();
   await page.getByRole('button', { name: 'Stop the circuit' }).click();
   await talkTo(page, 'bookshelf');
+  const bookshelf = page.getByRole('dialog', { name: 'My bookshelf', exact: true });
+  await expect(page.getByTestId('discover-ok').or(bookshelf)).toBeVisible();
   if (await page.getByTestId('discover-ok').count()) {
     await page.getByTestId('discover-ok').click();
+    await page.waitForFunction(() => window.__izzy?.game()?.busy === false);
     await talkTo(page, 'bookshelf');
   }
   await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(bookshelf).toBeVisible();
 });

@@ -630,6 +630,28 @@ kbd {
   transform: translateY(2px);
   box-shadow: 0 2px 0 #ecd9b8;
 }
+/* Activity cards keep the description below the title, never beside it. */
+.teacher-activity-chooser .choices {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+}
+.teacher-activity-chooser .choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-content: start;
+  gap: 8px 12px;
+  min-width: 0;
+}
+.teacher-activity-chooser .choice-label,
+.teacher-activity-chooser .choice-hint {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.teacher-activity-chooser .choice-hint {
+  grid-column: 1 / -1;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
 .choice-primary {
   border-color: var(--terracotta);
   box-shadow: 0 4px 0 var(--terracotta-deep);
