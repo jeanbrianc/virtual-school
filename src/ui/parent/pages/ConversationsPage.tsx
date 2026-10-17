@@ -9,10 +9,26 @@ import { TeacherPortrait } from '../../child/TeacherPortrait';
 import { Card, EmptyState, PageHeader } from '../components';
 import type { ParentData } from '../ParentApp';
 
-const OUTCOME_LABEL: Record<string, string> = { independent: 'On her own', supported: 'With a hint', not_yet: 'Not yet' };
+const OUTCOME_LABEL: Record<string, string> = {
+  independent: 'On her own',
+  supported: 'With a hint',
+  not_yet: 'Not yet',
+  skipped: 'Skipped',
+  model_only: 'Viewed model · ungraded',
+};
 
 function time(ts: string): string {
   return new Date(ts).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Prefer the stable per-run link; retain temporal matching only for legacy interactions. */
+export function findConversationLesson(lessons: LessonAttempt[], interaction: TeacherInteraction): LessonAttempt | undefined {
+  const sameOwner = (lesson: LessonAttempt) => lesson.childId === interaction.childId && lesson.teacherId === interaction.teacherId;
+  const exact = lessons.find((lesson) => sameOwner(lesson) && `${lesson.id}:talk` === interaction.id);
+  if (exact) return exact;
+  // A partially synced modern run must not display a different run's evidence.
+  if (interaction.id.startsWith('base-ten-arithmetic:') || interaction.id.startsWith('base-ten:')) return undefined;
+  return lessons.find((lesson) => sameOwner(lesson) && Math.abs(Date.parse(lesson.completedAt) - Date.parse(interaction.endedAt)) < 5 * 60_000);
 }
 
 /**
@@ -27,8 +43,7 @@ export function ConversationsPage({ data }: { data: ParentData }) {
     () => [...records.interactions].filter((i) => teacher === 'all' || i.teacherId === teacher).sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
     [records.interactions, teacher],
   );
-  const lessonFor = (i: TeacherInteraction): LessonAttempt | undefined =>
-    records.lessons.find((l) => l.teacherId === i.teacherId && Math.abs(Date.parse(l.completedAt) - Date.parse(i.endedAt)) < 5 * 60_000);
+  const lessonFor = (i: TeacherInteraction) => findConversationLesson(records.lessons, i);
 
   return (
     <div className="page">
@@ -106,24 +121,30 @@ export function ConversationsPage({ data }: { data: ParentData }) {
                         <h3 className="mini-head">
                           Problem by problem · started at level {lesson.startTier + 1}, ended at level {lesson.endTier + 1}
                         </h3>
-                        <table className="data-table">
+                        <table className="data-table" role="table">
                           <thead>
                             <tr>
-                              <th>Prompt</th>
-                              <th>Skill</th>
-                              <th>Her answers</th>
-                              <th>Help given</th>
-                              <th>Result</th>
+                              <th scope="col">Prompt</th>
+                              <th scope="col">Skill</th>
+                              <th scope="col">Her answers</th>
+                              <th scope="col">Help given</th>
+                              <th scope="col">Result</th>
                             </tr>
                           </thead>
                           <tbody>
                             {lesson.problems.map((p, k) => (
                               <tr key={k}>
-                                <td>{p.prompt}</td>
-                                <td className="small">{getSkill(p.skillId)?.name ?? p.skillId}</td>
-                                <td className="small">{p.responses.join(' → ')}</td>
-                                <td className="small">{p.scaffolds.length ? p.scaffolds.join('; ') : '—'}</td>
-                                <td>
+                                <td data-label="Prompt">{p.prompt}</td>
+                                <td className="small" data-label="Skill">
+                                  {getSkill(p.skillId)?.name ?? p.skillId}
+                                </td>
+                                <td className="small" data-label="Answers">
+                                  {p.responses.length ? p.responses.join(' → ') : 'No answer attempted'}
+                                </td>
+                                <td className="small" data-label="Help given">
+                                  {p.scaffolds.length ? p.scaffolds.join('; ') : '—'}
+                                </td>
+                                <td data-label="Result">
                                   <span className={`indep indep-${p.outcome === 'not_yet' ? 'assisted' : p.outcome}`}>{OUTCOME_LABEL[p.outcome]}</span>
                                 </td>
                               </tr>

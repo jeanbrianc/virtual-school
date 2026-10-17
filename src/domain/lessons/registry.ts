@@ -1,3 +1,4 @@
+import { arithmeticLesson } from './baseTenArithmetic';
 import { baseTenLesson } from './baseTen';
 import { patternsLesson } from './patterns';
 import { moonRocksLesson } from './moonRocks';
@@ -7,6 +8,7 @@ import type { LessonDefinition } from './types';
 
 /** Lessons that can be launched directly by a teacher (story chat is book-specific). */
 export const LESSONS: Record<string, LessonDefinition> = {
+  [arithmeticLesson.id]: arithmeticLesson,
   [baseTenLesson.id]: baseTenLesson,
   [patternsLesson.id]: patternsLesson,
   [moonRocksLesson.id]: moonRocksLesson,
@@ -15,6 +17,7 @@ export const LESSONS: Record<string, LessonDefinition> = {
 };
 
 export const LESSON_TITLES: Record<string, { title: string; childTitle: string; teacherId: string }> = {
+  [arithmeticLesson.id]: { title: arithmeticLesson.title, childTitle: arithmeticLesson.childTitle, teacherId: 'digit' },
   [baseTenLesson.id]: { title: baseTenLesson.title, childTitle: baseTenLesson.childTitle, teacherId: 'digit' },
   'patterns-shapes': { title: patternsLesson.title, childTitle: patternsLesson.childTitle, teacherId: 'pippa' },
   'keyboard-trail': { title: 'Keyboard trail (letter/key familiarity)', childTitle: 'Keyboard trail', teacherId: 'hoot' },

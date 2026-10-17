@@ -68,6 +68,13 @@ export const TEACHER_REGISTRY = {
         icon: '🔢',
         activity: { kind: 'lesson', lessonId: 'base-ten-mission' },
       },
+      {
+        id: 'base-ten-arithmetic',
+        label: 'Base-ten Workshop',
+        description: 'Optional grown-up choice: join or take away tens and ones.',
+        icon: '🧰',
+        activity: { kind: 'lesson', lessonId: 'base-ten-arithmetic' },
+      },
     ],
     scene: { x: 8.3, z: 4.4, model: 'robot', icon: '🤖' },
     room: 'the math corner, where you rescue moon rocks by counting, adding and sharing',

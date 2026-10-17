@@ -59,6 +59,9 @@ import { LessonFlow } from './flows/LessonFlow';
 import { BASE_TEN_ID } from '../../domain/lessons/baseTen';
 import { recordBaseTen } from '../../services/baseTenService';
 import { BaseTenFlow } from './flows/BaseTenFlow';
+import { ARITHMETIC_ID } from '../../domain/lessons/baseTenArithmetic';
+import { recordArithmetic } from '../../services/arithmeticService';
+import { ArithmeticFlow } from './flows/ArithmeticFlow';
 import { TeacherActivityChooser } from './flows/TeacherActivityChooser';
 import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
 import { MIC_NEEDS_GROWNUP, MIC_NO_BROWSER_SUPPORT, type MicSetup, type TalkKit } from './Talk';
@@ -1064,7 +1067,21 @@ export function ChildMode({ childId }: { childId: string }) {
               onChooseActivity={() => setOverlay({ kind: 'activities', teacher: 'digit', returnTo: overlay })}
             />
           )}
-          {overlay?.kind === 'lesson' && overlay.lessonId !== BASE_TEN_ID && (
+          {overlay?.kind === 'lesson' && overlay.lessonId === ARITHMETIC_ID && (
+            <ArithmeticFlow
+              key={`${childId}:${overlay.lessonId}`}
+              childId={childId}
+              mastery={data.records.mastery}
+              parentPin={data.household.settings.parentPin}
+              onSave={async (progress) => {
+                await recordArithmetic(ctx, childId, progress);
+                await reload();
+              }}
+              onClose={closeSheet}
+              onChooseActivity={() => setOverlay({ kind: 'activities', teacher: 'digit', returnTo: overlay })}
+            />
+          )}
+          {overlay?.kind === 'lesson' && overlay.lessonId !== BASE_TEN_ID && overlay.lessonId !== ARITHMETIC_ID && (
             <LessonFlow
               key={`${overlay.teacher}:${overlay.lessonId}`}
               {...(teacherActivities(overlay.teacher).length > 1
