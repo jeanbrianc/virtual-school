@@ -1,3 +1,4 @@
+import { LifeCycleStage } from './LifeCyclePicture';
 import { ShapePicture } from './ShapePicture';
 /**
  * Visual "stages" for adaptive lessons: moon rocks to tap and count,
@@ -119,6 +120,8 @@ function TankStage({ objectId, showResult, floats, dropping }: { objectId: strin
 
 export function LessonStage({ visual, seed, dropping }: { visual: LessonVisual; seed: number; dropping?: { floats: boolean } | null }) {
   switch (visual.type) {
+    case 'life-cycle':
+      return <LifeCycleStage stage={visual.stage} next={visual.next} />;
     case 'pattern':
       return (
         <div

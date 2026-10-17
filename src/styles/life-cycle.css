@@ -1,0 +1,135 @@
+.life-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0;
+}
+.life-stage figure {
+  margin: 0;
+  width: 160px;
+  text-align: center;
+}
+.life-picture {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 145px;
+}
+.life-stage figcaption {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.life-arrow {
+  font-size: 2rem;
+}
+.life-unknown {
+  width: 80px;
+  height: 90px;
+  display: grid;
+  place-items: center;
+  font-size: 3rem;
+  border: 3px dashed #668552;
+  border-radius: 18px;
+}
+.life-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.life-choices:has(> :last-child:nth-child(2)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.life-choice {
+  min-height: 132px;
+  padding: 8px;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  border: 3px solid #91ad76;
+  background: #fffdf2;
+  border-radius: 16px;
+  color: #29452e;
+  font: inherit;
+  cursor: pointer;
+}
+.life-choice span {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.life-choice:focus-visible,
+.life-controls button:focus-visible {
+  outline: 4px solid #285f9e;
+  outline-offset: 2px;
+}
+.life-choice:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+.life-choice.life-selected {
+  border-color: #316b40;
+  background: #dfedc7;
+}
+.life-choice.life-supported {
+  border-style: dashed;
+  border-color: #976515;
+}
+.life-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.life-controls button {
+  min-height: 48px;
+  flex: 1 1 auto;
+}
+.life-model {
+  padding: 8px;
+  background: #edf3e4;
+  border-radius: 12px;
+  margin: 8px 0;
+}
+.life-model ol {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style-position: inside;
+}
+.life-model li {
+  text-align: center;
+  font-size: 0.85rem;
+}
+.life-model p,
+.life-ceiling {
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+@media (max-width: 540px) {
+  .life-stage figure {
+    width: 130px;
+  }
+  .life-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .life-choice {
+    padding: 4px;
+    min-height: 126px;
+  }
+  .life-choice span {
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+  }
+  .life-model ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.life-next {
+  min-height: 52px;
+  width: 100%;
+  margin-top: 10px;
+}

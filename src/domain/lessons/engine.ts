@@ -180,6 +180,14 @@ export class LessonRun {
     return this.retry(this.main.problem.hints[0] ?? 'Let’s look together.', { type: 'hint', text: this.main.problem.hints[0] ?? '', manipulatives: true });
   }
 
+  /** Seeing a worked model is support; viewing alone never finishes an attempt. */
+  model(): LessonFeedback {
+    if (!this.main || this.complete) throw new Error('Lesson is not active');
+    this.stepping = null;
+    this.main.scaffolds.push('model');
+    return this.retry(this.main.problem.model, { type: 'model', text: this.main.problem.model, manipulatives: true });
+  }
+
   skip(): LessonFeedback {
     if (!this.main || this.complete) throw new Error('Lesson is not active');
     this.stepping = null;
