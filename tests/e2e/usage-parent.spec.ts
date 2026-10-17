@@ -28,7 +28,10 @@ for (const viewport of [
       throw new Error(`Unexpected helper request: ${path}`);
     });
     await page.addInitScript(() => {
+      const state = window as unknown as { usageMicCalls: number };
+      state.usageMicCalls = 0;
       navigator.mediaDevices.getUserMedia = async () => {
+        state.usageMicCalls += 1;
         throw new Error('Usage view must never open a microphone');
       };
     });
@@ -56,7 +59,9 @@ for (const viewport of [
     await expect(view).toContainText('Provider-reported tokens: unknown');
     await view.scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await page.screenshot({ path: `test-results/usage-parent-${viewport.width}.png`, fullPage: true });
+    await expect(view).toHaveCount(1);
+    expect(await page.evaluate(() => (window as unknown as { usageMicCalls: number }).usageMicCalls)).toBe(0);
+    await view.locator('..').screenshot({ path: `test-results/usage-parent-${viewport.width}.png`, scale: 'css' });
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export local usage' }).click();
     const download = await downloadPromise;
