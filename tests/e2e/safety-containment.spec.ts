@@ -116,11 +116,13 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   for (let turn = 0; turn < 12; turn++) {
     await say(`I like stars ${turn}`);
     await expect(page.getByTestId('dialogue-line')).not.toContainText('A synthetic story reply!');
+    expect(teacherRequests).toHaveLength(1);
+    expect(voiceRequests).toHaveLength(voicesBefore);
   }
   await page.getByRole('button', { name: 'Read it to me', exact: true }).click();
   await page.getByRole('button', { name: 'Back to library', exact: true }).click();
   await say('I like books');
-  await expect(page.getByTestId('dialogue-line')).toContainText('What was it called?');
+  await expect(page.getByTestId('dialogue-line')).toContainText('You love books? Hoo-hoo, so do I!');
   expect(teacherRequests).toHaveLength(1);
   expect(voiceRequests).toHaveLength(voicesBefore);
   await page.getByRole('dialog').screenshot({ path: `test-results/safety-local-${info.project.name}.png` });
