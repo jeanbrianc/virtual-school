@@ -60,6 +60,7 @@ export class Bookshelf {
   private units: THREE.Group[] = [];
   private unitVisible: boolean[] = [];
   private books = new Map<string, THREE.Mesh>();
+  private arrivals = new Map<string, () => void>();
   private plaque: THREE.Mesh;
   private plaqueCount = -1;
   private readonly z = LAYOUT.shelfZ;
@@ -232,6 +233,7 @@ export class Bookshelf {
 
   /** Places all books instantly (initial load / preview). */
   setBooks(books: ShelfBook[]): void {
+    for (const cancel of this.arrivals.values()) cancel();
     const keep = new Set(books.map((b) => b.id));
     for (const [id, mesh] of this.books) {
       if (!keep.has(id)) {
@@ -287,8 +289,15 @@ export class Bookshelf {
    * The signature moment: the book glows, arcs through the air from the
    * teacher to its permanent slot and settles with a satisfying thunk.
    */
-  async flyBookIn(book: ShelfBook, from: THREE.Vector3, onLand: (at: THREE.Vector3) => void): Promise<void> {
-    const mesh = this.makeBookMesh(book);
+  async flyBookIn(
+    book: ShelfBook,
+    from: THREE.Vector3,
+    onLand: (at: THREE.Vector3) => void,
+    options: { signal?: AbortSignal; arcHeight?: number } = {},
+  ): Promise<void> {
+    if (options.signal?.aborted) return;
+    this.arrivals.get(book.id)?.();
+    const mesh = this.books.get(book.id) ?? this.makeBookMesh(book);
     this.books.set(book.id, mesh);
     this.root.add(mesh);
     const glow = new THREE.PointLight('#ffd98a', 3, 2.5, 2);
@@ -300,36 +309,65 @@ export class Bookshelf {
     const ctrl = start
       .clone()
       .lerp(front, 0.5)
-      .add(new THREE.Vector3(0, 2.4, 0));
+      .add(new THREE.Vector3(0, options.arcHeight ?? 2.4, 0));
     const curve = new THREE.QuadraticBezierCurve3(start, ctrl, front);
-
-    mesh.position.copy(start);
-    mesh.scale.setScalar(0.01);
-    // Pop into existence, glowing.
-    await this.tweens.run(0.45, (k) => mesh.scale.setScalar(0.01 + k * 1.6), { easing: ease.outBack });
-    await this.tweens.run(1.6, (k) => {
-      mesh.position.copy(curve.getPoint(k));
-      mesh.rotation.set(Math.sin(k * Math.PI) * 0.6, k * Math.PI * 4, Math.sin(k * Math.PI * 2) * 0.3);
-      mesh.scale.setScalar(1.6 - k * 0.6);
-    });
-    // Settle into the slot.
-    await this.tweens.run(
-      0.5,
-      (k) => {
-        mesh.position.lerpVectors(front, end, k);
-        mesh.rotation.set(0, 0, 0);
-      },
-      { easing: ease.outCubic },
-    );
-    mesh.position.copy(end);
-    onLand(end.clone().add(new THREE.Vector3(0, 0.1, 0.2)));
-    await this.tweens.run(0.35, (k) => {
-      const s = 1 + Math.sin(k * Math.PI) * 0.12;
-      mesh.scale.set(s, 1 / s, s);
-      glow.intensity = 3 * (1 - k);
-    });
-    mesh.remove(glow);
-    this.setCount(this.books.size);
+    let cancelled = false;
+    const settle = () => {
+      mesh.position.copy(end);
+      mesh.rotation.set(0, 0, target.rotationZ);
+      mesh.scale.setScalar(1);
+      mesh.remove(glow);
+      this.setCount(this.books.size);
+    };
+    const cancel = () => {
+      cancelled = true;
+      settle();
+      if (this.arrivals.get(book.id) === cancel) this.arrivals.delete(book.id);
+    };
+    this.arrivals.set(book.id, cancel);
+    options.signal?.addEventListener('abort', cancel, { once: true });
+    const stage = (duration: number, update: (k: number) => void, easing = ease.inOutCubic) =>
+      this.tweens.run(
+        duration,
+        (k) => {
+          if (!cancelled) update(k);
+        },
+        { easing },
+      );
+    try {
+      mesh.position.copy(start);
+      mesh.scale.setScalar(0.01);
+      await stage(0.45, (k) => mesh.scale.setScalar(0.01 + k * 1.6), ease.outBack);
+      if (cancelled) return;
+      await stage(1.6, (k) => {
+        mesh.position.copy(curve.getPoint(k));
+        mesh.rotation.set(Math.sin(k * Math.PI) * 0.6, k * Math.PI * 4, Math.sin(k * Math.PI * 2) * 0.3);
+        mesh.scale.setScalar(1.6 - k * 0.6);
+      });
+      if (cancelled) return;
+      await stage(
+        0.5,
+        (k) => {
+          mesh.position.lerpVectors(front, end, k);
+          mesh.rotation.set(0, 0, target.rotationZ * k);
+        },
+        ease.outCubic,
+      );
+      if (cancelled) return;
+      mesh.position.copy(end);
+      onLand(end.clone().add(new THREE.Vector3(0, 0.1, 0.2)));
+      await stage(0.35, (k) => {
+        const s = 1 + Math.sin(k * Math.PI) * 0.12;
+        mesh.scale.set(s, 1 / s, s);
+        glow.intensity = 3 * (1 - k);
+      });
+    } finally {
+      options.signal?.removeEventListener('abort', cancel);
+      if (this.arrivals.get(book.id) === cancel) {
+        settle();
+        this.arrivals.delete(book.id);
+      }
+    }
   }
 
   update(time: number): void {
