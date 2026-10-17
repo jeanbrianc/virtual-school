@@ -112,6 +112,13 @@ export const TEACHER_REGISTRY = {
         icon: '💧',
         activity: { kind: 'lesson', lessonId: 'sink-float' },
       },
+      {
+        id: 'life-cycle',
+        label: 'Growing and changing',
+        description: 'Notice and sequence plant and butterfly pictures.',
+        icon: '🌱',
+        activity: { kind: 'lesson', lessonId: 'life-cycle' },
+      },
       { id: 'globe', label: 'Globe adventure', description: 'Explore US states or world countries.', icon: '🌎', activity: { kind: 'globe' } },
     ],
     scene: { x: 8.2, z: -5.4, model: 'panda', icon: '🔬' },

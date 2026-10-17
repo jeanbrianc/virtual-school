@@ -757,9 +757,11 @@ export function ChildMode({ childId }: { childId: string }) {
               icon: TEACHER_REGISTRY[teacher].celebration.icon,
               title: lesson.completeTitle,
               message:
-                teacher === 'digit'
-                  ? `You helped Digit on another moon mission. ${fresh && fresh.world.rocketStage >= 3 ? 'The rocket is almost ready!' : 'The rocket grew a little more!'}`
-                  : TEACHER_REGISTRY[teacher].celebration.message,
+                lesson.id === 'life-cycle'
+                  ? 'You explored life-cycle pictures. Try noticing changes in a real plant with a grown-up. Aquarium friends celebrate visits, not science proficiency.'
+                  : teacher === 'digit'
+                    ? `You helped Digit on another moon mission. ${fresh && fresh.world.rocketStage >= 3 ? 'The rocket is almost ready!' : 'The rocket grew a little more!'}`
+                    : TEACHER_REGISTRY[teacher].celebration.message,
             },
             ...res.outcome.newRewards.map(rewardToCelebration),
           ],
