@@ -1,5 +1,44 @@
 import { expect, test, type Page } from 'playwright/test';
-import { enterSchool, talkTo } from './helpers';
+import { APP, enterSchool, talkTo } from './helpers';
+
+// Every browser context is disposable local CI data. Keep review screenshots visibly synthetic.
+test.beforeEach(async ({ page }) => {
+  await page.goto(`${APP}#/`);
+  await expect(page.getByTestId('enter-izzy')).toBeVisible();
+  await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('izzys-classroom');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(['children', 'parents', 'households'], 'readwrite');
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        for (const name of ['children', 'parents', 'households']) {
+          const store = transaction.objectStore(name);
+          const request = store.getAll();
+          request.onsuccess = () => {
+            for (const row of request.result) {
+              if (name === 'children') {
+                delete row.birthDate;
+                row.name = row.status === 'active' ? 'Sample' : 'Sample sibling';
+                row.isDemo = true;
+              } else if (name === 'parents') row.displayName = 'Sample parent';
+              else row.name = 'Synthetic globe fixture';
+              store.put(row);
+            }
+          };
+        }
+      });
+    } finally {
+      db.close();
+    }
+  });
+});
+
 async function openGlobe(page: Page) {
   await talkTo(page, 'globe');
   const explore = page.getByRole('button', { name: 'Explore with Nova', exact: false });
@@ -25,7 +64,7 @@ async function records(page: Page) {
   });
 }
 test('five offline rounds retain retries, hint and skipped outcomes under Nova after reload', async ({ page, context }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await openGlobe(page);
   await page.getByRole('button', { name: 'Choose another level or map', exact: true }).click();
@@ -58,7 +97,7 @@ test('five offline rounds retain retries, hint and skipped outcomes under Nova a
 });
 test('phone portrait and narrow landscape offer countries, cancel/reopen and no save from exposure', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await openGlobe(page);
   await page.getByRole('button', { name: 'Choose another level or map', exact: true }).click();
@@ -77,10 +116,10 @@ test('phone portrait and narrow landscape offer countries, cancel/reopen and no 
 });
 
 test('two live tabs save a synthetic globe session once', async ({ page, context }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   const other = await context.newPage();
-  await enterSchool(other);
+  await enterSchool(other, 'sample');
   const run = {
     id: 'synthetic-globe-race',
     lessonId: 'globe-states' as const,
@@ -110,7 +149,7 @@ test('two live tabs save a synthetic globe session once', async ({ page, context
 });
 
 test('beginner state shapes fit phone sizes and preserve supported, skipped and independent rounds', async ({ page, context, isMobile }, testInfo) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   await openGlobe(page);
   const choices = page.getByRole('group', { name: 'Three state shapes', exact: true }).locator('button');
