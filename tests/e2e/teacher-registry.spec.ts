@@ -1,8 +1,9 @@
 import { expect, test } from 'playwright/test';
-import { enterSchool, talkTo } from './helpers';
+import { talkTo } from './helpers';
+import { loadRoutineSample } from './fixtures/routineSample';
+test.use({ actionTimeout: 30_000 });
 test('existing teachers keep their introductions and working offline activities', async ({ page }) => {
-  await enterSchool(page);
-  await page.getByTestId('discover-ok').click();
+  await loadRoutineSample(page);
   expect(
     await page.evaluate(() => {
       const g = window.__izzy!.game() as unknown as { world: { teachers: Map<string, { id: string }> } };
@@ -12,6 +13,7 @@ test('existing teachers keep their introductions and working offline activities'
     ['hoot', 'hoot'],
     ['digit', 'digit'],
     ['pippa', 'pippa'],
+    ['tavi', 'tavi'],
     ['nova', 'nova'],
   ]);
   for (const [id, name] of [

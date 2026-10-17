@@ -94,6 +94,26 @@ export const TEACHERS: Record<TeacherId, TeacherProfile> = {
     farewells: ['Keep noticing shapes, {name}!'],
     praise: ['You noticed the repeating pair!', 'You tried your own idea!'],
   },
+  tavi: {
+    id: 'tavi',
+    name: 'Tavi',
+    subject: 'Everyday picture steps',
+    species: 'Teal turtle',
+    personality: 'Patient, curious, and comfortable with more than one way to do things.',
+    color: '#356f6b',
+    accent: '#e9bb61',
+    voice: { pitch: 1.0, rate: 0.9 },
+    naturalVoice: {
+      voice: 'sage',
+      style:
+        'Speak gently and clearly as Tavi, an original patient turtle exploring fictional picture steps with a learner. Never assume a home routine or reading level.',
+    },
+    introductions: ['Hello, {name}! I’m Tavi. We can arrange pretend picture steps and see which orders work. We can take our time.'],
+    greetings: ['Hello, {name}! Shall we explore some picture steps?'],
+    returnGreetings: ['Welcome back! There can be more than one way.'],
+    farewells: ['Thanks for exploring with me!'],
+    praise: ['That order fits our pretend task.'],
+  },
   nova: {
     id: 'nova',
     name: 'Nova',

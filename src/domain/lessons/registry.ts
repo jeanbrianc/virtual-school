@@ -13,6 +13,7 @@ export const LESSONS: Record<string, LessonDefinition> = {
 };
 
 export const LESSON_TITLES: Record<string, { title: string; childTitle: string; teacherId: string }> = {
+  'everyday-sequencing': { title: 'Fictional everyday picture sequencing', childTitle: 'What comes next?', teacherId: 'tavi' },
   'patterns-shapes': { title: patternsLesson.title, childTitle: patternsLesson.childTitle, teacherId: 'pippa' },
   'keyboard-trail': { title: 'Keyboard trail (letter/key familiarity)', childTitle: 'Keyboard trail', teacherId: 'hoot' },
   'moon-rocks': { title: moonRocksLesson.title, childTitle: moonRocksLesson.childTitle, teacherId: 'digit' },

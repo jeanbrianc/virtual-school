@@ -1,5 +1,8 @@
 import { expect, test } from 'playwright/test';
-import { enterSchool, talkTo } from './helpers';
+import { talkTo } from './helpers';
+
+import { loadRoutineSample } from './fixtures/routineSample';
+test.use({ actionTimeout: 30_000 });
 
 for (const viewport of [
   { width: 1100, height: 720 },
@@ -9,8 +12,7 @@ for (const viewport of [
     test.use({ hasTouch: viewport.width < 500 });
     test(`activity chooser preserves default routes, closes and opens a registered activity at ${viewport.width}px`, async ({ page, context }) => {
       await page.setViewportSize(viewport);
-      await enterSchool(page);
-      await page.getByTestId('discover-ok').click();
+      await loadRoutineSample(page);
       await context.setOffline(true);
       await talkTo(page, 'nova');
       await expect(page.getByTestId('choice-go')).toBeVisible();

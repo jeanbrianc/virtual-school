@@ -1,3 +1,4 @@
+import './styles/routine.css';
 import { createRoot } from 'react-dom/client';
 import { App } from './app/App';
 import { createAppServices, ServicesProvider } from './app/services';

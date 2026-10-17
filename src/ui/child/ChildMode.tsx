@@ -52,6 +52,8 @@ import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
 import { GlobeFlow } from './flows/GlobeFlow';
 import { recordPractice } from '../../services/practiceService';
+import { RoutineFlow } from './flows/RoutineFlow';
+import { recordRoutine } from '../../services/routineService';
 import { KeyboardFlow } from './flows/KeyboardFlow';
 import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
@@ -66,6 +68,7 @@ type Overlay =
   | { kind: 'activities'; teacher: TeacherId; returnTo: { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number } }
   | { kind: 'globe' }
   | { kind: 'keyboard' }
+  | { kind: 'routine' }
   | { kind: 'hoot' }
   | { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number }
   | { kind: 'shelf' }
@@ -433,6 +436,13 @@ export function ChildMode({ childId }: { childId: string }) {
         setOverlay({ kind: 'hoot' });
         return;
       }
+      if (registeredTeacher && activity?.kind === 'routine') {
+        teacherForSpeech.current = registeredTeacher;
+        game.setInputEnabled(false);
+        void game.focusTeacher(registeredTeacher);
+        setOverlay({ kind: 'routine' });
+        return;
+      }
       if (registeredTeacher && activity?.kind === 'lesson') {
         const teacher = registeredTeacher;
         const lesson = getLesson(activity.lessonId);
@@ -534,7 +544,7 @@ export function ChildMode({ childId }: { childId: string }) {
         onStation: (n) => stationRef.current(n),
         onBack: () => {
           const o = overlayRef.current;
-          if (o && o.kind !== 'celebrate' && o.kind !== 'hoot' && o.kind !== 'lesson' && o.kind !== 'keyboard') setOverlay(null);
+          if (o && o.kind !== 'celebrate' && o.kind !== 'hoot' && o.kind !== 'lesson' && o.kind !== 'keyboard' && o.kind !== 'routine') setOverlay(null);
         },
       },
     }).then(async (game) => {
@@ -1000,6 +1010,24 @@ export function ChildMode({ childId }: { childId: string }) {
 
           {overlay?.kind === 'activities' && (
             <TeacherActivityChooser teacher={overlay.teacher} speech={speech} onPick={chooseActivity} onClose={() => setOverlay(overlay.returnTo)} />
+          )}
+          {overlay?.kind === 'routine' && (
+            <RoutineFlow
+              key={childId}
+              childId={childId}
+              speech={{
+                canSpeak: services.speechOut.available,
+                auto: readAloud,
+                speak: (text) => {
+                  if (!muted) void services.speechOut.speak(text, { ...TEACHERS.tavi.voice, volume: household?.settings.audio.voice ?? 1 });
+                },
+              }}
+              onClose={closeSheet}
+              onSave={async (run) => {
+                await recordRoutine(ctx, childId, run);
+                await reload();
+              }}
+            />
           )}
           {overlay?.kind === 'keyboard' && (
             <KeyboardFlow
