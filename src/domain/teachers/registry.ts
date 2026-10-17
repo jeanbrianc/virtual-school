@@ -1,6 +1,6 @@
 import type { DomainId } from '../curriculum/types';
 
-export type TeacherActivity = { kind: 'reading' } | { kind: 'lesson'; lessonId: string } | { kind: 'keyboard' } | { kind: 'globe' };
+export type TeacherActivity = { kind: 'reading' } | { kind: 'lesson'; lessonId: string } | { kind: 'keyboard' } | { kind: 'globe' } | { kind: 'rhythm' };
 
 export interface TeacherActivityChoice {
   /** Stable route key, never a label or user-supplied lesson ID. */
@@ -16,7 +16,7 @@ export interface TeacherRegistration {
   local: { questions: readonly string[]; shares: readonly string[]; likes: string; unclear: string };
   activity: TeacherActivity;
   activities: readonly TeacherActivityChoice[];
-  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox'; icon: string };
+  scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox' | 'otter'; icon: string };
   room: string;
   startLabel: string;
   completionIcon: string;
@@ -126,6 +126,30 @@ export const TEACHER_REGISTRY = {
     startLabel: 'Let’s investigate!',
     completionIcon: '💧',
     celebration: { icon: '🔬', anchor: 'aquarium', message: 'Nova added a new fish friend to the aquarium to thank you!' },
+  },
+  milo: {
+    domains: ['creativity'],
+    activity: { kind: 'rhythm' },
+    activities: [
+      {
+        id: 'rhythm-garden',
+        label: 'Beats and little pauses',
+        description: 'Copy gentle beats or match pictures without timing.',
+        icon: '🥁',
+        activity: { kind: 'rhythm' },
+      },
+    ],
+    scene: { x: -4.8, z: -6.8, model: 'otter', icon: '🥁' },
+    room: 'the music garden, where you explore original beat-and-pause patterns at a comfortable pace',
+    startLabel: 'Explore a rhythm',
+    completionIcon: '🥁',
+    celebration: { icon: '🥁', anchor: 'pippa', message: 'You explored beats and pauses with Milo.' },
+    local: {
+      questions: ['A rhythm can have beats with short or long pauses. Shall we watch one?', 'We can explore a beat with pictures or taps.'],
+      shares: ['Every way of joining in is welcome.', 'Tell a grown-up about a sound you noticed.'],
+      likes: 'You like {likes}? You can imagine a gentle beat about it.',
+      unclear: 'We can watch a pattern, copy it, or choose matching pictures.',
+    },
   },
 } as const satisfies Record<string, TeacherRegistration>;
 export type TeacherId = keyof typeof TEACHER_REGISTRY;

@@ -447,7 +447,44 @@ class Pippa extends BaseTeacher {
   }
 }
 
+class Milo extends BaseTeacher {
+  id = 'milo' as const;
+  headHeight = 1.95;
+  constructor(yaw: number) {
+    super(yaw);
+    const fur = mat('#74618c'),
+      cream = mat('#fff1da'),
+      dark = mat('#302c3a'),
+      gold = mat('#f4cf75');
+    const torso = sphere(0.38, fur, 0, 0.94, 0);
+    torso.scale.y = 1.35;
+    const tail = sphere(0.23, fur, 0, 0.33, -0.38);
+    tail.scale.set(0.7, 0.7, 2.0);
+    this.body.add(
+      torso,
+      tail,
+      sphere(0.34, fur, 0, 1.66, 0),
+      sphere(0.13, fur, -0.3, 1.87, 0),
+      sphere(0.13, fur, 0.3, 1.87, 0),
+      sphere(0.22, cream, 0, 1.53, 0.23),
+      sphere(0.06, dark, 0, 1.61, 0.42),
+      sphere(0.04, dark, -0.13, 1.75, 0.29),
+      sphere(0.04, dark, 0.13, 1.75, 0.29),
+      sphere(0.13, fur, -0.2, 0.23, 0.13),
+      sphere(0.13, fur, 0.2, 0.23, 0.13),
+      sphere(0.13, fur, -0.37, 1.1, 0.24),
+      sphere(0.13, fur, 0.37, 1.1, 0.24),
+      cyl(0.3, 0.23, 0.34, gold, 0, 0.95, 0.4),
+      cyl(0.31, 0.31, 0.03, cream, 0, 1.13, 0.4),
+    );
+  }
+  update(dt: number, lookAt: THREE.Vector3 | null) {
+    this.turnToward(dt, lookAt);
+  }
+}
+
 const MODEL_FACTORIES: Record<TeacherRegistration['scene']['model'], (yaw: number) => TeacherModel> = {
+  otter: (yaw) => new Milo(yaw),
   fox: (yaw) => new Pippa(yaw),
   owl: (yaw) => new Hoot(yaw),
   robot: (yaw) => new Digit(yaw),

@@ -3,6 +3,7 @@ import { App } from './app/App';
 import { createAppServices, ServicesProvider } from './app/services';
 import './styles/base.css';
 import './styles/child.css';
+import './styles/rhythm.css';
 import './styles/life-cycle.css';
 import './styles/parent.css';
 import './styles/showcase.css';

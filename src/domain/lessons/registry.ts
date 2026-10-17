@@ -14,6 +14,7 @@ export const LESSONS: Record<string, LessonDefinition> = {
 
 export const LESSON_TITLES: Record<string, { title: string; childTitle: string; teacherId: string }> = {
   'patterns-shapes': { title: patternsLesson.title, childTitle: patternsLesson.childTitle, teacherId: 'pippa' },
+  'rhythm-garden': { title: 'Milo’s rhythm garden (copying or untimed picture recognition)', childTitle: 'Beats and little pauses', teacherId: 'milo' },
   'keyboard-trail': { title: 'Keyboard trail (letter/key familiarity)', childTitle: 'Keyboard trail', teacherId: 'hoot' },
   'moon-rocks': { title: moonRocksLesson.title, childTitle: moonRocksLesson.childTitle, teacherId: 'digit' },
   'life-cycle': { title: lifeCycleLesson.title, childTitle: lifeCycleLesson.childTitle, teacherId: 'nova' },
