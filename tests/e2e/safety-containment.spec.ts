@@ -7,7 +7,7 @@ test.use({ actionTimeout: 45_000 });
 
 const chime = readFileSync(new URL('./fixtures/chime.mp3', import.meta.url));
 
-test('recognized safety stays local through repeated turns and Back; retained parent evidence and fresh AI both work', async ({ page }, info) => {
+test('recognized safety stays local through repeated turns and Back; retained parent evidence and fresh AI both work', async ({ page, isMobile }, info) => {
   const teacherRequests: unknown[] = [];
   const voiceRequests: { text: string }[] = [];
   const unexpected: string[] = [];
@@ -66,7 +66,9 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   expect(voiceRequests).toHaveLength(0);
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByLabel('Viewing learner').selectOption({ label: 'Sample' });
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByTestId('ai-endpoint').fill('/api');
   await page.getByTestId('ai-endpoint').blur();
   await page.getByTestId('ai-check').click();
@@ -119,9 +121,12 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   await page.getByTestId('dialogue-close').click();
   await page.goto(`${APP}#/parent/today`);
   await unlockParent(page);
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByLabel('Viewing learner').selectOption({ label: 'Sample' });
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await expect(page.getByTestId('teacher-notes')).toContainText('I am scared');
   await page.getByTestId('teacher-notes').screenshot({ path: `test-results/safety-parent-note-${info.project.name}.png` });
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByTestId('nav-conversations').click();
   const conversation = page.locator('.convo-head').filter({ hasText: 'Professor Hoot' }).first();
   await conversation.click();
