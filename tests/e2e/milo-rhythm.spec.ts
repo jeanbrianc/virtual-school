@@ -244,6 +244,25 @@ async function watch(page: Page, info: TestInfo, round: number) {
 async function finishRound(page: Page, info: TestInfo, round: number) {
   await activate(page.getByRole('button', { name: round === 0 ? 'Explore a fresh pattern' : 'Finish visit', exact: true }), info);
 }
+async function copyTwoBeats(page: Page, info: TestInfo, gap: number) {
+  const pad = page.getByTestId('rhythm-tap');
+  await expect(pad).toBeVisible();
+  await expect(pad).toBeEnabled();
+  await pad.scrollIntoViewIfNeeded();
+  await expect(pad).toBeInViewport({ ratio: 1 });
+  const box = (await pad.boundingBox())!;
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  expect(await pad.evaluate((element, p) => element.contains(document.elementFromPoint(p.x, p.y)), point)).toBe(true);
+  if (info.project.name !== 'phone') await pad.focus();
+  // Validate visibility and focus before the first beat. Locator.tap() waits
+  // for stable rendered frames, which can add seconds to a musical gap under
+  // SwiftShader. Native touchscreen/keyboard dispatch still exercises real
+  // input without inserting actionability waits between the two beats.
+  const tap = () => (info.project.name === 'phone' ? page.touchscreen.tap(point.x, point.y) : page.keyboard.press('Enter'));
+  await tap();
+  await page.waitForTimeout(gap);
+  await tap();
+}
 
 test('muted keyboard/touch copy, fresh independent pattern, parent evidence, dedup and sibling isolation', async ({ page, context }, info) => {
   const errors: string[] = [];
@@ -262,9 +281,7 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
     expect(box!.height).toBeGreaterThanOrEqual(100);
     expect(box!.width).toBeGreaterThanOrEqual(250);
     await screenshot(page, info, round === 0 ? 'guided-copy' : 'fresh-independent-copy');
-    await activate(pad, info);
-    await page.waitForTimeout(round === 0 ? 800 : 2400);
-    await activate(pad, info);
+    await copyTwoBeats(page, info, round === 0 ? 800 : 2400);
     await expect(page.getByText('You made a beat-and-pause pattern!', { exact: true })).toBeVisible();
     if (round === 1) await screenshot(page, info, 'independent-copy-feedback');
     await finishRound(page, info, round);
