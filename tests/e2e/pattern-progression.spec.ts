@@ -191,7 +191,19 @@ test('all five explicit levels work offline, save once, and preserve narrow evid
       expect(box!.height).toBeGreaterThanOrEqual(120);
       await screenshot(page, info, `pattern-${tier}`);
     }
-    for (let round = 0; round < 4; round++) await solveRound(page, info, round);
+    for (let round = 0; round < 4; round++) {
+      if (info.project.name === 'phone' && tier === 4 && round === 3) {
+        const viewport = page.viewportSize()!;
+        await page.setViewportSize({ width: 320, height: 760 });
+        await expect(page.locator('.pattern-playground-stage [data-shape]')).toHaveCount(9);
+        await screenshot(page, info, 'abc-long-320');
+        await activate(page.getByRole('button', { name: /Show the model/ }), info);
+        await page.locator('.pattern-worked-model').scrollIntoViewIfNeeded();
+        await screenshot(page, info, 'abc-long-model-320');
+        await page.setViewportSize(viewport);
+      }
+      await solveRound(page, info, round);
+    }
     if (tier < 4) {
       await page.getByTestId('choice-choose-pattern').dblclick();
       await expect(page.getByTestId('pattern-level-0')).toBeVisible();
@@ -205,7 +217,18 @@ test('all five explicit levels work offline, save once, and preserve narrow evid
   await expect.poll(async () => (await records(page)).lessons.length).toBe(5);
   const saved = await records(page);
   expect(saved.lessons.every((l) => l.childId === 'child_izzy' && l.lessonId === 'pattern-progression')).toBeTruthy();
-  expect(saved.evidence.map((e) => e.skillId).sort()).toEqual([...PATTERN_SKILLS].sort());
+  expect(
+    saved.evidence
+      .filter((e) => e.skillId !== 'reason.persistence')
+      .map((e) => e.skillId)
+      .sort(),
+  ).toEqual([...PATTERN_SKILLS].sort());
+  expect(saved.evidence.filter((e) => e.skillId === 'reason.persistence')).toHaveLength(info.project.name === 'phone' ? 1 : 0);
+  expect(saved.evidence.find((e) => e.skillId === 'reason.pattern-continue-abc')!.trials).toEqual({
+    independent: info.project.name === 'phone' ? 3 : 4,
+    supported: info.project.name === 'phone' ? 1 : 0,
+    notYet: 0,
+  });
   expect(saved.evidence.every((e) => e.childId === 'child_izzy')).toBeTruthy();
   expect(saved.portfolio).toHaveLength(0);
   await dismissCelebrations(page);
