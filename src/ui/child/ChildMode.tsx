@@ -36,7 +36,7 @@ import { speakableText } from '../../domain/pronounce';
 import { browserFamily, knownOnDevice, type OnDeviceAnswer } from '../../domain/talk';
 import { talkPhrases } from '../../domain/teachers/chat';
 import { isAllowedHelperUrl, naturalVoicesOn } from '../../domain/teachers/chatRemote';
-import { TEACHER_REGISTRY, teacherForInteraction } from '../../domain/teachers/registry';
+import { TEACHER_REGISTRY, teacherActivities, teacherActivity, teacherForInteraction } from '../../domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../domain/types';
 import { toDay } from '../../domain/util/time';
@@ -56,12 +56,17 @@ import { KeyboardFlow } from './flows/KeyboardFlow';
 import { recordKeyboardTrail } from '../../services/keyboardService';
 import { HootFlow } from './flows/HootFlow';
 import { LessonFlow } from './flows/LessonFlow';
+import { BASE_TEN_ID } from '../../domain/lessons/baseTen';
+import { recordBaseTen } from '../../services/baseTenService';
+import { BaseTenFlow } from './flows/BaseTenFlow';
+import { TeacherActivityChooser } from './flows/TeacherActivityChooser';
 import { BookshelfViewer, Celebration, DiscoveryCard, HintCard, ParentGate, Treasures, rewardToCelebration, type CelebrationItem } from './Overlays';
 import { MIC_NEEDS_GROWNUP, MIC_NO_BROWSER_SUPPORT, type MicSetup, type TalkKit } from './Talk';
 import { useChildWorld, type ChildWorldData } from './useChildWorld';
 import type { TalkAvailability } from '../../voice/SpeechService';
 
 type Overlay =
+  | { kind: 'activities'; teacher: TeacherId; returnTo: { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number } }
   | { kind: 'globe' }
   | { kind: 'keyboard' }
   | { kind: 'hoot' }
@@ -144,7 +149,7 @@ export function ChildMode({ childId }: { childId: string }) {
     () => ({
       canSpeak: services.speechOut.available || naturalVoices,
       auto: readAloud,
-      speak: (text: string) => {
+      speak: (text: string, options?: { localOnly: boolean }) => {
         const settings = dataRef.current?.household.settings;
         if (settings?.audio.muted) return;
         const teacher = teacherForSpeech.current;
@@ -158,6 +163,7 @@ export function ChildMode({ childId }: { childId: string }) {
           rate: v.rate,
           volume: settings?.audio.voice ?? 1,
           ...(settings?.voiceName ? { voiceName: settings.voiceName } : {}),
+          localOnly: options?.localOnly,
           ...(ai && naturalVoicesOn(ai) ? { natural: { endpoint: ai.endpoint, teacher } } : {}),
         });
       },
@@ -246,7 +252,8 @@ export function ChildMode({ childId }: { childId: string }) {
             },
       chat: services.teacherChat(dataRef.current?.household),
       phrases: talkPhrases(books ?? []),
-      speakReply: (text: string) => speech.speak(text),
+      speakReply: (text, options) => speech.speak(text, options),
+      stopSpeaking: () => speechOut.cancel(),
       autoSpeaks: speech.auto,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -755,9 +762,11 @@ export function ChildMode({ childId }: { childId: string }) {
               icon: TEACHER_REGISTRY[teacher].celebration.icon,
               title: lesson.completeTitle,
               message:
-                teacher === 'digit'
-                  ? `You helped Digit on another moon mission. ${fresh && fresh.world.rocketStage >= 3 ? 'The rocket is almost ready!' : 'The rocket grew a little more!'}`
-                  : TEACHER_REGISTRY[teacher].celebration.message,
+                lesson.id === 'life-cycle'
+                  ? 'You explored life-cycle pictures. Try noticing changes in a real plant with a grown-up. Aquarium friends celebrate visits, not science proficiency.'
+                  : teacher === 'digit'
+                    ? `You helped Digit on another moon mission. ${fresh && fresh.world.rocketStage >= 3 ? 'The rocket is almost ready!' : 'The rocket grew a little more!'}`
+                    : TEACHER_REGISTRY[teacher].celebration.message,
             },
             ...res.outcome.newRewards.map(rewardToCelebration),
           ],
@@ -786,6 +795,24 @@ export function ChildMode({ childId }: { childId: string }) {
     maybeCelebrateExplorer();
   }, [ctx, childId, maybeCelebrateExplorer]);
 
+  /** A choice can only launch its own teacher's reviewed route. Ignore stale async launches after dismissal. */
+  const chooseActivity = async (activityId: string) => {
+    const current = overlayRef.current;
+    if (current?.kind !== 'activities') return;
+    const choice = teacherActivity(current.teacher, activityId);
+    if (!choice) return;
+    const activity = choice.activity;
+    if (activity.kind === 'lesson') {
+      const lesson = getLesson(activity.lessonId);
+      if (!lesson || lesson.teacherId !== current.teacher) return;
+      const startTier = await startTierFor(ctx, childId, lesson);
+      if (overlayRef.current !== current) return;
+      setOverlay({ kind: 'lesson', teacher: current.teacher, lessonId: lesson.id, startTier });
+    } else {
+      setOverlay({ kind: activity.kind === 'reading' ? 'hoot' : activity.kind });
+    }
+  };
+
   // ── HUD actions ─────────────────────────────────────────────────────────
   const toggleSound = async () => {
     if (!household) return;
@@ -803,6 +830,7 @@ export function ChildMode({ childId }: { childId: string }) {
 
   const closeSheet = () => {
     setOverlay(null);
+    void gameRef.current?.releaseCamera();
     gameRef.current?.setInputEnabled(true);
   };
 
@@ -975,6 +1003,9 @@ export function ChildMode({ childId }: { childId: string }) {
 
           {hint && <HintCard {...hint} onClose={() => setHint(null)} />}
 
+          {overlay?.kind === 'activities' && (
+            <TeacherActivityChooser teacher={overlay.teacher} speech={speech} onPick={chooseActivity} onClose={() => setOverlay(overlay.returnTo)} />
+          )}
           {overlay?.kind === 'keyboard' && (
             <KeyboardFlow
               speech={speech}
@@ -1005,6 +1036,8 @@ export function ChildMode({ childId }: { childId: string }) {
               childName={data.child.name}
               books={data.records.books}
               mastery={data.records.mastery}
+              storyEvidence={data.records.evidence}
+              conversationDepth={data.household.settings.storyConversationDepth ?? 'adaptive'}
               visitsToday={visitsToday('hoot')}
               firstMeeting={!metTeacher('hoot')}
               speech={speech}
@@ -1016,8 +1049,27 @@ export function ChildMode({ childId }: { childId: string }) {
               talk={talkKit}
             />
           )}
-          {overlay?.kind === 'lesson' && (
+          {overlay?.kind === 'lesson' && overlay.lessonId === BASE_TEN_ID && (
+            <BaseTenFlow
+              key={`${childId}:${overlay.lessonId}`}
+              childId={childId}
+              mastery={data.records.mastery}
+              parentPin={data.household.settings.parentPin}
+              speech={speech}
+              onSave={async (progress) => {
+                await recordBaseTen(ctx, childId, progress);
+                await reload();
+              }}
+              onClose={closeSheet}
+              onChooseActivity={() => setOverlay({ kind: 'activities', teacher: 'digit', returnTo: overlay })}
+            />
+          )}
+          {overlay?.kind === 'lesson' && overlay.lessonId !== BASE_TEN_ID && (
             <LessonFlow
+              key={`${overlay.teacher}:${overlay.lessonId}`}
+              {...(teacherActivities(overlay.teacher).length > 1
+                ? { onChooseActivity: () => setOverlay({ kind: 'activities', teacher: overlay.teacher, returnTo: overlay }) }
+                : {})}
               teacher={overlay.teacher}
               lesson={getLesson(overlay.lessonId)!}
               startTier={overlay.startTier}

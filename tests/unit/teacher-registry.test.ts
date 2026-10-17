@@ -4,7 +4,16 @@ import { getSkill, skillsForLesson } from '../../src/domain/curriculum';
 import { getLesson } from '../../src/domain/lessons/registry';
 import { parseTeacherAiInput, teacherSystemPrompt } from '../../src/domain/teachers/aiPrompt';
 import { localTeacherReply } from '../../src/domain/teachers/chat';
-import { TEACHER_IDS, TEACHER_REGISTRY, isTeacherId, teacherForInteraction, teacherRegistration, type TeacherId } from '../../src/domain/teachers/registry';
+import {
+  TEACHER_IDS,
+  TEACHER_REGISTRY,
+  teacherActivities,
+  teacherActivity,
+  isTeacherId,
+  teacherForInteraction,
+  teacherRegistration,
+  type TeacherId,
+} from '../../src/domain/teachers/registry';
 import { TEACHERS, teacherOpening, teacherDisplayName } from '../../src/domain/teachers/teachers';
 import { createTeacher } from '../../src/engine/characters/teachers';
 import { parseSpeakInput } from '../../scripts/ai-helper/openai';
@@ -52,5 +61,31 @@ it('unknown, retired and prototype IDs are rejected or shown safely; existing sa
   for (const id of ['hoot', 'digit', 'pippa', 'nova']) {
     assert.equal(isTeacherId(id), true);
     assert.equal(teacherDisplayName(id), TEACHERS[id as TeacherId].name);
+  }
+});
+
+it('shared activity choices preserve defaults and reject cross-teacher or unknown route keys', () => {
+  const defaults = {
+    hoot: { kind: 'reading' },
+    digit: { kind: 'lesson', lessonId: 'moon-rocks' },
+    pippa: { kind: 'lesson', lessonId: 'patterns-shapes' },
+    nova: { kind: 'lesson', lessonId: 'sink-float' },
+  };
+  for (const teacher of TEACHER_IDS) {
+    assert.deepEqual(TEACHER_REGISTRY[teacher].activity, defaults[teacher]);
+    const choices = teacherActivities(teacher);
+    assert.equal(new Set(choices.map((c) => c.id)).size, choices.length);
+    assert.deepEqual(choices[0]?.activity, defaults[teacher]);
+    for (const choice of choices) {
+      assert.ok(choice.label && choice.description && choice.icon);
+      assert.doesNotMatch(choice.label + choice.description, /<|>|https?:/);
+      assert.equal(teacherActivity(teacher, choice.id), choice);
+      if (choice.activity.kind === 'lesson') assert.equal(getLesson(choice.activity.lessonId)?.teacherId, teacher);
+    }
+  }
+  assert.equal(teacherActivity('nova', 'moon-rocks'), undefined);
+  for (const id of ['retired', '__proto__', 'constructor', 'toString']) {
+    assert.deepEqual(teacherActivities(id), []);
+    assert.equal(teacherActivity('digit', id), undefined);
   }
 });

@@ -1,0 +1,46 @@
+name: Hoot story browser regressions
+on:
+  pull_request:
+    paths:
+      - 'src/domain/reading/**'
+      - 'src/domain/lessons/storyChat.ts'
+      - 'src/services/readingService.ts'
+      - 'src/ui/child/flows/HootFlow.tsx'
+      - 'src/ui/parent/pages/BooksPage.tsx'
+      - 'src/ui/parent/pages/SettingsPage.tsx'
+      - 'tests/e2e/story-conversations.spec.ts'
+      - 'tests/e2e/hoot-mobile.spec.ts'
+      - 'tests/e2e/core-loop.spec.ts'
+      - 'tests/e2e/synthetic-household.ts'
+      - 'tests/e2e/helpers.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/hoot-story-browser.yml'
+permissions:
+  contents: read
+concurrency:
+  group: hoot-story-browser-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Hoot story desktop and narrow-touch journeys
+        run: npm run test:e2e -- tests/e2e/story-conversations.spec.ts tests/e2e/hoot-mobile.spec.ts tests/e2e/core-loop.spec.ts --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hoot-story-browser-evidence-${{ matrix.project }}
+          path: test-results/
+          retention-days: 7

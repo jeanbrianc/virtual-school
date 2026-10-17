@@ -1,9 +1,21 @@
 import type { DomainId } from '../curriculum/types';
 
+export type TeacherActivity = { kind: 'reading' } | { kind: 'lesson'; lessonId: string } | { kind: 'keyboard' } | { kind: 'globe' };
+
+export interface TeacherActivityChoice {
+  /** Stable route key, never a label or user-supplied lesson ID. */
+  id: string;
+  label: string;
+  description: string;
+  icon: string;
+  activity: TeacherActivity;
+}
+
 export interface TeacherRegistration {
   domains: readonly DomainId[];
   local: { questions: readonly string[]; shares: readonly string[]; likes: string; unclear: string };
-  activity: { kind: 'reading' } | { kind: 'lesson'; lessonId: string };
+  activity: TeacherActivity;
+  activities: readonly TeacherActivityChoice[];
   scene: { x: number; z: number; model: 'owl' | 'robot' | 'panda' | 'fox'; icon: string };
   room: string;
   startLabel: string;
@@ -22,6 +34,10 @@ export const TEACHER_REGISTRY = {
     },
     domains: ['reading', 'vocabulary'],
     activity: { kind: 'reading' },
+    activities: [
+      { id: 'story-chat', label: 'Talk about a book', description: 'Read and share a story with Hoot.', icon: '📚', activity: { kind: 'reading' } },
+      { id: 'keyboard-trail', label: 'Keyboard trail', description: 'Explore letters and keys.', icon: '⌨️', activity: { kind: 'keyboard' } },
+    ],
     scene: { x: -8.3, z: -5.2, model: 'owl', icon: '🦉' },
     room: 'the library, where you help the learner talk about books so they can go on the bookshelf',
     startLabel: 'Let’s read!',
@@ -37,6 +53,22 @@ export const TEACHER_REGISTRY = {
     },
     domains: ['math', 'reasoning'],
     activity: { kind: 'lesson', lessonId: 'moon-rocks' },
+    activities: [
+      {
+        id: 'moon-rocks',
+        label: 'Moon Rock Rescue',
+        description: 'Count, compare, add and share moon rocks.',
+        icon: '🚀',
+        activity: { kind: 'lesson', lessonId: 'moon-rocks' },
+      },
+      {
+        id: 'base-ten-mission',
+        label: 'Tens and ones mission',
+        description: 'Build and take apart numbers from 20 to 99.',
+        icon: '🔢',
+        activity: { kind: 'lesson', lessonId: 'base-ten-mission' },
+      },
+    ],
     scene: { x: 8.3, z: 4.4, model: 'robot', icon: '🤖' },
     room: 'the math corner, where you rescue moon rocks by counting, adding and sharing',
     startLabel: 'Let’s rescue them!',
@@ -46,6 +78,15 @@ export const TEACHER_REGISTRY = {
   pippa: {
     domains: ['creativity', 'reasoning'],
     activity: { kind: 'lesson', lessonId: 'patterns-shapes' },
+    activities: [
+      {
+        id: 'patterns-shapes',
+        label: 'Shapes and patterns',
+        description: 'Match shapes and continue a pattern.',
+        icon: '🎨',
+        activity: { kind: 'lesson', lessonId: 'patterns-shapes' },
+      },
+    ],
     scene: { x: -3.6, z: 4.4, model: 'fox', icon: '🎨' },
     room: 'the shape studio, where you copy and extend patterns and make a design',
     startLabel: 'Let’s make shapes!',
@@ -70,6 +111,23 @@ export const TEACHER_REGISTRY = {
     },
     domains: ['science'],
     activity: { kind: 'lesson', lessonId: 'sink-float' },
+    activities: [
+      {
+        id: 'sink-float',
+        label: 'Sink or float',
+        description: 'Predict and test objects in the tank.',
+        icon: '💧',
+        activity: { kind: 'lesson', lessonId: 'sink-float' },
+      },
+      {
+        id: 'life-cycle',
+        label: 'Growing and changing',
+        description: 'Notice and sequence plant and butterfly pictures.',
+        icon: '🌱',
+        activity: { kind: 'lesson', lessonId: 'life-cycle' },
+      },
+      { id: 'globe', label: 'Globe adventure', description: 'Explore US states or world countries.', icon: '🌎', activity: { kind: 'globe' } },
+    ],
     scene: { x: 8.2, z: -5.4, model: 'panda', icon: '🔬' },
     room: 'the science lab, where you test which things sink or float',
     startLabel: 'Let’s investigate!',
@@ -89,4 +147,12 @@ const aliases: Record<string, TeacherId> = { rocket: 'digit', tank: 'nova' };
 export function teacherForInteraction(id: string): TeacherId | undefined {
   if (isTeacherId(id)) return id;
   return Object.prototype.hasOwnProperty.call(aliases, id) ? aliases[id] : undefined;
+}
+
+/** Registry-only routes: reject unknown teachers, cross-teacher and prototype keys. */
+export function teacherActivities(id: string): readonly TeacherActivityChoice[] {
+  return teacherRegistration(id)?.activities ?? [];
+}
+export function teacherActivity(id: string, activityId: string): TeacherActivityChoice | undefined {
+  return teacherActivities(id).find((choice) => choice.id === activityId);
 }

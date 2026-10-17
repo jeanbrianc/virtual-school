@@ -51,6 +51,8 @@ export interface HouseholdSettings {
   parentPin: string;
   audio: AudioSettings;
   readAloud: boolean;
+  /** Parent-selected story depth; unset keeps the adaptive legacy behavior. */
+  storyConversationDepth?: 'adaptive' | 'gentler' | 'deeper';
   /** The built-in voice teachers read with (its name on this device); '' or unset = pick automatically. */
   voiceName?: string;
   /**
@@ -71,6 +73,8 @@ export interface HouseholdSettings {
   teacherAi: TeacherAiSettings;
   /** Shows demo tooling (milestone previews, demo banners). */
   demoTools: boolean;
+  /** Advisory threshold for this tab’s observed requests; never a paid-use limit. */
+  usageWarningRequests?: number;
 }
 
 export interface Household {
@@ -198,6 +202,8 @@ export interface Book {
   favoritePart?: string;
   parentNotes?: string;
   comprehensionNotes?: string;
+  /** Optional parent-authored custom-book conversation; never auto-graded. */
+  storyPrompt?: { prompt: string; answer: string };
   workSampleMediaId?: ID;
   readingMode: ReadingMode;
   tags: string[];
@@ -350,6 +356,8 @@ export interface ProblemAttemptRecord {
 }
 
 export interface LessonAttempt {
+  /** Explicitly separate optional review observations from new learning. */
+  practiceMode?: 'learning' | 'review';
   /** False for a saved, unfinished practice adventure; absent preserves historical completions. */
   complete?: boolean;
   id: ID;
@@ -366,6 +374,8 @@ export interface LessonAttempt {
 }
 
 export interface TranscriptLine {
+  /** Retained containment marker; never clears when an old conversation is reopened. */
+  localOnly?: true;
   speaker: 'teacher' | 'child' | 'system';
   text: string;
   at: Timestamp;

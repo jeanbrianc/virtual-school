@@ -46,6 +46,8 @@ export const CHAT_INTENTS: readonly ChatIntent[] = [
 ];
 
 export interface ChatTurn {
+  /** Retained containment marker, never sent to the helper. */
+  localOnly?: true;
   speaker: 'child' | 'teacher';
   text: string;
 }
@@ -64,10 +66,35 @@ export interface TeacherChatRequest {
   utterance: string;
   /** Recent turns in this conversation (oldest first). */
   history: ChatTurn[];
+  /** Monotonic local-only boundary, owned by the conversation, never serialized. */
+  privacy?: TeacherConversationPrivacy;
   /** Her books (titles only are ever sent anywhere). */
   books: { id: string; title: string; status: BookStatus }[];
   /** The book this conversation is about so far (for "yes!" / "not yet" answers). Never sent anywhere. */
   topic?: ChatBookRef;
+}
+
+/** Separate from retained records: resetting UI/topic must not clear this boundary. */
+export interface TeacherConversationPrivacy {
+  localOnly: boolean;
+}
+
+/** Uses the existing local text/intent classifier, not comprehensive safety detection. */
+export function recognizedSafetyText(text: string): boolean {
+  return understand(text).intent === 'safety';
+}
+
+/** Inspect retained context BEFORE any transport truncation, including possible echoes. */
+export function keepTeacherChatLocal(req: TeacherChatRequest, privacy: TeacherConversationPrivacy): boolean {
+  if (
+    recognizedSafetyText(req.utterance) ||
+    req.history.some((turn) => turn.localOnly || recognizedSafetyText(turn.text)) ||
+    req.books.some((book) => recognizedSafetyText(book.title)) ||
+    recognizedSafetyText(req.childName) ||
+    (req.topic && recognizedSafetyText(req.topic.title))
+  )
+    privacy.localOnly = true;
+  return privacy.localOnly;
 }
 
 export interface TeacherChatReply {
@@ -368,7 +395,7 @@ export function localTeacherReply(req: TeacherChatRequest): TeacherChatReply {
       source: 'local',
     };
   const lastTeacher = [...req.history].reverse().find((h) => h.speaker === 'teacher')?.text ?? '';
-  const answered = req.topic && req.teacherId === 'hoot' ? answerToFinishedQuestion(req.utterance, lastTeacher) : null;
+  const answered = req.topic && req.teacherId === 'hoot' && !recognizedSafetyText(req.utterance) ? answerToFinishedQuestion(req.utterance, lastTeacher) : null;
   if (answered !== null && req.topic) {
     const title = req.topic.title;
     return {

@@ -13,6 +13,7 @@ import { hashString } from '../../../domain/util/random';
 import { Choices, DialogueShell, type Speech } from '../DialogueShell';
 import { TalkBar, useTeacherTalk, type TalkKit } from '../Talk';
 import { ShapePicture } from '../lesson/ShapePicture';
+import { LifeCycleModel, LifeCyclePicture } from '../lesson/LifeCyclePicture';
 import { LessonStage } from '../lesson/Stages';
 
 type Phase = 'intro' | 'play' | 'complete';
@@ -26,6 +27,8 @@ export interface LessonFlowProps {
   /** True until she has had a conversation with this teacher. */
   firstMeeting: boolean;
   lastSummary?: string;
+  /** Available only before this run begins. */
+  onChooseActivity?: () => void;
   speech: Speech;
   playSfx: (name: 'correct' | 'tryAgain' | 'click' | 'sparkle' | 'splash' | 'plop') => void;
   onSaveContinue?: (run: LessonRun, transcript: TranscriptLine[], startedAt: string, parentNotes: string[]) => Promise<void>;
@@ -41,6 +44,11 @@ const LATER_WORDS = /^(?:no|nope|maybe later|later|not now|bye|goodbye)\b/i;
 
 export function LessonFlow(props: LessonFlowProps) {
   const { teacher, lesson, speech, playSfx } = props;
+  const lifeCycle = lesson.id === 'life-cycle';
+  const active = useRef(true);
+  const [showModel, setShowModel] = useState(false);
+  const [nextReady, setNextReady] = useState(false);
+  const nextReadyRef = useRef(false);
   const startedAt = useRef(new Date().toISOString());
   const transcript = useRef<TranscriptLine[]>([]);
   const seed = useRef(hashString(startedAt.current + lesson.id));
@@ -77,13 +85,20 @@ export function LessonFlow(props: LessonFlowProps) {
   const later = (fn: () => void, delay: number) => {
     timers.current.push(window.setTimeout(fn, delay));
   };
-  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      timers.current.forEach(window.clearTimeout);
+    };
+  }, []);
   const [, force] = useState(0);
   const [stars, setStars] = useState(0);
 
-  const log = (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via']) =>
-    transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}) });
+  const log = (speaker: TranscriptLine['speaker'], text: string, via?: TranscriptLine['via'], localOnly?: true) =>
+    transcript.current.push({ speaker, text, at: new Date().toISOString(), ...(via ? { via } : {}), ...(localOnly ? { localOnly } : {}) });
   const say = (text: string, m: typeof mood = 'happy', via?: TranscriptLine['via']) => {
+    if (!active.current) return;
     setLine(text);
     setMood(m);
     log('teacher', text, via);
@@ -118,10 +133,21 @@ export function LessonFlow(props: LessonFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const close = () => props.onClose(transcript.current, startedAt.current, talk.notes);
+  const close = () => {
+    if (!active.current || saving) return;
+    active.current = false;
+    timers.current.forEach(window.clearTimeout);
+    busyRef.current = true;
+    props.onClose(transcript.current, startedAt.current, talk.notes);
+  };
 
   const start = (chosenTier?: number) => {
-    runRef.current = new LessonRun(lesson, lesson.id === 'patterns-shapes' ? (chosenTier ?? 0) : props.startTier, seed.current);
+    if (!active.current) return;
+    runRef.current = new LessonRun(lesson, lesson.id === 'patterns-shapes' || lifeCycle ? (chosenTier ?? 0) : props.startTier, seed.current);
+    setShowModel(false);
+    setNextReady(false);
+    nextReadyRef.current = false;
+    setChoiceState({});
     setPhase('play');
     const p = runRef.current.currentProblem();
     setShownProblem(p);
@@ -131,6 +157,10 @@ export function LessonFlow(props: LessonFlowProps) {
   };
 
   const advance = (run: LessonRun) => {
+    if (!active.current) return;
+    setShowModel(false);
+    setNextReady(false);
+    nextReadyRef.current = false;
     setShownProblem(run.currentProblem());
     setShownRound(run.roundIndex);
     setChoiceState({});
@@ -150,7 +180,7 @@ export function LessonFlow(props: LessonFlowProps) {
   const answer = (choiceId: string) => {
     const run = runRef.current;
     const p = run?.currentProblem();
-    if (!run || !p || busyRef.current) return;
+    if (!active.current || !run || !p || busyRef.current) return;
     const label = p.choices.find((c) => c.id === choiceId)?.label ?? choiceId;
     log('child', label);
     const wasStone = run.isSteppingStone();
@@ -216,6 +246,11 @@ export function LessonFlow(props: LessonFlowProps) {
       return;
     }
     setBusy(true);
+    if (lifeCycle) {
+      nextReadyRef.current = true;
+      setNextReady(true);
+      return;
+    }
     later(() => {
       setBusy(false);
       advance(run);
@@ -226,21 +261,31 @@ export function LessonFlow(props: LessonFlowProps) {
   const problem = shownProblem;
 
   return (
-    <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} closeDisabled={saving} speech={speech} wide={phase === 'play'}>
+    <DialogueShell teacher={teacher} line={line} mood={mood} onClose={close} closeDisabled={saving} speech={talk.guardSpeech(speech)} wide={phase === 'play'}>
       {phase === 'intro' && (
         <>
           <Choices
             items={[
-              { id: 'go', label: TEACHER_REGISTRY[teacher].startLabel, icon: TEACHER_REGISTRY[teacher].celebration.icon, tone: 'primary' },
+              ...(lifeCycle
+                ? [
+                    { id: 'go', label: lesson.tiers[0]!.label, icon: '🌱', tone: 'primary' as const },
+                    { id: 'challenge', label: lesson.tiers[1]!.label, icon: '🦋' },
+                  ]
+                : [{ id: 'go', label: TEACHER_REGISTRY[teacher].startLabel, icon: TEACHER_REGISTRY[teacher].celebration.icon, tone: 'primary' as const }]),
               { id: 'later', label: 'Maybe later', icon: '👋' },
             ]}
             onPick={(id) => {
               playSfx('click');
-              log('child', id === 'go' ? 'Let’s go!' : 'Maybe later');
-              if (id === 'go') start();
+              log('child', id === 'challenge' ? lesson.tiers[1]!.label : id === 'go' ? (lifeCycle ? lesson.tiers[0]!.label : 'Let’s go!') : 'Maybe later');
+              if (id === 'go' || id === 'challenge') start(id === 'challenge' ? 1 : undefined);
               else close();
             }}
           />
+          {props.onChooseActivity && (
+            <button type="button" className="btn" onClick={props.onChooseActivity} data-testid="choose-teacher-activity">
+              Choose an activity
+            </button>
+          )}
           <TalkBar kit={props.talk} teacherName={TEACHERS[teacher].name} busy={talk.thinking} onSay={(t, via) => void tell(t, via)} />
         </>
       )}
@@ -252,7 +297,81 @@ export function LessonFlow(props: LessonFlowProps) {
             ))}
           </div>
           <LessonStage visual={problem.visual} seed={hashString(problem.id)} dropping={dropping} />
-          {lesson.id === 'patterns-shapes' ? (
+          {lifeCycle ? (
+            <>
+              <div className="life-choices" aria-label="Life-cycle picture choices">
+                {problem.choices.map((choice) => (
+                  <button
+                    type="button"
+                    key={choice.id}
+                    data-testid={`choice-${choice.id}`}
+                    aria-label={`Choose ${choice.label}`}
+                    disabled={busy || choiceState[choice.id] === 'disabled'}
+                    className={`life-choice ${choiceState[choice.id] === 'right' ? 'life-selected' : choiceState[choice.id] === 'soft' ? 'life-supported' : ''}`}
+                    onClick={() => answer(choice.id)}
+                  >
+                    {choice.lifeStage && <LifeCyclePicture stage={choice.lifeStage} />}
+                    <span>{choice.label}</span>
+                  </button>
+                ))}
+              </div>
+              {showModel && problem.visual.type === 'life-cycle' && <LifeCycleModel cycle={problem.visual.cycle} />}
+              {nextReady && (
+                <button
+                  type="button"
+                  className="btn btn-primary life-next"
+                  data-testid="life-next"
+                  onClick={() => {
+                    if (!active.current || !nextReadyRef.current || !run) return;
+                    nextReadyRef.current = false;
+                    setBusy(false);
+                    advance(run);
+                  }}
+                >
+                  Next picture →
+                </button>
+              )}
+              <div className="life-controls">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => {
+                    if (run) say(run.hint().message);
+                  }}
+                >
+                  💡 Hint
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => {
+                    if (run) {
+                      say(run.model().message);
+                      setShowModel(true);
+                      setChoiceState({ [problem.answerId]: 'soft' });
+                    }
+                  }}
+                >
+                  👀 Show the model
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={busy}
+                  onClick={() => {
+                    if (run) {
+                      run.skip();
+                      advance(run);
+                    }
+                  }}
+                >
+                  Skip this round
+                </button>
+              </div>
+            </>
+          ) : lesson.id === 'patterns-shapes' ? (
             <div className="shape-choices">
               {problem.choices.map((choice) => (
                 <button
@@ -310,16 +429,28 @@ export function LessonFlow(props: LessonFlowProps) {
       {phase === 'complete' && (
         <div className="lesson-complete">
           <div className="lesson-complete-title">{lesson.completeTitle}</div>
-          <div className="lesson-stars" aria-label={`${stars} solved`}>
+          {lifeCycle && (
+            <p className="life-ceiling">
+              You explored two picture models. Picture-and-label matching and next-stage choices are the only skills recorded here. Next: look at a real plant
+              with a grown-up. Aquarium friends celebrate visits, not science proficiency.
+            </p>
+          )}
+          <div className="lesson-stars" aria-label={lifeCycle ? 'Picture lab finished' : `${stars} solved`}>
             {Array.from({ length: Math.max(1, stars) }, (_, i) => (
               <span key={i} className="lesson-star" style={{ animationDelay: `${i * 0.12}s` }}>
-                {TEACHER_REGISTRY[teacher].completionIcon}
+                {lifeCycle ? '🌱' : TEACHER_REGISTRY[teacher].completionIcon}
               </span>
             ))}
           </div>
           <Choices
             items={[
-              { id: 'yay', label: 'Yay!', icon: '🎉', tone: 'primary' },
+              { id: 'yay', label: lifeCycle ? 'Save & finish' : 'Yay!', icon: '🎉', tone: 'primary' },
+              ...(lifeCycle
+                ? [
+                    { id: 'replay', label: 'Save & play again', icon: '🌱' },
+                    { id: 'switch-level', label: run?.startTier === 0 ? 'Save & try next stage' : 'Save & try matching', icon: '🦋' },
+                  ]
+                : []),
               ...(lesson.id === 'patterns-shapes'
                 ? [
                     { id: 'replay', label: 'Play again', icon: '🎨' },
@@ -331,8 +462,8 @@ export function LessonFlow(props: LessonFlowProps) {
                 : []),
             ]}
             onPick={async (id) => {
-              if (submitted.current) return;
-              if (id === 'pattern' && run) {
+              if (submitted.current || !active.current) return;
+              if ((id === 'pattern' || (lifeCycle && (id === 'replay' || id === 'switch-level'))) && run) {
                 if (!props.onSaveContinue) return;
                 submitted.current = true;
                 setSaving(true);
@@ -346,11 +477,12 @@ export function LessonFlow(props: LessonFlowProps) {
                   setSaving(false);
                 }
               }
-              if (id === 'replay' || id === 'pattern') {
+              if (!active.current) return;
+              if (id === 'replay' || id === 'pattern' || id === 'switch-level') {
                 startedAt.current = new Date().toISOString();
                 seed.current = hashString(startedAt.current + lesson.id);
                 transcript.current = [];
-                start(id === 'pattern' ? 1 : run?.startTier);
+                start(id === 'pattern' ? 1 : id === 'switch-level' ? (run?.startTier === 0 ? 1 : 0) : run?.startTier);
                 return;
               }
               playSfx('click');

@@ -7,23 +7,26 @@
  */
 import { expect, test } from 'playwright/test';
 import { APP, dismissCelebrations, enterSchool, unlockParent } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
 
-test('first day: discover the school and put the first book on the shelf', async ({ page }) => {
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+
+test('first day: discover the school and put the first book on the shelf', async ({ page, isMobile }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   // Fresh school: nothing on the shelf, everything waiting to be discovered.
   await expect(page.getByTestId('hud-books')).toContainText('0');
   expect(await page.evaluate(() => window.__izzy!.booksOnShelf())).toBe(0);
   const welcome = page.getByTestId('discover-card');
-  await expect(welcome).toContainText('Welcome to your school, Izzy!');
+  await expect(welcome).toContainText('Welcome to your school, Sample!');
   await expect(page.getByTestId('hud-discoveries')).toContainText('0');
 
   // "Meet Professor Hoot" walks her over; Hoot introduces himself (first meeting).
   await page.getByTestId('discover-action').click();
-  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Izzy', { timeout: 120_000 });
+  await expect(page.getByTestId('dialogue-line')).toContainText('you must be Sample', { timeout: 120_000 });
   await expect(page.getByTestId('dialogue-line')).not.toContainText(/welcome back|again/i);
 
   // Her first book: no books exist yet, so she names it herself.
@@ -54,7 +57,7 @@ test('first day: discover the school and put the first book on the shelf', async
 
   // Persistence: reload and re-enter — no welcome card the second time.
   await page.reload();
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await expect(page.getByTestId('hud-books')).toContainText('1');
   await page.waitForTimeout(2000);
   expect(await page.evaluate(() => window.__izzy!.overlay())).not.toBe('discover');
@@ -62,8 +65,10 @@ test('first day: discover the school and put the first book on the shelf', async
   // The parent sees the new evidence, the conversation, and the first-week checklist.
   await page.goto(`${APP}#/parent/today`);
   await unlockParent(page);
+  await expect(page.getByRole('heading', { name: 'Today with Sample', exact: true })).toBeVisible();
   await expect(page.getByTestId('today-feed')).toContainText('Finished Charlotte’s Web');
   await expect(page.getByText('Getting started')).toBeVisible();
+  if (isMobile) await page.getByRole('button', { name: 'Menu', exact: true }).click();
   await page.getByTestId('nav-conversations').click();
   await expect(page.getByText('Professor Hoot').first()).toBeVisible();
 

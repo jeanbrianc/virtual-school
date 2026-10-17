@@ -1,0 +1,53 @@
+name: Combined backlog browser validation
+# Validation only: no push trigger, secrets, deployment job or write permission.
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: backlog-batch-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    if: github.head_ref == 'codex/backlog-batch-validation'
+    name: Batch / ${{ matrix.suite }} / ${{ matrix.project }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+        suite: [globe, activity-chooser, teacher-registry, story-conversations, core-loop, hoot-mobile, usage-parent, helper-voice, batch-voice-fallback, book-arrival, nova-life-cycle, reading-nook, base-ten, safety-containment]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Test the recorded candidate head, not an implicit moving merge ref.
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Record exact candidate tree
+        run: |
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+        timeout-minutes: 5
+      - run: npx playwright install --with-deps chromium
+        timeout-minutes: 5
+      - run: node scripts/build.mjs --e2e
+        timeout-minutes: 2
+      - name: Prove suite is selected on this device
+        run: npx playwright test --config=playwright.batch.config.ts tests/e2e/${{ matrix.suite }}.spec.ts --project=${{ matrix.project }} --list
+      - name: Run focused synthetic browser journey
+        run: npx playwright test --config=playwright.batch.config.ts tests/e2e/${{ matrix.suite }}.spec.ts --project=${{ matrix.project }}
+        timeout-minutes: 25
+      - name: Save synthetic screenshots and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-${{ matrix.suite }}-${{ matrix.project }}-${{ github.event.pull_request.head.sha }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore

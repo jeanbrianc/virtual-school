@@ -1,9 +1,12 @@
 import { expect, test } from 'playwright/test';
 import { enterSchool, talkTo, dismissCelebrations } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
 
 test.use({ viewport: { width: 320, height: 740 }, permissions: [] });
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
+
 test('Hoot completes without microphone, cancels safely, and remembers returning readers', async ({ page }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click();
   await page.getByTestId('choice-finish').click();
   await expect(page.getByTestId('dialogue-line')).toContainText('first book');
@@ -58,7 +61,7 @@ test('Hoot completes without microphone, cancels safely, and remembers returning
   expect(synthetic).toHaveLength(1);
   expect(synthetic[0]!.childRating).toBe(5);
   await page.reload();
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await talkTo(page, 'hoot');
   await page.getByTestId('choice-finish').click();
   await expect(page.getByTestId('dialogue-line')).toContainText('another book');
@@ -66,7 +69,7 @@ test('Hoot completes without microphone, cancels safely, and remembers returning
 });
 
 test('Hoot cancels a pending save and offers an unrated completion on repeat open', async ({ page }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-action').click();
   for (let attempt = 0; attempt < 2; attempt++) {
     await page.getByTestId('choice-finish').click();
@@ -75,9 +78,15 @@ test('Hoot cancels a pending save and offers an unrated completion on repeat ope
     await page.getByRole('button', { name: 'Not sure', exact: true }).click();
     await page.getByTestId('rating-skip').click();
     if (attempt === 0) {
-      await page.getByTestId('dialogue-close').click();
+      const close = page.getByTestId('dialogue-close');
+      await expect(close).toBeVisible();
+      await expect(close).toBeEnabled();
+      // At maxfps=3, two stability frames can outlast the pending save delay.
+      // Click the visible Close immediately; keep the real cancellation guards.
+      await close.click({ force: true });
       await page.waitForTimeout(1200);
       await expect(page.getByTestId('hud-books')).toContainText('0');
+      await page.waitForFunction(() => !(window.__izzy!.game() as unknown as { rig: { inCinematic: boolean } }).rig.inCinematic);
       await talkTo(page, 'hoot');
     }
   }

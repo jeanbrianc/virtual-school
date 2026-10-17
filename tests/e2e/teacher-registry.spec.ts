@@ -1,7 +1,10 @@
 import { expect, test } from 'playwright/test';
 import { enterSchool, talkTo } from './helpers';
+import { useSyntheticHousehold } from './synthetic-household';
+
+test.beforeEach(async ({ page }) => useSyntheticHousehold(page));
 test('existing teachers keep their introductions and working offline activities', async ({ page }) => {
-  await enterSchool(page);
+  await enterSchool(page, 'sample');
   await page.getByTestId('discover-ok').click();
   expect(
     await page.evaluate(() => {

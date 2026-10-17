@@ -37,9 +37,13 @@ Everything is one CloudFormation stack: [`infra/aws/stack.yaml`](../infra/aws/st
 | Listening | OpenAI `gpt-transcribe`: about 0.45¢ per minute of her talking (about 0.1¢ per sentence). |
 | The OpenAI key in Secrets Manager | $0.40 a month for the secret (the helper reads it about once an hour) |
 
-Tip: set a monthly budget on the OpenAI project that owns the key
-(platform.openai.com → Settings → Limits). The helper also caps use per day:
-300 replies (`AiDailyLimit`), 1,500 spoken lines and 500 recordings.
+Review billing and budget controls in the provider project that owns the key;
+verify whether each setting alerts or enforces a limit. The helper has **process-local
+request throttles**, normally 300 replies (`AiDailyLimit`), 1,500 spoken lines and
+500 recordings per UTC day. Counts reset on runtime restart and are independent
+across Lambda workers. They are neither a durable household quota nor a dollar
+spending cap. Parent Settings shows only this tab’s partial observed usage, with
+unknown cost/billing explicitly separated. See [usage and quota design](AI_USAGE_AND_QUOTAS.md).
 
 ## One-time setup (on your Mac, ~20 minutes, mostly waiting)
 
@@ -154,7 +158,7 @@ errors, without exposing provider bodies or child text. Known quota failures pau
 provider voice calls for 15 minutes; transient/unknown 429 failures honor bounded
 `Retry-After` (1–900 seconds, default 60). The browser also pauses failed voice calls
 and uses built-in read-aloud. Helper cooldowns apply to each warm Lambda instance,
-not globally across instances. They do not change the existing daily caps or billing.
+not globally across instances. They do not make the process-local daily throttles durable or cap billing.
 The explicit parent test may be retried, but the warm helper cooldown still applies.
 
 **Children's privacy — please read.** OpenAI's guidance for apps used by

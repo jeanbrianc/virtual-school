@@ -1,3 +1,4 @@
+import type { LifeCycle, LifeStage } from './lifeCycle';
 import type { Shape } from './patterns';
 import type { Rng } from '../util/random';
 
@@ -7,11 +8,14 @@ export interface LessonChoice {
   /** Optional emoji/pictogram to support pre-readers and quick scanning. */
   icon?: string;
   shapes?: readonly Shape[];
+  lifeStage?: LifeStage;
 }
 
 export type LessonVisual =
+  | { type: 'base-ten'; tens: number; ones: number; numeral: number | null; revealLabels?: boolean }
   | { type: 'pattern'; shapes: readonly Shape[] }
   | { type: 'none' }
+  | { type: 'life-cycle'; cycle: LifeCycle; stage: LifeStage; next: boolean }
   | { type: 'rocks'; groups: number[]; removed?: number }
   | { type: 'compare'; left: number; right: number }
   | { type: 'share'; total: number; groups: number }
