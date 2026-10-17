@@ -52,6 +52,7 @@ import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
 import { GlobeFlow } from './flows/GlobeFlow';
 import { recordPractice } from '../../services/practiceService';
+import { routineSpeech } from './flows/routineSpeech';
 import { RoutineFlow } from './flows/RoutineFlow';
 import { recordRoutine } from '../../services/routineService';
 import { KeyboardFlow } from './flows/KeyboardFlow';
@@ -1015,13 +1016,7 @@ export function ChildMode({ childId }: { childId: string }) {
             <RoutineFlow
               key={childId}
               childId={childId}
-              speech={{
-                canSpeak: services.speechOut.available,
-                auto: readAloud,
-                speak: (text) => {
-                  if (!muted) void services.speechOut.speak(text, { ...TEACHERS.tavi.voice, volume: household?.settings.audio.voice ?? 1 });
-                },
-              }}
+              speech={routineSpeech(services.speechOut, { auto: readAloud, muted, volume: household?.settings.audio.voice ?? 1 })}
               onClose={closeSheet}
               onSave={async (run) => {
                 await recordRoutine(ctx, childId, run);
