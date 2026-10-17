@@ -135,7 +135,8 @@ test('recognized safety stays local through repeated turns and Back; retained pa
   expect(JSON.stringify([...teacherRequests, ...voiceRequests])).not.toContain('I am scared');
   await page.getByTestId('dialogue-close').click();
   await page.goto(`${APP}#/parent/today`);
-  await unlockParent(page);
+  // The existing parent tab session remains unlocked after the child visit.
+  await expect(page.getByRole('heading', { name: 'Today with Sample', exact: true })).toBeVisible();
   await selectSample('today');
   await expect(page.getByTestId('teacher-notes')).toContainText('I am scared');
   await page.getByTestId('teacher-notes').screenshot({ path: `test-results/safety-parent-note-${info.project.name}.png` });
