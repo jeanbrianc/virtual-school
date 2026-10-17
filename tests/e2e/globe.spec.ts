@@ -5,7 +5,7 @@ async function openGlobe(page: Page) {
   if (await page.getByTestId('discover-ok').count()) {
     await page.getByRole('button', { name: 'Explore with Nova', exact: false }).click();
   }
-  await expect(page.getByRole('button', { name: 'US states', exact: false })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Three state shapes', exact: true })).toBeVisible();
 }
 async function records(page: Page) {
   return page.evaluate(async () => {
@@ -27,7 +27,8 @@ test('five offline rounds retain retries, hint and skipped outcomes under Nova a
   await enterSchool(page);
   await page.getByTestId('discover-ok').click();
   await openGlobe(page);
-  await page.getByRole('button', { name: 'US states', exact: false }).click();
+  await page.getByRole('button', { name: 'Choose another level or map', exact: true }).click();
+  await page.getByRole('button', { name: 'Whole US map · Level 2', exact: false }).click();
   await context.setOffline(true);
   await page.getByLabel('Pick a place on the map').selectOption('Ohio');
   await expect(page.getByTestId('dialogue-line')).toContainText('That’s Ohio');
@@ -59,6 +60,7 @@ test('phone portrait and narrow landscape offer countries, cancel/reopen and no 
   await enterSchool(page);
   await page.getByTestId('discover-ok').click();
   await openGlobe(page);
+  await page.getByRole('button', { name: 'Choose another level or map', exact: true }).click();
   await page.getByRole('button', { name: 'World countries', exact: false }).click();
   await expect(page.getByLabel('Pick a place on the map')).toBeVisible();
   expect(await page.getByLabel('Pick a place on the map').locator('option').count()).toBe(12);
@@ -66,7 +68,8 @@ test('phone portrait and narrow landscape offer countries, cancel/reopen and no 
   expect(await records(page)).toHaveLength(0);
   await page.setViewportSize({ width: 667, height: 375 });
   await openGlobe(page);
-  await page.getByRole('button', { name: 'US states', exact: false }).click();
+  await page.getByRole('button', { name: 'Choose another level or map', exact: true }).click();
+  await page.getByRole('button', { name: 'Whole US map · Level 2', exact: false }).click();
   await expect(page.getByLabel('Pick a place on the map')).toBeVisible();
   await page.getByTestId('dialogue-close').click();
   expect(await records(page)).toHaveLength(0);
@@ -103,4 +106,66 @@ test('two live tabs save a synthetic globe session once', async ({ page, context
   await page.reload();
   expect((await records(page)).filter((r) => r.id === run.id)).toHaveLength(1);
   await other.close();
+});
+
+test('beginner state shapes fit phone sizes and preserve supported, skipped and independent rounds', async ({ page, context, isMobile }, testInfo) => {
+  await enterSchool(page);
+  await page.getByTestId('discover-ok').click();
+  await openGlobe(page);
+  const choices = page.getByRole('group', { name: 'Three state shapes', exact: true }).locator('button');
+  await expect(choices).toHaveCount(3);
+  await expect(page.getByTestId('dialogue-line')).toContainText('Which state is Florida?');
+  await expect(page.getByLabel('Pick a place on the map')).toHaveCount(0);
+  for (const viewport of [
+    { width: 320, height: 740 },
+    { width: 375, height: 812 },
+    { width: 412, height: 915 },
+    { width: 667, height: 375 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await choices.first().scrollIntoViewIfNeeded();
+    for (let i = 0; i < 3; i++) {
+      const box = await choices.nth(i).boundingBox();
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.height).toBeGreaterThanOrEqual(100);
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`state-shapes-${viewport.width}x${viewport.height}.png`) });
+  }
+  await page.setViewportSize({ width: 375, height: 812 });
+  await context.setOffline(true);
+  const wrongName = await choices.evaluateAll((buttons) =>
+    buttons.find((button) => button.getAttribute('data-state') !== 'Florida')!.getAttribute('data-state'),
+  );
+  const tap = async (name: string) => {
+    const button = page.locator(`.geography-shape-choice[data-state="${name}"]`);
+    if (isMobile) await button.tap();
+    else await button.press('Enter');
+  };
+  await tap(wrongName!);
+  await expect(page.getByTestId('dialogue-line')).toContainText('Let’s look for Florida together');
+  await page.getByRole('button', { name: 'Show state names for help', exact: true }).click();
+  await tap('Florida');
+  await expect(page.getByTestId('dialogue-line')).toContainText('Yes!');
+  await page.getByRole('button', { name: 'Next place!', exact: false }).click();
+  await page.getByRole('button', { name: 'Skip this place', exact: false }).click();
+  await expect(page.getByTestId('dialogue-line')).toContainText('We skipped');
+  await page.getByRole('button', { name: 'Next place!', exact: false }).click();
+  for (let i = 2; i < 5; i++) {
+    const line = await page.getByTestId('dialogue-line').locator('.sr-only').textContent();
+    await tap(/Which state is (.*?)\?/.exec(line!)![1]!);
+    await expect(page.getByTestId('dialogue-line')).toContainText('Yes!');
+    await page.getByRole('button', { name: i === 4 ? 'Finish exploring!' : 'Next place!', exact: false }).click();
+  }
+  const saved = (await records(page)).filter((record) => record.lessonId === 'globe-states');
+  expect(saved).toHaveLength(1);
+  expect(saved[0]!.complete).toBe(true);
+  expect(saved[0]!.problems.every((problem) => problem.skillId === 'geography.state-shapes')).toBe(true);
+  expect(saved[0]!.problems.map((problem) => problem.outcome)).toEqual(['supported', 'skipped', 'independent', 'independent', 'independent']);
+  expect(saved[0]!.summary).toContain('three choices');
+  await context.setOffline(false);
+  await page.reload();
+  expect((await records(page)).filter((record) => record.lessonId === 'globe-states')).toEqual(saved);
 });
