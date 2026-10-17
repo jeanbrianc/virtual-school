@@ -223,6 +223,8 @@ async function expectStanding(page: Page) {
 
 // Every rendered chair is exercised through its actual canvas bubble on both devices.
 test('all eleven seats have real reachable taps, framed personalized poses and safe stand exits', async ({ page, isMobile }, info) => {
+  // All 22 captures and settled camera waits can exceed 15 minutes on hosted SwiftShader.
+  test.setTimeout(25 * 60_000);
   await loadBookSample(page, 25);
   await enterSchool(page, 'sample');
   await ready(page);
