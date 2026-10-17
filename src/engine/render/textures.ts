@@ -196,12 +196,37 @@ export function rugTexture(kind: 'classroom' | 'library' | 'nook'): THREE.Canvas
       return;
     }
     if (kind === 'nook') {
-      ctx.fillStyle = '#e9c7c0';
+      // A woven meadow rug, with a winding pebble path and tiny daisies.
+      ctx.fillStyle = '#91ad76';
       ctx.fillRect(0, 0, w, h);
-      for (let i = 0; i < 16; i++) {
-        ctx.strokeStyle = i % 2 ? 'rgba(255,255,255,0.5)' : 'rgba(180,100,90,0.25)';
-        ctx.lineWidth = 12;
-        ctx.strokeRect(20 + i * 14, 20 + i * 14, w - 40 - i * 28, h - 40 - i * 28);
+      ctx.strokeStyle = '#cad3a1';
+      ctx.lineWidth = 22;
+      ctx.strokeRect(16, 16, w - 32, h - 32);
+      for (let i = 0; i < 1800; i++) {
+        ctx.fillStyle = rng() < 0.5 ? 'rgba(44,77,40,0.1)' : 'rgba(255,245,200,0.15)';
+        ctx.fillRect(rng() * w, rng() * h, 2, 5);
+      }
+      // Painted stepping stones have no collision or raised edges.
+      for (let i = 0; i < 5; i++) {
+        ctx.fillStyle = i % 2 ? '#e9dfbb' : '#d8d2ad';
+        ctx.beginPath();
+        ctx.ellipse(w * (0.38 + i * 0.13), h * (0.48 + Math.sin(i * 1.4) * 0.045), 43, 29, i * 0.17, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (let i = 0; i < 34; i++) {
+        const x = 42 + rng() * (w - 84);
+        const y = rng() < 0.5 ? 45 + rng() * 180 : h - 45 - rng() * 180;
+        ctx.fillStyle = '#f7f0d5';
+        for (let p = 0; p < 5; p++) {
+          const a = (p * Math.PI * 2) / 5;
+          ctx.beginPath();
+          ctx.ellipse(x + Math.cos(a) * 7, y + Math.sin(a) * 7, 6, 4, a, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#e7bd58';
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
       }
       return;
     }

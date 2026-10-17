@@ -21,7 +21,7 @@ export interface MilestonePreviewDef {
 
 export const MILESTONE_PREVIEWS: MilestonePreviewDef[] = [
   { id: 'books-10', label: '10 books', description: 'Second bookshelf + first reading trophy', icon: '📚' },
-  { id: 'books-25', label: '25 books', description: 'Cozy reading nook opens', icon: '🛋️' },
+  { id: 'books-25', label: '25 books', description: 'Sunny garden reading nook opens', icon: '🌼' },
   { id: 'books-50', label: '50 books', description: 'Grand library shelves', icon: '🏛️' },
   { id: 'books-100', label: '100 books', description: 'Sparkle the reading dragon', icon: '🐉' },
   { id: 'greenhouse', label: 'Plant study', description: 'Greenhouse full of seedlings', icon: '🌱' },

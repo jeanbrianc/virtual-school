@@ -8,6 +8,8 @@ import { createRng } from '../../domain/util/random';
 import { ease } from '../core/tween';
 import { box, contactShadow, cyl, group, mat, rbox, sphere, uniqueMat } from '../render/kit';
 import { rugTexture, signTexture } from '../render/textures';
+import { bakeStatic } from '../render/bake';
+import { gardenMuralMaterial, gardenPot, gardenSunlight, gardenWallDecor } from './gardenNook';
 import { LAYOUT, PALETTE } from '../palette';
 import { toggleFeature, type BuildContext } from './types';
 
@@ -268,13 +270,21 @@ function buildReadingNook(ctx: BuildContext) {
   floor.position.set(cx, 0.005, cz);
   floor.receiveShadow = true;
   nook.add(floor);
-  const wallMat = mat('#f2d7cf', { roughness: 0.95 });
+  const wallMat = mat('#d9e7c6', { roughness: 0.95 });
+  const muralMaterial = gardenMuralMaterial();
   // Fold the outer nook walls with the same camera policy as the school.
   // Keep these dynamic groups outside static batching.
   const nookWall = (side: 'west' | 'north' | 'south', x: number, z: number, w: number, d: number) => {
     const split = 0.42;
     nook.add(box(w, split, d, wallMat, x, split / 2, z));
     const upper = group(box(w, 3.2 - split, d, wallMat, x, (3.2 + split) / 2, z));
+    upper.name = `nook-${side}-upper`;
+    const decor = gardenWallDecor(side === 'west' ? maxZ - minZ : maxX - minX, side === 'west', muralMaterial);
+    decor.position.set(side === 'west' ? minX + 0.015 : cx, 0, side === 'west' ? cz : side === 'north' ? minZ + 0.015 : maxZ - 0.015);
+    decor.rotation.y = side === 'west' ? Math.PI / 2 : side === 'south' ? Math.PI : 0;
+    upper.add(decor);
+    // Bake each wall separately, so its mural and flowers fold away with it.
+    bakeStatic(upper);
     ctx.add(upper);
     ctx.structure.cutaways.push({
       side,
@@ -289,20 +299,21 @@ function buildReadingNook(ctx: BuildContext) {
   nookWall('north', cx, minZ - 0.125, maxX - minX, 0.25);
   nookWall('south', cx, maxZ + 0.125, maxX - minX, 0.25);
 
-  // An open fabric canopy frames a child-sized reading bench. No opaque
-  // tent face hides the cushions, books or learner from the entrance.
-  const fabric = mat('#fbf1e3', { side: THREE.DoubleSide, roughness: 0.95 });
+  // An airy garden pergola frames the bench. Spaced rafters let the camera
+  // see the cushions from above; there is no opaque canopy or front panel.
   const wood = mat(PALETTE.oak, { roughness: 0.8 });
   const benchX = minX + 0.75;
   const canopy = group(
-    rbox(1.25, 0.1, 2.5, 0.04, fabric, benchX, 2.15, cz),
+    box(0.07, 0.08, 2.5, wood, benchX + 0.55, 2.15, cz),
+    box(0.07, 0.08, 2.5, wood, benchX - 0.55, 2.15, cz),
     cyl(0.035, 0.035, 2.15, wood, benchX + 0.55, 1.075, cz - 1.2, 8),
     cyl(0.035, 0.035, 2.15, wood, benchX + 0.55, 1.075, cz + 1.2, 8),
     rbox(1.05, 0.3, 2.3, 0.08, wood, benchX, 0.25, cz),
-    rbox(1.0, 0.18, 2.2, 0.08, mat('#e9a8a0'), benchX, 0.49, cz),
-    rbox(0.18, 0.65, 2.3, 0.07, mat('#e9a8a0'), minX + 0.22, 0.72, cz),
+    rbox(1.0, 0.18, 2.2, 0.08, mat('#a7bd8b'), benchX, 0.49, cz),
+    rbox(0.18, 0.65, 2.3, 0.07, mat('#a7bd8b'), minX + 0.22, 0.72, cz),
   );
-  for (const [i, color] of ['#f2cc8f', '#9fbdd0', '#a7c4a0'].entries()) {
+  for (let i = 0; i < 5; i++) canopy.add(box(1.25, 0.07, 0.075, wood, benchX, 2.2, cz - 1.1 + i * 0.55));
+  for (const [i, color] of ['#f2cc8f', '#e9aaa1', '#bca9d1'].entries()) {
     const pillow = rbox(0.22, 0.4, 0.5, 0.08, mat(color), benchX - 0.25, 0.78, cz - 0.7 + i * 0.7);
     pillow.rotation.z = -0.15;
     canopy.add(pillow);
@@ -319,9 +330,19 @@ function buildReadingNook(ctx: BuildContext) {
     nook.add(box(0.2, 0.3 + (i % 2) * 0.08, 0.055, mat(color), shelfX - 0.64 + i * 0.25, 0.83, shelfZ + 0.19));
   });
   ctx.collide(shelfX, shelfZ, 1.7, 0.5);
-  const bean = sphere(0.55, mat(PALETTE.teal, { roughness: 1 }), cx + 0.2, 0.32, maxZ - 0.85, 16);
+  const bean = sphere(0.55, mat('#e7bc60', { roughness: 1 }), cx + 0.2, 0.32, maxZ - 0.85, 16);
   bean.scale.set(1, 0.65, 1);
   nook.add(bean);
+  // A daisy cushion gives the sunny little seat a flower-shaped top.
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3;
+    const petal = sphere(0.18, mat('#fff0d5', { roughness: 1 }), cx + 0.2 + Math.cos(a) * 0.28, 0.56, maxZ - 0.85 + Math.sin(a) * 0.28, 10);
+    petal.scale.set(1, 0.32, 1);
+    nook.add(petal);
+  }
+  const center = sphere(0.18, mat('#dca84e', { roughness: 1 }), cx + 0.2, 0.58, maxZ - 0.85, 12);
+  center.scale.y = 0.35;
+  nook.add(center);
   ctx.collide(cx + 0.2, maxZ - 0.85, 1.0, 1.0);
   const tableX = cx + 0.45;
   nook.add(cyl(0.36, 0.36, 0.08, wood, tableX, 0.5, cz + 0.65, 16), cyl(0.16, 0.2, 0.46, wood, tableX, 0.23, cz + 0.65, 12));
@@ -331,29 +352,22 @@ function buildReadingNook(ctx: BuildContext) {
     nook.add(page);
   }
   ctx.collide(tableX, cz + 0.65, 0.72, 0.72);
-  // Warm shaded lamp uses the existing single nook light; no extra shadows.
-  nook.add(
-    cyl(0.14, 0.18, 0.03, wood, shelfX + 0.58, 0.745, shelfZ),
-    cyl(0.02, 0.02, 0.38, wood, shelfX + 0.58, 0.94, shelfZ),
-    cyl(0.14, 0.22, 0.25, mat('#ffe7b0', { emissive: '#ffcf8a', emissiveIntensity: 0.6 }), shelfX + 0.58, 1.15, shelfZ, 16),
-  );
-  // Fairy lights along the walls.
-  const bulbMat = mat('#fff1c1', { emissive: '#ffd36b', emissiveIntensity: 2 });
-  for (let i = 0; i < 26; i++) {
-    const t = i / 25;
-    const x = minX + 0.1 + t * (maxX - minX - 0.2);
-    nook.add(sphere(0.035, bulbMat, x, 2.6 - Math.sin(t * Math.PI * 3) * 0.12, minZ + 0.02, 8));
-    nook.add(sphere(0.035, bulbMat, x, 2.6 - Math.sin(t * Math.PI * 3 + 1) * 0.12, maxZ - 0.02, 8));
-  }
-  const glow = new THREE.PointLight('#ffcf8a', 6, 6, 1.6);
-  glow.position.set(cx, 2.2, cz);
+  // Flowers on the book ledge and a sun-warmed floor, with one gentle light.
+  const pot = gardenPot();
+  pot.position.set(shelfX + 0.58, 0.75, shelfZ);
+  nook.add(pot);
+  const sunlight = gardenSunlight();
+  sunlight.position.set(cx + 0.5, 0.018, cz - 0.2);
+  nook.add(sunlight);
+  const glow = new THREE.PointLight('#ffe5ac', 4, 6, 1.6);
+  glow.position.set(cx, 2.4, cz);
   nook.add(glow);
   ctx.addStatic(nook);
 
   // Curtain across the arch (closed until 25 books).
   const archX = LAYOUT.hall.minX - 0.05;
   const curtain = new THREE.Group();
-  const drapeMat = mat('#b8433a', { roughness: 0.95, side: THREE.DoubleSide });
+  const drapeMat = mat('#698961', { roughness: 0.95, side: THREE.DoubleSide });
   const drapes: THREE.Mesh[] = [];
   for (const s of [-1, 1]) {
     const geo = new THREE.PlaneGeometry(2.55, 3.1, 24, 1);
@@ -372,7 +386,7 @@ function buildReadingNook(ctx: BuildContext) {
   curtain.add(rod);
   const lockSign = new THREE.Mesh(
     new THREE.PlaneGeometry(1.5, 0.48),
-    new THREE.MeshStandardMaterial({ map: signTexture('Reading Nook', { icon: '🔒', bg: '#fff6e6', fg: '#b8433a' }), roughness: 0.7 }),
+    new THREE.MeshStandardMaterial({ map: signTexture('Reading Nook', { icon: '🔒', bg: '#fff6e6', fg: '#52764e' }), roughness: 0.7 }),
   );
   lockSign.rotation.y = Math.PI / 2;
   lockSign.position.set(archX + 0.08, 2.3, cz);

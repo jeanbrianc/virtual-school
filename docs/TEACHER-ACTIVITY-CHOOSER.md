@@ -13,3 +13,5 @@ The typed registry retains every existing default `activity` and historical ID. 
 Owner/reviewer acceptance: run `activity-chooser.spec.ts` and `teacher-registry.spec.ts` in a browser-capable environment; check touch, keyboard focus, Escape/Close/reopen, offline and original default routes. New chooser routes do not modify saved learning evidence or unlocks.
 
 Issue 20 remains open. Place value 20–99, base-ten representations, parent-controlled entry/review, reviewed objective evidence, progression/ceiling documentation and the later two-digit arithmetic increment are not implemented in this first slice. Arithmetic must wait for the place-value slice to be verified.
+
+The candidate now includes main `5e2aaf9` and an independent, read-only `Teacher activity chooser review` pull-request workflow. It installs Chromium on CI and runs the focused desktop/phone-viewport tests plus the original teacher-route regression. CI results must be checked for the exact published head; adding the workflow is not a browser pass.

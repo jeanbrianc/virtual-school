@@ -472,7 +472,7 @@ export function ChildMode({ childId }: { childId: string }) {
       const lockHints: Record<string, { rewardId: string; open: boolean; openText: string }> = {
         greenhouse: { rewardId: 'room.greenhouse', open: state.greenhouseOpen, openText: 'Every plant in here grew from something you learned about plants!' },
         artStudio: { rewardId: 'room.art-studio', open: state.artStudioOpen, openText: 'Your very own Art Studio. Easels ready!' },
-        nook: { rewardId: 'room.reading-nook', open: state.readingNookOpen, openText: 'The coziest place to read.' },
+        nook: { rewardId: 'room.reading-nook', open: state.readingNookOpen, openText: 'A sunny garden corner, made for stories.' },
       };
       const lock = lockHints[id];
       if (lock) {

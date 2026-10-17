@@ -36,6 +36,20 @@ aws s3 cp dist/welcome/index.html "s3://$BUCKET/welcome/index.html" --cache-cont
 aws s3 sync dist/assets "s3://$BUCKET/assets" --delete --exclude '*.map' \
   --cache-control 'public, max-age=31536000, immutable' --only-show-errors
 
+# Read back the entry page and the classroom bundle before refreshing the CDN.
+# This uses the deploy role's existing GetObject permission and checks the exact
+# bytes built for this commit, without needing a family browser session.
+VERIFY_DIR="$(mktemp -d)"
+trap 'rm -rf "$VERIFY_DIR"' EXIT
+for file in dist/index.html dist/assets/chunk-ChildMode-*.js; do
+  [ -f "$file" ] || { echo "Missing classroom build artifact: $file" >&2; exit 1; }
+  key="${file#dist/}"
+  aws s3 cp "s3://$BUCKET/$key" "$VERIFY_DIR/$(basename "$file")" --only-show-errors
+  cmp "$file" "$VERIFY_DIR/$(basename "$file")"
+  digest="$(node -e 'const fs = require("node:fs"); const crypto = require("node:crypto"); console.log(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex"));' "$file")"
+  echo "✓ Published bytes verified: $digest  $file"
+done
+
 if [ -f dist-lambda/ai-helper.zip ]; then
   echo "→ Updating AI helper ($FUNCTION)"
   aws lambda update-function-code --function-name "$FUNCTION" \
