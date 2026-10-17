@@ -25,6 +25,12 @@ declare global {
   }
 }
 
+// Bound missing UI actions so a discovery card cannot stall the whole CI job.
+test.beforeEach(({ page }) => {
+  page.setDefaultTimeout(60_000);
+  page.setDefaultNavigationTimeout(90_000);
+});
+
 async function ready(page: Page) {
   await expect(page.locator('.loading-screen')).toHaveCount(0);
   await page.waitForFunction(
@@ -151,6 +157,9 @@ test('destination book stays visible through third, grand and overflow arrivals 
   await loadBookSample(page, 131);
   await enterSchool(page, 'sample');
   await ready(page);
+  // Real completions dismiss this hint when Hoot is opened. The direct engine
+  // fixture waits for its normal expiry instead of hiding any HUD element.
+  await expect(page.locator('.controls-hint')).toHaveCount(0);
   const saved = await savedReading(page);
   const books = saved.books as unknown as ShelfBook[];
   const sizes = isMobile
@@ -240,6 +249,11 @@ test('real 25-to-26 completion survives interruption, Back/Forward, reload and a
   expect(final.books).toHaveLength(27);
   expect(final.books.find((b) => b.id === added.id)).toEqual(added);
   await talkTo(page, 'bookshelf');
+  await expect(page.getByTestId('discover-card')).toBeVisible();
+  await page.getByTestId('discover-ok').click();
+  await expect(page.getByTestId('discover-card')).toHaveCount(0);
+  await talkTo(page, 'bookshelf');
+  await expect(page.getByRole('dialog', { name: 'My bookshelf', exact: true })).toBeVisible();
   await page.getByRole('img', { name: /Synthetic third shelf arrival by/ }).click();
   await expect(page.getByRole('heading', { name: 'Synthetic third shelf arrival', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'All my books', exact: true }).click();
