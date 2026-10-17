@@ -20,6 +20,10 @@ jobs:
   chromium:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,10 +33,10 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Hoot story desktop and narrow-touch journeys
-        run: npm run test:e2e -- tests/e2e/story-conversations.spec.ts tests/e2e/hoot-mobile.spec.ts tests/e2e/core-loop.spec.ts --project=desktop
+        run: npm run test:e2e -- tests/e2e/story-conversations.spec.ts tests/e2e/hoot-mobile.spec.ts tests/e2e/core-loop.spec.ts --project=${{ matrix.project }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: hoot-story-browser-evidence
+          name: hoot-story-browser-evidence-${{ matrix.project }}
           path: test-results/
           retention-days: 7

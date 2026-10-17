@@ -389,7 +389,7 @@ function BookDetail({ data, book }: { data: ParentData; book: Book }) {
                     onChange={(e) => set({ storyPrompt: { prompt: draft.storyPrompt?.prompt ?? '', answer: e.target.value } })}
                   />
                 </label>
-                <p className="muted small">Both fields are needed. Clear them to remove the prompt, then Save changes.</p>
+                <p className="muted small">Both fields are needed. Clear them to remove the prompt, then Save details.</p>
               </fieldset>
             )}
             <label className="span-2">
