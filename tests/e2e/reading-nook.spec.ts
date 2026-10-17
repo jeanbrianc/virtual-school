@@ -1,5 +1,5 @@
 /** Garden reading nook: milestone boundary, navigation, persistence and preview cleanup. */
-import { expect, test, type Page } from 'playwright/test';
+import { expect, test, type Page, type TestInfo } from 'playwright/test';
 import type { PerspectiveCamera, Vector3 } from 'three';
 import { Repositories } from '../../src/data/repositories';
 import { DB_NAME, TABLES } from '../../src/data/schema';
@@ -17,6 +17,12 @@ const OUTSIDE = { x: LAYOUT.nook.maxX + 1.5, z: LAYOUT.nook.doorZ - 0.5 };
 
 type NookGame = {
   busy: boolean;
+  teleport(x: number, z: number): void;
+  renderer: { info: { render: { frame: number } } };
+  interaction: {
+    pick(point: { x: number; y: number }, camera: PerspectiveCamera): { id: string } | null;
+    pickFloor(point: { x: number; y: number }, camera: PerspectiveCamera): Vector3 | null;
+  };
   input: { enabled: boolean };
   player: {
     position: Vector3;
@@ -26,6 +32,7 @@ type NookGame = {
   rig: {
     camera: PerspectiveCamera;
     yaw: number;
+    inCinematic: boolean;
     snapTo(position: Vector3): void;
     shot(position: Vector3, lookAt: Vector3, duration: number): Promise<void>;
     release(duration: number): Promise<void>;
@@ -144,41 +151,105 @@ async function expectNook(page: Page, open: boolean, preview = false) {
 
 async function waitForSchool(page: Page) {
   await expect(page.getByTestId('hud-books')).toBeVisible({ timeout: 300_000 });
-  await page.waitForFunction(() => window.__izzy?.game()?.busy === false, null, { timeout: 300_000 });
+  await expect(page.locator('.loading-screen')).toHaveCount(0);
+  await expect(page.getByTestId('child-mode')).toHaveClass(/\bready\b/);
+  await page.waitForFunction(
+    () => {
+      const game = window.__izzy?.game() as unknown as NookGame | null;
+      return game && !game.busy && game.renderer.info.render.frame > 0;
+    },
+    null,
+    { timeout: 300_000, polling: 100 },
+  );
+}
+
+/** A dismissed celebration still needs to release the camera and restore input. */
+async function waitForPlayable(page: Page) {
+  await waitForSchool(page);
+  await page.waitForFunction(
+    () => {
+      const game = window.__izzy?.game() as unknown as NookGame | null;
+      return game && game.input.enabled && !game.busy && !game.rig.inCinematic && !window.__izzy!.performing() && !window.__izzy!.overlay();
+    },
+    null,
+    { timeout: 180_000, polling: 100 },
+  );
+}
+
+/** Fixed sleeps can finish before SwiftShader has rendered even one new frame. */
+async function waitForRenderedFrame(page: Page, previous: number) {
+  await page.waitForFunction((frame) => (window.__izzy!.game() as unknown as NookGame).renderer.info.render.frame > frame, previous, {
+    timeout: 90_000,
+    polling: 100,
+  });
 }
 
 async function standOutside(page: Page) {
-  await page.evaluate(() => {
-    window.__izzy!.teleportTo('nook');
+  await waitForPlayable(page);
+  const frame = await page.evaluate(({ x, z }) => {
     const game = window.__izzy!.game() as unknown as NookGame;
+    game.teleport(x, z);
     // Face the entrance so the same floor targets are visible on portrait phones.
     game.rig.yaw = Math.PI / 2;
     game.rig.snapTo(game.player.position);
-  });
-  // Let the software-rendered follow camera catch up before projecting a floor tap.
-  await page.waitForTimeout(800);
+    return game.renderer.info.render.frame;
+  }, OUTSIDE);
+  await waitForRenderedFrame(page, frame);
+  await expect
+    .poll(() =>
+      page.evaluate(({ x, z }) => {
+        const position = (window.__izzy!.game() as unknown as NookGame).player.position;
+        return Math.hypot(position.x - x, position.z - z);
+      }, OUTSIDE),
+    )
+    .toBeLessThan(0.01);
+}
+
+async function attachRoomView(page: Page, testInfo: TestInfo, name: string) {
+  const path = testInfo.outputPath(`${name}-${testInfo.project.name}.png`);
+  await page.screenshot({ path });
+  await testInfo.attach(`${name} (synthetic Sample profile)`, { path, contentType: 'image/png' });
 }
 
 /** Use actual mouse/touch input and the floor picker, rather than teleporting through the gate. */
 async function tapFloor(page: Page, point: { x: number; z: number }, touch: boolean) {
+  await waitForPlayable(page);
   // Set a useful view before each tap; a point behind the learner can be off-screen.
-  await page.evaluate(({ x, z }) => {
+  const frame = await page.evaluate(({ x, z }) => {
     const game = window.__izzy!.game() as unknown as NookGame;
     game.rig.yaw = Math.atan2(game.player.position.x - x, game.player.position.z - z);
     game.rig.snapTo(game.player.position);
+    return game.renderer.info.render.frame;
   }, point);
-  await page.waitForTimeout(800);
+  await waitForRenderedFrame(page, frame);
   const position = await page.evaluate(({ x, z }) => {
     const game = window.__izzy!.game() as unknown as NookGame;
     const projected = game.player.position.clone().set(x, 0, z).project(game.rig.camera);
-    const bounds = document.querySelector('canvas.game-canvas')!.getBoundingClientRect();
-    return { x: bounds.left + ((projected.x + 1) / 2) * bounds.width, y: bounds.top + ((1 - projected.y) / 2) * bounds.height };
+    const canvas = document.querySelector('canvas.game-canvas')!;
+    const bounds = canvas.getBoundingClientRect();
+    const screen = { x: bounds.left + ((projected.x + 1) / 2) * bounds.width, y: bounds.top + ((1 - projected.y) / 2) * bounds.height };
+    const picked = game.interaction.pick(projected, game.rig.camera);
+    const floor = game.interaction.pickFloor(projected, game.rig.camera);
+    return {
+      ...screen,
+      onCanvas: document.elementFromPoint(screen.x, screen.y) === canvas,
+      picked: picked?.id ?? null,
+      floorError: floor ? Math.hypot(floor.x - x, floor.z - z) : null,
+      inputEnabled: game.input.enabled,
+      cinematic: game.busy || game.rig.inCinematic,
+    };
   }, point);
   const viewport = page.viewportSize()!;
   expect(position.x).toBeGreaterThan(0);
   expect(position.x).toBeLessThan(viewport.width);
   expect(position.y).toBeGreaterThan(0);
   expect(position.y).toBeLessThan(viewport.height);
+  expect(position.onCanvas, 'the floor target must not be covered by an overlay').toBe(true);
+  expect(position.picked, 'the floor target must not select a teacher or object').toBeNull();
+  expect(position.floorError, 'projection and floor-picking matrices must agree').not.toBeNull();
+  expect(position.floorError!).toBeLessThan(0.01);
+  expect(position.inputEnabled).toBe(true);
+  expect(position.cinematic).toBe(false);
   if (touch) await page.touchscreen.tap(position.x, position.y);
   else await page.mouse.click(position.x, position.y);
   await expect
@@ -236,6 +307,7 @@ test('25 books open the garden nook for floor-tap entry, exit and persisted retu
   expect(saved.rewards.filter((reward) => reward.rewardId === 'room.reading-nook')).toHaveLength(1);
 
   await standOutside(page);
+  await attachRoomView(page, testInfo, 'garden-nook-before-walking');
   for (let i = 0; i < 2; i++) {
     await tapFloor(page, INSIDE, isMobile);
     if (i === 0) {
@@ -275,7 +347,7 @@ test('25 books open the garden nook for floor-tap entry, exit and persisted retu
   expect(await savedReading(page)).toEqual(saved);
 });
 
-test('repeated nook previews dismiss cleanly, survive phone navigation and save no progress', async ({ page, isMobile }) => {
+test('repeated nook previews dismiss cleanly, survive phone navigation and save no progress', async ({ page, isMobile }, testInfo) => {
   await loadSample(page, 24);
   const before = await savedReading(page);
   await page.goto(`${APP}#/parent/settings`);
@@ -291,6 +363,7 @@ test('repeated nook previews dismiss cleanly, survive phone navigation and save 
     await expect(page.locator('.preview-ribbon')).toContainText('nothing here is saved');
     await expect(page.getByTestId('hud-books')).toHaveText(/25/);
     await standOutside(page);
+    await attachRoomView(page, testInfo, `garden-nook-preview-${i + 1}-before-walking`);
     await tapFloor(page, INSIDE, isMobile);
     await tapFloor(page, OUTSIDE, isMobile);
 
