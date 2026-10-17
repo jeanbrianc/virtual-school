@@ -14,11 +14,12 @@ import {
   answerToFinishedQuestion,
   LocalTeacherChat,
   localTeacherReply,
-  understand,
+  keepTeacherChatLocal,
   validateTeacherReply,
   type TeacherChatReply,
   type TeacherChatRequest,
   type TeacherChatService,
+  type TeacherConversationPrivacy,
 } from './chat';
 
 /** Same-site paths ("/api"), loopback helpers over plain http, or any https address. */
@@ -39,6 +40,8 @@ export class HttpTeacherChat implements TeacherChatService {
   readonly id = 'ai-helper';
   readonly sendsDataOffDevice = true;
   private readonly local = new LocalTeacherChat();
+  // Legacy callers without an explicit conversation boundary stay local for this instance.
+  private readonly privacy: TeacherConversationPrivacy = { localOnly: false };
 
   constructor(
     private readonly endpoint: string,
@@ -49,7 +52,8 @@ export class HttpTeacherChat implements TeacherChatService {
   async respond(req: TeacherChatRequest): Promise<TeacherChatReply> {
     // Safety first, on-device: a worried child gets the same careful answer every time.
     const lastTeacher = [...req.history].reverse().find((h) => h.speaker === 'teacher')?.text ?? '';
-    if (understand(req.utterance, lastTeacher).intent === 'safety') return this.local.respond(req);
+    const privacy = req.privacy ?? this.privacy;
+    if (keepTeacherChatLocal(req, privacy)) return this.local.respond(req);
     if (!isAllowedHelperUrl(this.endpoint)) return this.local.respond(req);
 
     const finishUsage = usageJournal.begin('teacher');
@@ -73,6 +77,7 @@ export class HttpTeacherChat implements TeacherChatService {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const reply = validateTeacherReply(await res.json(), req);
       if (!reply) throw new Error('Invalid reply');
+      if (reply.intent === 'safety' || reply.parentNote) privacy.localOnly = true;
       // Fill gaps from the on-device reading: the book she named, and a plain
       // "yes" / "not yet" to "did you read the whole book?".
       const local = localTeacherReply(req);

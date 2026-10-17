@@ -368,6 +368,8 @@ export interface LessonAttempt {
 }
 
 export interface TranscriptLine {
+  /** Retained containment marker; never clears when an old conversation is reopened. */
+  localOnly?: true;
   speaker: 'teacher' | 'child' | 'system';
   text: string;
   at: Timestamp;
