@@ -68,9 +68,14 @@ test('she tells Hoot about a book out loud and it goes on her shelf', async ({ p
   await page.getByTestId('discover-action').click(); // "Meet Professor Hoot"
   await expect(page.getByTestId('dialogue-line')).toContainText('you must be Sample', { timeout: 120_000 });
 
-  // Tap the microphone and talk. The first tap sets up on-device listening
-  // (the simulated browser needs its voice pack downloaded first).
+  // First-time setup refreshes the mic and cancels the obsolete operation.
+  // A second explicit tap starts listening with the installed on-device pack.
   await page.evaluate(() => window.__speechQueue.push('i read daddy the goodnight leelanau book'));
+  await page.getByTestId('talk-bar').getByTestId('mic-btn').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __installs: number }).__installs)).toBe(1);
+  await expect(page.getByTestId('talk-bar').getByTestId('mic-btn')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByTestId('talk-bar').getByTestId('mic-btn')).toHaveAttribute('aria-pressed', 'false');
+  expect(await page.evaluate(() => window.__speechQueue)).toEqual(['i read daddy the goodnight leelanau book']);
   await page.getByTestId('talk-bar').getByTestId('mic-btn').click();
   await expect(page.getByTestId('dialogue-line')).toContainText('You read Goodnight Leelanau to Daddy?', { timeout: 60_000 });
   await expect(page.getByTestId('talk-topic')).toContainText('Goodnight Leelanau');
@@ -86,7 +91,11 @@ test('she tells Hoot about a book out loud and it goes on her shelf', async ({ p
   // A book Hoot doesn't know: how did it make her feel, then stars.
   await expect(page.getByTestId('dialogue-line')).toContainText('How did the story make you feel?');
   await page.locator('.choices .choice').first().click();
+  await expect(page.locator('.choices .choice').first()).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByTestId('star-5').click();
+  await expect(page.getByTestId('star-5')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByTestId('rating-next').click();
   await expect(page.getByTestId('celebration')).toBeVisible({ timeout: 180_000 });
   const cards = await dismissCelebrations(page);
   expect(cards.join(' ')).toMatch(/Goodnight Leelanau is on your bookshelf/);

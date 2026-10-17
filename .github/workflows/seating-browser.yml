@@ -16,7 +16,7 @@ env:
 permissions:
   contents: read
 concurrency:
-  group: seating-${{ github.event.pull_request.number }}
+  group: seating-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: true
 jobs:
   browser:

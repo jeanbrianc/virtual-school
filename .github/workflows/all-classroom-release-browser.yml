@@ -7,8 +7,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 permissions:
   contents: read
+  actions: read
 concurrency:
-  group: all-classroom-release-${{ github.event.pull_request.number }}
+  group: all-classroom-release-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: true
 jobs:
   checks-and-matrix:
@@ -22,6 +23,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -31,23 +33,39 @@ jobs:
       - name: Check the exact combined candidate
         run: npm run check
       - run: npm run build:lambda
-      - name: Discover every E2E suite with no phone exclusions
+      - run: node scripts/build.mjs --e2e
+      - name: Verify exact copy-only boundaries and choose focused successor suites
         id: matrix
-        run: |
-          node --input-type=module <<'NODE'
-          import { appendFileSync, readdirSync } from 'node:fs';
-          const priority = ['seating', 'combined-classroom-release'];
-          const suites = readdirSync('tests/e2e').filter((name) => name.endsWith('.spec.ts')).map((name) => name.slice(0, -8)).sort((a, b) => {
-            const rank = (name) => priority.includes(name) ? priority.indexOf(name) : priority.length;
-            return rank(a) - rank(b) || a.localeCompare(b);
-          });
-          if (!suites.length || suites.some((name) => !/^[a-z0-9-]+$/.test(name))) throw new Error('Missing or invalid E2E suite names');
-          for (const required of ['combined-classroom-release', 'pattern-progression', 'delete-learning-records', 'tavi-routines', 'milo-rhythm', 'conversation-privacy-parent', 'nova-weather', 'base-ten-arithmetic', 'seating']) {
-            if (!suites.includes(required)) throw new Error(`Missing implemented feature suite: ${required}`);
-          }
-          appendFileSync(process.env.GITHUB_OUTPUT, `suites=${JSON.stringify(suites)}\n`);
-          console.log(JSON.stringify({ suites, projects: ['desktop', 'phone'], totalJobs: suites.length * 2 }, null, 2));
-          NODE
+        run: node scripts/verify-classroom-copy-successor.mjs source
+      - name: Record source and emitted-module boundary proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: successor-boundaries-${{ github.event.pull_request.head.sha }}
+          path: test-results/successor-boundaries.json
+          if-no-files-found: error
+  baseline-proof:
+    if: github.head_ref == 'codex/all-implemented-classroom-release' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require 64 exact baseline passes and record the two known talk failures
+        run: node scripts/verify-classroom-copy-successor.mjs baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline-reuse-${{ github.event.pull_request.head.sha }}
+          path: test-results/baseline-reuse.json
+          if-no-files-found: error
+
   browser:
     needs: checks-and-matrix
     name: Combined / ${{ matrix.suite }} / ${{ matrix.project }}

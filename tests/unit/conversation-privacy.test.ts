@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { ServicesProvider, type AppServices } from '../../src/app/services';
 import { DEFAULT_SETTINGS } from '../../src/domain/settings';
 import type { ParentData } from '../../src/ui/parent/ParentApp';
 import { ConversationsPage } from '../../src/ui/parent/pages/ConversationsPage';
+import { AvatarPage } from '../../src/ui/parent/pages/AvatarPage';
+import { makeContext } from './helpers';
 
 function sampleData(enabled: boolean, consentToSend: boolean, endpoint = '/api'): ParentData {
   const child = {
@@ -69,4 +72,21 @@ test('an invalid helper address does not claim optional AI chat is on', () => {
   const html = renderToStaticMarkup(createElement(ConversationsPage, { data: sampleData(true, true, 'http://untrusted.invalid') }));
   assert.match(html, /Optional AI chat: off/);
   assert.match(html, /Voice and microphone sharing are controlled separately/);
+});
+
+test('avatar photo notice accurately includes opt-in household sync without changing settings or records', async () => {
+  const data = sampleData(false, false);
+  const before = structuredClone(data);
+  const { ctx, db } = makeContext();
+  const services = { ctx } as AppServices; // Static rendering only reads the service context; effects do not run.
+  const html = renderToStaticMarkup(createElement(ServicesProvider, { services, children: createElement(AvatarPage, { data }) }));
+  assert.match(html, /Stored in this browser/);
+  assert.match(html, /When family sync is on/);
+  assert.match(html, /photos already saved here, are uploaded to your household sync/);
+  assert.match(html, /shared with your household’s signed-in devices/);
+  assert.doesNotMatch(html, /Stays on this device only|Never uploaded|never analysed or uploaded/i);
+  assert.deepEqual(data, before);
+  assert.deepEqual(await db.table('households').all(), []);
+  assert.deepEqual(await db.table('avatars').all(), []);
+  assert.deepEqual(await db.table('media').all(), []);
 });

@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from 'playwright/test';
 import { DB_NAME } from '../../src/data/schema';
 import type { Household, TeacherInteraction } from '../../src/domain/types';
@@ -56,6 +57,84 @@ async function seedNoticeState(page: Page, enabled: boolean, consentToSend: bool
   await page.reload();
   await expect(page.getByTestId('enter-sample')).toBeVisible();
 }
+
+test('avatar inspiration photo notice includes opt-in household sharing without changing saved settings', async ({ page, baseURL }, info) => {
+  const unexpected: string[] = [];
+  const errors: string[] = [];
+  let microphoneAttempts = 0;
+  await page.exposeFunction('avatarPrivacyMicrophoneAttempt', () => microphoneAttempts++);
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('**/*', async (route) => {
+    const url = new URL(route.request().url());
+    if (url.origin === new URL(baseURL!).origin && !url.pathname.startsWith('/api/')) return route.continue();
+    if (url.origin === new URL(baseURL!).origin && url.pathname === '/api/health')
+      return route.fulfill({ json: { ok: true, keyConfigured: false, provider: 'mock-only', voices: false, listening: false } });
+    unexpected.push(url.href);
+    return route.abort();
+  });
+  await page.routeWebSocket('**/*', (socket) => {
+    unexpected.push(socket.url());
+    socket.close();
+  });
+  await page.addInitScript(() => {
+    const state = window as unknown as { avatarPrivacyMicrophoneAttempt(): Promise<void> };
+    navigator.mediaDevices.getUserMedia = async () => {
+      await state.avatarPrivacyMicrophoneAttempt();
+      throw new Error('No real microphone allowed');
+    };
+  });
+  await useSyntheticHousehold(page);
+  const saved = () =>
+    page.evaluate(async (name) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        const read = (table: string) =>
+          new Promise<unknown[]>((resolve, reject) => {
+            const request = db.transaction(table).objectStore(table).getAll();
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+        return { households: await read('households'), avatars: await read('avatars'), media: await read('media') };
+      } finally {
+        db.close();
+      }
+    }, DB_NAME);
+  const before = await saved();
+  await page.goto(`${APP}#/parent/avatar`);
+  await unlockParent(page);
+  await expect(page.getByRole('heading', { name: 'Sample’s avatar', exact: true })).toBeVisible();
+  const notice = page.locator('.inspiration .privacy-points');
+  for (const text of [
+    'Stored in this browser',
+    'When family sync is on',
+    'photos already saved here, are uploaded to your household sync',
+    'shared with your household’s signed-in devices',
+  ])
+    await expect(notice).toContainText(text);
+  await expect(notice).not.toContainText(/Stays on this device only|Never uploaded|never analysed or uploaded/i);
+  await notice.scrollIntoViewIfNeeded();
+  const bounds = await notice.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return { left: box.left, right: box.right, viewportWidth: innerWidth, scrollWidth: document.documentElement.scrollWidth };
+  });
+  expect(bounds.left).toBeGreaterThanOrEqual(0);
+  expect(bounds.right).toBeLessThanOrEqual(bounds.viewportWidth + 1);
+  expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.viewportWidth + 1);
+  await notice.screenshot({ path: info.outputPath(`avatar-photo-privacy-${info.project.name}.png`) });
+  const after = await saved();
+  expect(after).toEqual(before);
+  expect(microphoneAttempts).toBe(0);
+  expect(unexpected).toEqual([]);
+  expect(errors).toEqual([]);
+  writeFileSync(
+    info.outputPath('avatar-photo-privacy.json'),
+    JSON.stringify({ project: info.project.name, bounds, savedRecordsUnchanged: true, microphoneAttempts, unexpected, errors }, null, 2),
+  );
+});
 
 for (const enabled of [false, true]) {
   for (const consent of [false, true]) {

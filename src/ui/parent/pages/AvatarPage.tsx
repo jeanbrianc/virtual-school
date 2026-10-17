@@ -66,7 +66,7 @@ function Options<T extends string>({
 /**
  * Avatar editor with a live 3D turntable. An optional inspiration photo can
  * be kept beside the controls as a reference for choosing features by hand —
- * it is stored only on this device and is never analysed or uploaded.
+ * it is stored in this browser and included in opt-in household sync.
  */
 export function AvatarPage({ data }: { data: ParentData }) {
   const { ctx } = useServices();
@@ -178,7 +178,10 @@ export function AvatarPage({ data }: { data: ParentData }) {
               </label>
             )}
             <ul className="privacy-points small">
-              <li>🔒 Stays on this device only. Never uploaded, shared or analysed.</li>
+              <li>
+                🔒 Stored in this browser. When family sync is on, inspiration photos, including photos already saved here, are uploaded to your household sync
+                and shared with your household’s signed-in devices.
+              </li>
               <li>🙈 No face recognition or biometric processing — you choose features by eye.</li>
               <li>🧩 A photo-to-avatar generator could be added later as an explicit, opt-in service; none is enabled.</li>
             </ul>

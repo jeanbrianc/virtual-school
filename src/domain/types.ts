@@ -141,7 +141,7 @@ export interface AvatarConfig {
 export interface Avatar extends AvatarConfig {
   id: ID;
   childId: ID;
-  /** Parent-uploaded inspiration photo (stored locally only). */
+  /** Parent-uploaded inspiration photo (stored in this browser and included in opt-in household sync). */
   inspirationMediaId?: ID;
   updatedAt: Timestamp;
 }
