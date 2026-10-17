@@ -8,11 +8,14 @@ import type { AudioEngine } from '../../audio/AudioEngine';
 import type { AvatarModel } from '../characters/avatarModel';
 import type { CollisionWorld } from '../core/collision';
 import type { NavGrid, Point } from '../core/navGrid';
+import type { SeatAnchor } from '../world/seats';
 import { dampAngle } from '../core/tween';
 
 export class PlayerController {
   readonly position = new THREE.Vector3();
   yaw = Math.PI;
+  seated: SeatAnchor | null = null;
+  onSeatChange: ((seat: SeatAnchor | null) => void) | null = null;
   private velocity = new THREE.Vector3();
   private path: Point[] = [];
   private onArrive: (() => void) | null = null;
@@ -29,6 +32,8 @@ export class PlayerController {
   ) {}
 
   teleport(x: number, z: number, yaw = this.yaw): void {
+    this.stand();
+    this.faceTarget = null;
     this.position.set(x, 0, z);
     this.yaw = yaw;
     this.velocity.set(0, 0, 0);
@@ -38,8 +43,32 @@ export class PlayerController {
     this.sync();
   }
 
+  /** Seat anchors alone may bypass furniture collision; standing always exits to clear floor. */
+  sit(seat: SeatAnchor): boolean {
+    if (this.collisions.blocked(seat.exit.x, seat.exit.z, PLAYER.radius)) return false;
+    this.stop();
+    this.faceTarget = null;
+    this.seated = seat;
+    this.position.copy(seat.position);
+    this.yaw = seat.yaw;
+    this.avatar.setSeated(seat.reading ? 'read' : 'sit');
+    this.sync();
+    this.onSeatChange?.(seat);
+    return true;
+  }
+
+  stand(): void {
+    const seat = this.seated;
+    if (!seat) return;
+    this.seated = null;
+    this.avatar.setSeated(null);
+    this.teleport(seat.exit.x, seat.exit.z, seat.yaw);
+    this.onSeatChange?.(null);
+  }
+
   /** Walks to a point via pathfinding; `onArrive` fires when she gets there. */
   walkTo(x: number, z: number, onArrive?: () => void): boolean {
+    this.stand();
     const path = this.nav.findPath({ x: this.position.x, z: this.position.z }, { x, z });
     if (!path || path.length === 0) return false;
     this.path = path.slice(1);
@@ -88,6 +117,12 @@ export class PlayerController {
   }
 
   update(dt: number, move: { x: number; z: number } | null): void {
+    if (move && (move.x || move.z)) this.stand();
+    if (this.seated) {
+      this.avatar.update(dt, 0);
+      this.sync();
+      return;
+    }
     const desired = new THREE.Vector3();
     if (move && (move.x !== 0 || move.z !== 0)) {
       this.cancelPath();
@@ -108,6 +143,11 @@ export class PlayerController {
       }
     }
 
+    if (this.seated) {
+      this.avatar.update(dt, 0);
+      this.sync();
+      return;
+    }
     const k = 1 - Math.exp(-PLAYER.acceleration * dt);
     this.velocity.lerp(desired, k);
     if (this.velocity.lengthSq() < 0.0004 && desired.lengthSq() === 0) this.velocity.set(0, 0, 0);

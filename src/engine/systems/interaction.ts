@@ -84,6 +84,7 @@ export class InteractionSystem {
   hovered: InteractableDef | null = null;
   private raycaster = new THREE.Raycaster();
   private time = 0;
+  private viewportHeight = 720;
   private fresh = new Set<string>();
 
   constructor(private readonly defs: InteractableDef[]) {
@@ -170,6 +171,23 @@ export class InteractionSystem {
   }
 
   pick(ndc: THREE.Vector2, camera: THREE.Camera): InteractableDef | null {
+    // Seat bubbles get a 48 CSS-pixel target independent of phone resolution.
+    // Prefer the nearest visible bubble so adjacent classroom chairs stay distinct.
+    let nearest: InteractableDef | null = null;
+    let distance = 24;
+    const aspect = camera instanceof THREE.PerspectiveCamera ? camera.aspect : 1;
+    for (const d of this.defs) {
+      const marker = this.markers.get(d.id)?.sprite;
+      if (!d.seat || !d.enabled || !marker?.visible) continue;
+      const projected = marker.position.clone().project(camera);
+      if (projected.z < -1 || projected.z > 1 || Math.abs(projected.x) > 1 || Math.abs(projected.y) > 1) continue;
+      const pixels = (Math.hypot((projected.x - ndc.x) * aspect, projected.y - ndc.y) * this.viewportHeight) / 2;
+      if (pixels < distance) {
+        nearest = d;
+        distance = pixels;
+      }
+    }
+    if (nearest) return nearest;
     this.raycaster.setFromCamera(ndc, camera);
     const hits = this.raycaster.intersectObjects(this.proxies, false);
     for (const h of hits) {
@@ -191,7 +209,8 @@ export class InteractionSystem {
     this.dest.visible = true;
   }
 
-  update(dt: number, player: THREE.Vector3): void {
+  update(dt: number, player: THREE.Vector3, camera?: THREE.PerspectiveCamera, viewportHeight = 720): void {
+    this.viewportHeight = viewportHeight;
     this.time += dt;
     for (const d of this.defs) {
       const m = this.markers.get(d.id);
@@ -208,7 +227,12 @@ export class InteractionSystem {
       m.sprite.position.set(m.base.x, m.base.y + bob + (isFocus ? 0.15 : 0), m.base.z);
       const pulse = fresh ? 1 + Math.sin(this.time * 3 + m.phase) * 0.06 : 1;
       const target = (d.kind === 'teacher' ? 0.62 : 0.5) * (isFocus ? 1.35 : fresh ? 1.3 * pulse : 1);
-      const s = m.sprite.scale.x + (target - m.sprite.scale.x) * Math.min(1, dt * 10);
+      let minimum = 0;
+      if (d.seat && camera) {
+        const depth = -m.sprite.position.clone().applyMatrix4(camera.matrixWorldInverse).z;
+        minimum = (66 * 2 * Math.max(0, depth) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / Math.max(1, viewportHeight);
+      }
+      const s = Math.max(minimum, m.sprite.scale.x + (target - m.sprite.scale.x) * Math.min(1, dt * 10));
       m.sprite.scale.setScalar(s);
       (m.sprite.material as THREE.SpriteMaterial).opacity = isFocus ? 1 : 0.85;
     }

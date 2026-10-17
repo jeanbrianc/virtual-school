@@ -42,6 +42,9 @@ export class AvatarModel {
   private armR = new THREE.Group();
   private legL = new THREE.Group();
   private legR = new THREE.Group();
+  private knees: THREE.Group[] = [];
+  private readingBook = new THREE.Group();
+  private seatPose: 'sit' | 'read' | null = null;
   private eyes: THREE.Object3D[] = [];
   /** Per arm (L, R): the hand and sleeve puff, kept round while a raised arm stretches. */
   private armEnds: { hand: THREE.Object3D; puff: THREE.Object3D | null }[] = [];
@@ -63,6 +66,7 @@ export class AvatarModel {
   }
 
   setConfig(config: AvatarConfig): void {
+    this.setSeated(null);
     this.config = config;
     this.rig.clear();
     this.upper = new THREE.Group();
@@ -72,6 +76,8 @@ export class AvatarModel {
     this.armR = new THREE.Group();
     this.legL = new THREE.Group();
     this.legR = new THREE.Group();
+    this.knees = [];
+    this.readingBook = new THREE.Group();
     this.eyes = [];
     this.armEnds = [];
     this.build();
@@ -102,12 +108,19 @@ export class AvatarModel {
       // Swing front/back first, then out to the side (so "forward" means forward at any spread).
       leg.rotation.order = 'ZXY';
       const bareLeg = c.outfit === 'dress' || c.outfit === 'tee';
-      const upper = capsule(0.068, 0.2, bareLeg ? skin : pants, 0, -0.16, 0);
-      leg.add(upper);
-      if (c.outfit === 'dress') leg.add(cyl(0.07, 0.07, 0.07, mat('#fff8ee'), 0, -0.3, 0));
-      const foot = sphere(0.085, shoe, 0, -0.36, 0.035);
+      leg.name = side === -1 ? 'left-thigh' : 'right-thigh';
+      leg.add(capsule(0.066, 0.07, bareLeg ? skin : pants, 0, -0.075, 0));
+      const knee = new THREE.Group();
+      knee.name = side === -1 ? 'left-knee' : 'right-knee';
+      knee.position.y = -0.17;
+      knee.add(capsule(0.061, 0.07, bareLeg ? skin : pants, 0, -0.075, 0));
+      if (c.outfit === 'dress') knee.add(cyl(0.062, 0.062, 0.07, mat('#fff8ee'), 0, -0.13, 0));
+      const foot = sphere(0.085, shoe, 0, -0.19, 0.035);
+      foot.name = side === -1 ? 'left-shoe' : 'right-shoe';
       foot.scale.set(1, 0.62, 1.35);
-      leg.add(foot);
+      knee.add(foot);
+      leg.add(knee);
+      this.knees.push(knee);
       this.rig.add(leg);
     }
 
@@ -229,6 +242,21 @@ export class AvatarModel {
     this.buildHair(hair, c);
     this.buildAccessory(c);
     this.upper.add(this.head);
+    this.readingBook.name = 'seated-open-book';
+    const cover = mat(c.accentColor, { roughness: 0.8 });
+    for (const side of [-1, 1]) {
+      const page = new THREE.Group();
+      page.add(rbox(0.18, 0.018, 0.25, 0.008, cover, side * 0.09, 0, 0));
+      page.add(rbox(0.164, 0.022, 0.232, 0.006, mat('#fff6df'), side * 0.09, 0.018, 0));
+      // A few friendly printed lines, entirely procedural and local.
+      for (let line = 0; line < 4; line++) page.add(rbox(0.11, 0.003, 0.007, 0.002, mat('#b9a78b'), side * 0.09, 0.032, -0.07 + line * 0.04));
+      page.rotation.z = side * 0.13;
+      this.readingBook.add(page);
+    }
+    this.readingBook.position.set(0, 0.15, 0.27);
+    this.readingBook.rotation.x = 0.18;
+    this.readingBook.visible = false;
+    this.upper.add(this.readingBook);
   }
 
   private buildHair(hair: THREE.Material, c: AvatarConfig) {
@@ -390,6 +418,7 @@ export class AvatarModel {
 
   /** Does a dance or gym move; resolves when she's standing again. A new move replaces one in progress. */
   perform(move: DanceMoveId): Promise<void> {
+    this.setSeated(null);
     this.move?.done();
     return new Promise((resolve) => {
       this.move = { id: move, t: 0, nextCue: 0, done: resolve };
@@ -472,11 +501,37 @@ export class AvatarModel {
     }
   }
 
+  /** Temporary pose only. The learner's saved appearance is never replaced. */
+  setSeated(pose: 'sit' | 'read' | null): void {
+    this.move?.done();
+    this.move = null;
+    this.waveTime = 0;
+    this.hopTime = 0;
+    this.seatPose = pose;
+    this.resetPose();
+    this.readingBook.visible = pose === 'read';
+    if (pose) this.updateSeated();
+  }
+
+  get seatedPose(): 'sit' | 'read' | null {
+    return this.seatPose;
+  }
+
+  private updateSeated(): void {
+    this.legL.rotation.x = this.legR.rotation.x = -Math.PI / 2;
+    for (const knee of this.knees) knee.rotation.x = Math.PI / 2;
+    this.armL.rotation.set(-0.95, 0, -0.06);
+    this.armR.rotation.set(-0.95, 0, 0.06);
+    this.head.rotation.set(this.seatPose === 'read' ? 0.24 : 0, 0, 0);
+    this.torso.scale.y = 1;
+  }
+
   private resetPose() {
     this.rig.rotation.set(0, 0, 0);
     this.rig.position.set(0, 0, 0);
     this.rig.scale.set(1, 1, 1);
     this.upper.rotation.set(0, 0, 0);
+    for (const knee of this.knees) knee.rotation.set(0, 0, 0);
     for (const limb of [this.armL, this.armR, this.legL, this.legR]) {
       limb.rotation.set(0, 0, 0);
       limb.scale.set(1, 1, 1);
@@ -493,6 +548,11 @@ export class AvatarModel {
   /** speed01: 0 idle … 1 full walk. */
   update(dt: number, speed01: number): void {
     this.time += dt;
+    if (this.seatPose) {
+      this.updateSeated();
+      this.blink(dt);
+      return;
+    }
     if (this.updateMove(dt)) {
       this.blink(dt);
       return;

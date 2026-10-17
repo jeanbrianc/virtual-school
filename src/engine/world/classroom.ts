@@ -2,6 +2,7 @@
  * Central classroom: alphabet rug, chalkboard greeting, low tables, globe,
  * paper lanterns, the art line (Izzy's artwork) and the planet mobile.
  */
+import { addSeat } from './seats';
 import { AlphabetBanner } from './alphabetBanner';
 import * as THREE from 'three';
 import { createRng } from '../../domain/util/random';
@@ -55,6 +56,16 @@ function roundTable(ctx: BuildContext, x: number, z: number, seed: number) {
     c.position.set(x + Math.cos(a) * 0.85, 0, z + Math.sin(a) * 0.85);
     c.rotation.y = -a - Math.PI / 2;
     ctx.addStatic(c);
+    addSeat(ctx, c, {
+      id: `seat-table-${seed}-${i + 1}`,
+      label: `Sit on ${seed === 1 ? 'left' : 'right'} table chair ${i + 1}`,
+      x: c.position.x,
+      z: c.position.z,
+      top: 0.325,
+      yaw: c.rotation.y,
+      forward: 0.02,
+      exit: [x + Math.cos(a) * 1.5, z + Math.sin(a) * 1.5],
+    });
   }
   ctx.collide(x, z, 1.5, 1.5);
 }
@@ -164,6 +175,8 @@ export function buildClassroom(ctx: BuildContext, today: Date): AlphabetBanner {
   bb2.scale.set(1, 0.65, 1);
   ctx.addStatic(bb1);
   ctx.addStatic(bb2);
+  addSeat(ctx, bb1, { id: 'seat-classroom-coral', label: 'Sit on the coral beanbag', x: -3.1, z: -2.3, top: 0.59, yaw: 0, exit: [-3.1, -1.4] });
+  addSeat(ctx, bb2, { id: 'seat-classroom-teal', label: 'Sit on the teal beanbag', x: 3.1, z: -2.3, top: 0.59, yaw: 0, exit: [3.1, -1.4] });
   ctx.collide(-3.1, -2.3, 0.8, 0.8);
   ctx.collide(3.1, -2.3, 0.8, 0.8);
 

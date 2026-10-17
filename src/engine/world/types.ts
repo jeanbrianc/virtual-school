@@ -4,8 +4,9 @@ import type { CollisionWorld } from '../core/collision';
 import { ease, type Tweens } from '../core/tween';
 import type { Particles } from '../fx/particles';
 import type { Structure, WallSide } from './structure';
+import type { SeatAnchor } from './seats';
 
-export type InteractKind = 'teacher' | 'shelf' | 'door' | 'pet' | 'exhibit' | 'object' | 'museum' | 'lesson';
+export type InteractKind = 'teacher' | 'shelf' | 'door' | 'pet' | 'exhibit' | 'object' | 'museum' | 'lesson' | 'seat';
 
 export interface InteractableDef {
   id: string;
@@ -20,6 +21,7 @@ export interface InteractableDef {
   object: THREE.Object3D;
   markerHeight: number;
   enabled: boolean;
+  seat?: SeatAnchor;
 }
 
 /** A piece of the world that reacts to WorldState changes. */

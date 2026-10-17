@@ -2787,3 +2787,24 @@ button.treasure {
   width: 100%;
   min-height: 44px;
 }
+
+/* Seat labels and the always-reachable Stand up action fit small touch screens. */
+.interact-prompt.seat-prompt {
+  max-width: calc(100% - 24px);
+  min-height: 56px;
+  width: max-content;
+}
+.seat-prompt .interact-icon {
+  flex-shrink: 0;
+}
+@media (max-width: 600px), (max-height: 500px) {
+  .interact-prompt.seat-prompt {
+    font-size: 1.05rem;
+    gap: 8px;
+    bottom: 18px;
+  }
+  .seat-prompt .interact-icon {
+    width: 44px;
+    height: 44px;
+  }
+}
