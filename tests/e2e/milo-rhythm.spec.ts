@@ -10,7 +10,7 @@ import type { Evidence, LessonAttempt } from '../../src/domain/types';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
 
 type SyntheticInputTiming = { kind: string; timeStamp: number; receivedAt: number; queueMs: number };
-type TimingWindow = Window & { __rhythmTiming?: SyntheticInputTiming[] };
+type TimingWindow = Window & { __rhythmTiming?: SyntheticInputTiming[]; __rhythmWorldAdvanced?: boolean };
 type RhythmGame = {
   busy: boolean;
   teleport(x: number, z: number): void;
@@ -20,6 +20,7 @@ type RhythmGame = {
     pickFloor(point: { x: number; y: number }, camera: PerspectiveCamera): Vector3 | null;
   };
   input: { enabled: boolean };
+  tweens: { wait(seconds: number): Promise<void> };
   player: {
     position: Vector3;
     isWalkingPath: boolean;
@@ -306,8 +307,16 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
   await loadSample(page);
   await context.setOffline(true);
   await talkTo(page, 'milo');
-  await page.waitForFunction(() => !(window.__izzy!.game() as unknown as RhythmGame).rig.inCinematic);
   const suspendedFrame = await page.evaluate(() => (window.__izzy!.game() as unknown as RhythmGame).renderer.info.render.frame);
+  // inCinematic stays true while the teacher shot is held. A frame-driven
+  // sentinel instead proves that world/camera tween updates keep advancing.
+  await page.evaluate(() => {
+    (window as TimingWindow).__rhythmWorldAdvanced = false;
+    void (window.__izzy!.game() as unknown as RhythmGame).tweens.wait(0.1).then(() => {
+      (window as TimingWindow).__rhythmWorldAdvanced = true;
+    });
+  });
+  await page.waitForFunction(() => (window as TimingWindow).__rhythmWorldAdvanced === true);
   await expect(page.getByRole('img', { name: 'Milo the otter' })).toBeVisible();
   await screenshot(page, info, 'milo-introduction');
   await activate(page.getByRole('button', { name: 'Tap a rhythm', exact: true }), info);
