@@ -123,6 +123,7 @@ export class Game {
   private sun: THREE.DirectionalLight;
   private resizeObserver: ResizeObserver;
   private disposed = false;
+  private renderSuspensions = new Set<symbol>();
   private lastFocusId: string | null = null;
   private pointerDown: { x: number; y: number; moved: number; id: number; button: number } | null = null;
   private quality: GraphicsQuality;
@@ -447,8 +448,23 @@ export class Game {
     this.rig.update(dt, this.player.position);
     this.world.structure.updateCutaways(this.rig.forward, dt, this.player.position);
 
+    this.drawFrame(dt);
+  }
+
+  private drawFrame(dt: number): void {
+    if (this.renderSuspensions.size) return;
     if (this.composer) this.composer.render(dt);
     else this.renderer.render(this.scene, this.rig.camera);
+  }
+
+  /** A DOM-only activity can own a draw pause without stopping world/camera updates. */
+  suspendRendering(): () => void {
+    const owner = Symbol('render-suspension');
+    this.renderSuspensions.add(owner);
+    // A lease restores the prior state and is safe under repeated effect cleanup.
+    return () => {
+      this.renderSuspensions.delete(owner);
+    };
   }
 
   // ─── Dance circuit ──────────────────────────────────────────────────────

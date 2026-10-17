@@ -10,6 +10,8 @@ Two beats are the default. Grown-ups can deliberately select two, three or four 
 
 The non-timed route matches labeled beat-and-pause diagrams. It does not require waiting for playback or responding to a deadline. Native buttons support touch, Enter, Space and assistive activation; repeats and modified keys do not count as taps. Focus stays in the modal and Escape closes. Sound is optional, follows household mute/volume, and can be stopped during playback. All sounds are original oscillator synthesis; unavailable output falls back to visual-only. Pulses change a numbered circle's fill/border without movement. Reduced-motion CSS disables animations. There is no microphone, recording, external link, AI chat, remote speech or network teaching path.
 
+While the DOM-only music modal is mounted, it owns a scoped lease that skips background WebGL drawing. World updates, camera tweens, audio and numbered DOM pulses continue; close, cancel, teacher/child switch and unmount release that lease, including StrictMode cleanup. Other activities retain their existing rendering. This reduces avoidable rendering contention on slower devices without changing input timestamps or the stale-event guard.
+
 ## Timing contract and limitations
 
 - Default pulse is 800 ms. Optional three-tap warm-up uses the mean of two positive intervals, with a minimum of 800 ms; samples beyond 30 seconds or invalid clocks are discarded. It changes playback pace for this visit only, never an ability level. Very slow or variable access has the fully untimed diagram alternative.
@@ -36,6 +38,7 @@ Exploration and skip remain in the human-readable parent summary; legacy problem
 - Dedicated tests cover deterministic/contrasting patterns, timing boundaries, latency-offset invariance, wrong-pattern rejection, calibration, output cancellation/fallback, narrow skills, memory/IndexedDB/syncing deduplication and child isolation, hint classification, fresh independent work, blur/cancel/stale callbacks and save retry.
 - `milo-rhythm.spec.ts` targets desktop Chrome and true Pixel 7 emulation: actual keyboard/touch copying; visual-only, no voice/headphones; parent selection and evidence; untimed matching; mute mid-play; blur, skip, Escape, reload and focus; existing Pippa/Digit/Nova launches; and real floor-tap walking plus collision clearance and visible Milo interaction, not teleport-only discovery.
 - Browser screenshots use synthetic Sample / Sample sibling / Sample parent profiles, omit birth dates and pronunciation hints, and explicitly reload after direct IndexedDB fixture writes.
+- Browser-fixture-only input timing attachments retain event timestamps and delivery delay even on failure; no such telemetry is added to application records. Real touch/keyboard timing starts only after pad visibility and hit-testing checks, and a missing/reflowed pad blocks the next automated tap.
 - Hosted CI and screenshot review must be checked against the exact published head before calling this ready. Local Chromium is blocked by the environment's socket restriction; no local browser pass is claimed.
 
 ## Approval checklist

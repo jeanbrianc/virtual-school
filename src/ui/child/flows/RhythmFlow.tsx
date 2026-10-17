@@ -42,6 +42,7 @@ export function RhythmFlow({
   beats: configuredBeats,
   muted,
   volume,
+  suspendBackground,
   onSave,
   onClose,
 }: {
@@ -49,6 +50,7 @@ export function RhythmFlow({
   beats?: number;
   muted: boolean;
   volume: number;
+  suspendBackground?: () => () => void;
   onSave: (run: RhythmRun) => Promise<void>;
   onClose: () => void;
 }) {
@@ -92,6 +94,7 @@ export function RhythmFlow({
   const stateRef = useRef({ stage, round, supported, mode });
   stateRef.current = { stage, round, supported, mode };
   const pattern = round === 0 ? 'a' : 'b';
+  useEffect(() => suspendBackground?.(), [suspendBackground]);
   const cancelPlayback = () => {
     epoch.current++;
     player.current.stop();

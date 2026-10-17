@@ -120,6 +120,7 @@ export function ChildMode({ childId }: { childId: string }) {
   const preview = useStore(appStore, (s) => s.preview);
   const host = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Game | null>(null);
+  const suspendRhythmBackground = useCallback(() => gameRef.current?.suspendRendering() ?? (() => {}), []);
   const dataRef = useRef<ChildWorldData | null>(null);
   dataRef.current = data;
   const [ready, setReady] = useState(false);
@@ -1015,6 +1016,7 @@ export function ChildMode({ childId }: { childId: string }) {
             <RhythmFlow
               key={childId}
               childId={childId}
+              suspendBackground={suspendRhythmBackground}
               {...(data.child.rhythmBeatCount ? { beats: data.child.rhythmBeatCount } : {})}
               muted={muted}
               volume={data.household.settings.audio.master * data.household.settings.audio.effects}

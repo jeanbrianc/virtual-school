@@ -1,4 +1,5 @@
 import type { PerspectiveCamera, Vector3 } from 'three';
+import { writeFileSync } from 'node:fs';
 import { expect, test, type Page, type TestInfo, type Locator } from 'playwright/test';
 import { Repositories } from '../../src/data/repositories';
 import { DB_NAME, TABLES } from '../../src/data/schema';
@@ -8,6 +9,8 @@ import { fixedClock } from '../../src/domain/util/time';
 import type { Evidence, LessonAttempt } from '../../src/domain/types';
 import { APP, enterSchool, talkTo, unlockParent } from './helpers';
 
+type SyntheticInputTiming = { kind: string; timeStamp: number; receivedAt: number; queueMs: number };
+type TimingWindow = Window & { __rhythmTiming?: SyntheticInputTiming[] };
 type RhythmGame = {
   busy: boolean;
   teleport(x: number, z: number): void;
@@ -130,6 +133,19 @@ test.use({ actionTimeout: 30_000 });
 test.setTimeout(360_000);
 async function loadSample(page: Page, sound = false) {
   await page.addInitScript(() => {
+    const timing: SyntheticInputTiming[] = [];
+    (window as TimingWindow).__rhythmTiming = timing;
+    for (const kind of ['click', 'keydown']) {
+      document.addEventListener(
+        kind,
+        (event) => {
+          if (!(event.target instanceof Element) || !event.target.closest('[data-testid="rhythm-tap"]')) return;
+          const receivedAt = performance.now();
+          timing.push({ kind, timeStamp: event.timeStamp, receivedAt, queueMs: receivedAt - event.timeStamp });
+        },
+        true,
+      );
+    }
     // Deliberately unavailable optional voice capabilities. Picture/touch participation must still work.
     Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: undefined });
     Object.defineProperty(window, 'webkitSpeechRecognition', { configurable: true, value: undefined });
@@ -202,6 +218,16 @@ async function loadSample(page: Page, sound = false) {
   await enterSchool(page, 'sample');
   if (await page.getByTestId('discover-ok').count()) await page.getByTestId('discover-ok').click();
 }
+test.afterEach(async ({ page }, info) => {
+  await saveInputTiming(page, info, 'end-of-test');
+});
+async function saveInputTiming(page: Page, info: TestInfo, label: string) {
+  // Synthetic browser-fixture diagnostics only; never added to application records.
+  const timing = await page.evaluate(() => (window as TimingWindow).__rhythmTiming ?? []).catch(() => ({ unavailable: 'Page closed before capture' }));
+  const path = info.outputPath(`synthetic-input-${label}-${info.project.name}.json`);
+  writeFileSync(path, JSON.stringify(timing, null, 2));
+  await info.attach(`synthetic-input-${label}`, { path, contentType: 'application/json' });
+}
 async function records(page: Page) {
   return page.evaluate(async (name) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -253,15 +279,25 @@ async function copyTwoBeats(page: Page, info: TestInfo, gap: number) {
   const box = (await pad.boundingBox())!;
   const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   expect(await pad.evaluate((element, p) => element.contains(document.elementFromPoint(p.x, p.y)), point)).toBe(true);
+  const originalPad = (await pad.elementHandle())!;
   if (info.project.name !== 'phone') await pad.focus();
   // Validate visibility and focus before the first beat. Locator.tap() waits
   // for stable rendered frames, which can add seconds to a musical gap under
   // SwiftShader. Native touchscreen/keyboard dispatch still exercises real
   // input without inserting actionability waits between the two beats.
   const tap = () => (info.project.name === 'phone' ? page.touchscreen.tap(point.x, point.y) : page.keyboard.press('Enter'));
-  await tap();
-  await page.waitForTimeout(gap);
-  await tap();
+  try {
+    await tap();
+    await page.waitForTimeout(gap);
+    expect(
+      await originalPad.evaluate((element, p) => element.isConnected && element.contains(document.elementFromPoint(p.x, p.y)), point),
+      'The original pad must still own this point; never tap a reflowed feedback/Next button after an unreliable input.',
+    ).toBe(true);
+    await tap();
+  } finally {
+    // Save before a later reload resets this synthetic page's diagnostics.
+    await saveInputTiming(page, info, `gap-${gap}ms`);
+  }
 }
 
 test('muted keyboard/touch copy, fresh independent pattern, parent evidence, dedup and sibling isolation', async ({ page, context }, info) => {
@@ -270,6 +306,8 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
   await loadSample(page);
   await context.setOffline(true);
   await talkTo(page, 'milo');
+  await page.waitForFunction(() => !(window.__izzy!.game() as unknown as RhythmGame).rig.inCinematic);
+  const suspendedFrame = await page.evaluate(() => (window.__izzy!.game() as unknown as RhythmGame).renderer.info.render.frame);
   await expect(page.getByRole('img', { name: 'Milo the otter' })).toBeVisible();
   await screenshot(page, info, 'milo-introduction');
   await activate(page.getByRole('button', { name: 'Tap a rhythm', exact: true }), info);
@@ -296,7 +334,10 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
   expect(saved.evidence.every((e) => e.statement.includes('visual-only'))).toBeTruthy();
   expect(saved.evidence.every((e) => e.statement.includes(info.project.name === 'phone' ? 'pointer-or-touch' : 'keyboard-or-assistive'))).toBeTruthy();
   await screenshot(page, info, 'copy-complete');
+  expect(await page.evaluate(() => (window.__izzy!.game() as unknown as RhythmGame).renderer.info.render.frame)).toBe(suspendedFrame);
   await activate(page.getByRole('button', { name: 'Back to school', exact: true }), info);
+  await waitForRenderedFrame(page, suspendedFrame);
+  await waitForPlayable(page);
   await context.setOffline(false);
   await page.reload();
   expect((await records(page)).lessons).toHaveLength(1);
@@ -382,9 +423,12 @@ test('audio fallback, mute mid-play, blur, skip, Escape, reload and focus restor
   await watch(page, info, 1);
   await activate(page.getByRole('button', { name: 'Replay the model with help' }), info);
   await page.getByRole('button', { name: 'Play / watch pattern', exact: true }).click();
+  const beforeEscape = await page.evaluate(() => (window.__izzy!.game() as unknown as RhythmGame).renderer.info.render.frame);
   await page.getByRole('button', { name: 'Close without saving', exact: true }).focus();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('rhythm-flow')).toHaveCount(0);
+  await waitForRenderedFrame(page, beforeEscape);
+  await waitForPlayable(page);
   expect((await records(page)).lessons).toHaveLength(0);
   await context.setOffline(false);
   await page.reload();
