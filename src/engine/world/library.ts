@@ -10,6 +10,7 @@ import { box, contactShadow, cyl, group, mat, rbox, sphere, uniqueMat } from '..
 import { rugTexture, signTexture } from '../render/textures';
 import { bakeStatic } from '../render/bake';
 import { gardenMuralMaterial, gardenPot, gardenSunlight, gardenWallDecor } from './gardenNook';
+import { addSeat } from './seats';
 import { LAYOUT, PALETTE } from '../palette';
 import { toggleFeature, type BuildContext } from './types';
 
@@ -140,6 +141,16 @@ export function buildLibrary(ctx: BuildContext): void {
   chair.position.set(-12.1, 0, -3.3);
   chair.rotation.y = Math.PI / 2 + 0.5;
   ctx.addStatic(chair);
+  addSeat(ctx, chair, {
+    id: 'seat-library-armchair',
+    label: 'Sit in the library chair',
+    x: -12.1,
+    z: -3.3,
+    top: 0.65,
+    yaw: chair.rotation.y,
+    forward: 0.17,
+    exit: [-11.0, -3.9],
+  });
   ctx.addStatic(contactShadow(1.4, 1.3, 0.3, -12.1, -3.3));
   ctx.collide(-12.1, -3.3, 1.0, 1.0);
   const table = group(
@@ -319,6 +330,18 @@ function buildReadingNook(ctx: BuildContext) {
     canopy.add(pillow);
   }
   nook.add(canopy);
+  addSeat(ctx, canopy, {
+    id: 'seat-nook-couch',
+    label: 'Sit and read on the garden couch',
+    x: benchX,
+    z: cz,
+    top: 0.58,
+    yaw: Math.PI / 2,
+    forward: 0.18,
+    exit: [benchX + 1.05, cz],
+    reading: true,
+    nook: true,
+  });
   ctx.collide(benchX, cz, 1.25, 2.5);
 
   // Low outward-facing books, a second seat, and a book left open to read.
@@ -333,6 +356,16 @@ function buildReadingNook(ctx: BuildContext) {
   const bean = sphere(0.55, mat('#e7bc60', { roughness: 1 }), cx + 0.2, 0.32, maxZ - 0.85, 16);
   bean.scale.set(1, 0.65, 1);
   nook.add(bean);
+  addSeat(ctx, bean, {
+    id: 'seat-nook-daisy',
+    label: 'Sit on the daisy cushion',
+    x: cx + 0.2,
+    z: maxZ - 0.85,
+    top: 0.64,
+    yaw: Math.PI / 2,
+    exit: [cx + 1.15, maxZ - 0.85],
+    nook: true,
+  });
   // A daisy cushion gives the sunny little seat a flower-shaped top.
   for (let i = 0; i < 6; i++) {
     const a = (i * Math.PI) / 3;

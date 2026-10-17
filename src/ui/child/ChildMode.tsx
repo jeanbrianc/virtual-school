@@ -124,6 +124,7 @@ export function ChildMode({ childId }: { childId: string }) {
   dataRef.current = data;
   const [ready, setReady] = useState(false);
   const [focus, setFocus] = useState<FocusInfo | null>(null);
+  const [seatedLabel, setSeatedLabel] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const overlayRef = useRef<Overlay>(null);
   overlayRef.current = overlay;
@@ -535,6 +536,7 @@ export function ChildMode({ childId }: { childId: string }) {
       childName: data.child.name,
       callbacks: {
         onFocus: (f) => setFocus(f),
+        onSeated: setSeatedLabel,
         onInteract: (id) => void handleInteract(id),
         onStation: (n) => stationRef.current(n),
         onBack: () => {
@@ -986,10 +988,13 @@ export function ChildMode({ childId }: { childId: string }) {
             </div>
           )}
 
+          <span className="sr-only" role="status" aria-live="polite">
+            {seatedLabel ?? ''}
+          </span>
           {focus && !overlay && !busy && (
             <button
               type="button"
-              className={`interact-prompt ${focusIsNew ? 'fresh' : ''}`}
+              className={`interact-prompt ${focusIsNew ? 'fresh' : ''} ${focus.kind === 'seat' ? 'seat-prompt' : ''}`}
               onClick={() => gameRef.current?.interactById(focus.id)}
               data-testid="interact-prompt"
             >
