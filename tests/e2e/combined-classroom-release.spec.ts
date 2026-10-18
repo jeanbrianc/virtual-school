@@ -466,8 +466,12 @@ test('seat → leave → available teacher → restored movement → another sea
       if (!isTeacherAvailable('milo')) {
         await openTeacher(page, 'digit', isMobile);
         await expect(page.getByRole('dialog', { name: 'Talking with Digit' })).toBeVisible();
-        if (dismissal === 'close') await activate(page.getByTestId('dialogue-close'), isMobile);
-        else await page.getByTestId('dialogue-close').press('Escape');
+        if (dismissal === 'escape') {
+          await activate(page.getByTestId('choose-teacher-activity'), isMobile);
+          await page.getByTestId('choice-moon-rocks').press('Escape');
+          await expect(page.getByTestId('teacher-activity-chooser')).toHaveCount(0);
+        }
+        await activate(page.getByTestId('dialogue-close'), isMobile);
         await playable(page);
         expect((await state(page))!.renderLeases).toBe(0);
         await checkpoint(page, info, `05-digit-${dismissal}-restored-world`);
