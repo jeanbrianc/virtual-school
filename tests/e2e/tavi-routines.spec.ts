@@ -1,3 +1,5 @@
+import { isTeacherAvailable } from '../../src/domain/teachers/registry';
+import { hiddenTeacherTests, restoredTeacherTest } from './fixtures/hiddenTeacher';
 import { expect, test, type Page, type TestInfo, type Locator } from 'playwright/test';
 import type { PerspectiveCamera, Vector3 } from 'three';
 import { PLAYER } from '../../src/config/gameConfig';
@@ -63,7 +65,8 @@ async function screenshot(page: Page, info: TestInfo, name: string) {
   await info.attach(name, { path, contentType: 'image/png' });
 }
 
-test('offline tap/keyboard steps, explicit 2→3→4 offers, valid alternative orders, duplicate saves and parent evidence', async ({ page, context }, info) => {
+const run = restoredTeacherTest('tavi');
+run('offline tap/keyboard steps, explicit 2→3→4 offers, valid alternative orders, duplicate saves and parent evidence', async ({ page, context }, info) => {
   await loadRoutineSample(page);
   await context.setOffline(true);
   await open(page, info);
@@ -119,7 +122,7 @@ test('offline tap/keyboard steps, explicit 2→3→4 offers, valid alternative o
   expect((await records(page)).evidence.filter((e) => e.childId === 'child_georgia')).toHaveLength(0);
 });
 
-test('incomplete, invalid, model, simpler, interruption, skip, replay, cancel and reload are gentle and honest', async ({ page, context }, info) => {
+run('incomplete, invalid, model, simpler, interruption, skip, replay, cancel and reload are gentle and honest', async ({ page, context }, info) => {
   await loadRoutineSample(page);
   await context.setOffline(true);
   await open(page, info, 4);
@@ -163,7 +166,7 @@ test('incomplete, invalid, model, simpler, interruption, skip, replay, cancel an
   await expect(page.getByTestId('routine-flow')).toHaveCount(0);
 });
 
-test('new teacher placement leaves existing teachers, globe, dance, keyboard and bookshelf usable', async ({ page }, info) => {
+run('new teacher placement leaves existing teachers, globe, dance, keyboard and bookshelf usable', async ({ page }, info) => {
   await loadRoutineSample(page);
   await screenshot(page, info, 'school-with-tavi');
   // Frame the teacher with the ordinary orbit camera, then use a real canvas click/tap.
@@ -262,3 +265,6 @@ test('new teacher placement leaves existing teachers, globe, dance, keyboard and
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(bookshelf).toBeVisible();
 });
+
+// Hidden defaults run positive regression assertions, with no skipped test results.
+if (!isTeacherAvailable('tavi')) hiddenTeacherTests('tavi');

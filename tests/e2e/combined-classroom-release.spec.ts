@@ -1,3 +1,4 @@
+import { isTeacherAvailable } from '../../src/domain/teachers/registry';
 /** The final merged candidate must preserve seating, Milo, and parent arithmetic/privacy together. */
 import { writeFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page, type TestInfo } from 'playwright/test';
@@ -404,7 +405,7 @@ async function arithmeticCard(page: Page, run: LessonAttempt, mobile: boolean) {
   await detail.scrollIntoViewIfNeeded();
 }
 
-test('seat → leave → Milo → restored movement → another seat and teacher; exact arithmetic cards retain privacy copy', async ({
+test('seat → leave → available teacher → restored movement → another seat; exact arithmetic cards retain privacy copy', async ({
   page,
   isMobile,
   baseURL,
@@ -452,7 +453,7 @@ test('seat → leave → Milo → restored movement → another seat and teacher
     await configureFixture(page, false);
     await enterSchool(page, 'sample');
     await playable(page);
-    const before = await records(page);
+    let before = await records(page);
     await checkpoint(page, info, '01-ready-before-seating');
     await sit(page, 'seat-nook-couch', isMobile);
     await checkpoint(page, info, '02-reading-seat');
@@ -462,6 +463,16 @@ test('seat → leave → Milo → restored movement → another seat and teacher
 
     // Both dismissal paths must release exactly the owned draw lease, on the same world.
     for (const dismissal of ['close', 'escape'] as const) {
+      if (!isTeacherAvailable('milo')) {
+        await openTeacher(page, 'digit', isMobile);
+        await expect(page.getByRole('dialog', { name: 'Talking with Digit' })).toBeVisible();
+        if (dismissal === 'close') await activate(page.getByTestId('dialogue-close'), isMobile);
+        else await page.getByTestId('dialogue-close').press('Escape');
+        await playable(page);
+        expect((await state(page))!.renderLeases).toBe(0);
+        await checkpoint(page, info, `05-digit-${dismissal}-restored-world`);
+        continue;
+      }
       await openTeacher(page, 'milo', isMobile);
       await expect(page.getByTestId('rhythm-flow')).toBeVisible();
       await expect.poll(async () => (await state(page))!.renderLeases).toBe(1);
@@ -485,6 +496,7 @@ test('seat → leave → Milo → restored movement → another seat and teacher
       expect((await state(page))!.renderLeases).toBe(0);
       await checkpoint(page, info, `05-milo-${dismissal}-restored-world`);
     }
+    if (!isTeacherAvailable('milo')) before = await records(page);
     await moveByFloor(page, info, isMobile);
     await checkpoint(page, info, '06-real-floor-movement-restored');
     await sit(page, 'seat-table-1-1', isMobile);

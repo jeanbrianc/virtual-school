@@ -4,7 +4,7 @@
  * WorldState + shelf book list — it never touches persistence.
  */
 import * as THREE from 'three';
-import { TEACHER_IDS, TEACHER_REGISTRY } from '../../domain/teachers/registry';
+import { AVAILABLE_TEACHER_IDS, TEACHER_REGISTRY } from '../../domain/teachers/registry';
 import { TEACHERS } from '../../domain/teachers/teachers';
 import type { TeacherId } from '../../domain/teachers/teachers';
 import type { WorldState } from '../../domain/world/worldState';
@@ -104,7 +104,7 @@ export class SchoolWorld {
   }
 
   private addTeachers(ctx: BuildContext) {
-    const specs = TEACHER_IDS.map((id) => ({ id, ...TEACHER_REGISTRY[id].scene, label: `Talk to ${TEACHERS[id].name}` }));
+    const specs = AVAILABLE_TEACHER_IDS.map((id) => ({ id, ...TEACHER_REGISTRY[id].scene, label: `Talk to ${TEACHERS[id].name}` }));
     for (const s of specs) {
       // Face toward the middle of the room.
       const yaw = Math.atan2(0 - s.x, 1.5 - s.z);

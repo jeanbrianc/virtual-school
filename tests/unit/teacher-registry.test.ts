@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
+import { DISCOVERABLE_IDS, TEACHER_DISCOVERIES, undiscovered } from '../../src/domain/discovery';
 import { getSkill, skillsForLesson } from '../../src/domain/curriculum';
 import { getLesson } from '../../src/domain/lessons/registry';
 import { parseTeacherAiInput, teacherSystemPrompt } from '../../src/domain/teachers/aiPrompt';
 import { localTeacherReply } from '../../src/domain/teachers/chat';
 import {
+  AVAILABLE_TEACHER_IDS,
+  isTeacherAvailable,
   TEACHER_IDS,
   TEACHER_REGISTRY,
   teacherActivities,
@@ -28,7 +31,7 @@ it('every stable teacher has a complete profile, curriculum activity, local voic
     assert.ok(p.introductions.length);
     assert.ok(p.voice.rate > 0);
     assert.ok(p.naturalVoice.voice);
-    assert.equal(teacherForInteraction(id), id);
+    assert.equal(teacherForInteraction(id), isTeacherAvailable(id) ? id : undefined);
     const lessonId =
       r.activity.kind === 'lesson'
         ? r.activity.lessonId
@@ -83,6 +86,11 @@ it('shared activity choices preserve defaults and reject cross-teacher or unknow
   for (const teacher of TEACHER_IDS) {
     assert.deepEqual(TEACHER_REGISTRY[teacher].activity, defaults[teacher]);
     const choices = teacherActivities(teacher);
+    if (!isTeacherAvailable(teacher)) {
+      assert.deepEqual(choices, []);
+      for (const choice of TEACHER_REGISTRY[teacher].activities) assert.equal(teacherActivity(teacher, choice.id), undefined);
+      continue;
+    }
     assert.equal(new Set(choices.map((c) => c.id)).size, choices.length);
     assert.deepEqual(choices[0]?.activity, defaults[teacher]);
     for (const choice of choices) {
@@ -96,5 +104,21 @@ it('shared activity choices preserve defaults and reject cross-teacher or unknow
   for (const id of ['retired', '__proto__', 'constructor', 'toString']) {
     assert.deepEqual(teacherActivities(id), []);
     assert.equal(teacherActivity('digit', id), undefined);
+  }
+});
+
+it('only Hoot, Digit, Pippa and Nova are available; hidden teachers retain stable profiles and curriculum', () => {
+  assert.deepEqual(AVAILABLE_TEACHER_IDS, ['hoot', 'digit', 'pippa', 'nova']);
+  assert.deepEqual(TEACHER_DISCOVERIES, ['hoot', 'digit', 'pippa', 'nova']);
+  assert.deepEqual(undiscovered(['milo', 'tavi', 'hoot'], []), ['hoot']);
+  for (const id of ['milo', 'tavi'] as const) {
+    assert.equal(isTeacherAvailable(id), false);
+    assert.equal(DISCOVERABLE_IDS.includes(id), false);
+    assert.equal(isTeacherId(id), true);
+    assert.equal(teacherRegistration(id), TEACHER_REGISTRY[id]);
+    assert.equal(teacherDisplayName(id), TEACHERS[id].name);
+    assert.equal(createTeacher(id, 0).id, id);
+    assert.equal(teacherForInteraction(id), undefined);
+    assert.deepEqual(teacherActivities(id), []);
   }
 });

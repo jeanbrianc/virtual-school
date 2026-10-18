@@ -11,29 +11,31 @@ import { getReward } from './rewards/catalog';
 import { ruleProgress } from './rewards/engine';
 import type { WorldState } from './world/worldState';
 
-import { TEACHER_IDS } from './teachers/registry';
-export const TEACHER_DISCOVERIES = TEACHER_IDS;
+import { AVAILABLE_TEACHER_IDS, isTeacherId, isTeacherAvailable } from './teachers/registry';
+export const TEACHER_DISCOVERIES = AVAILABLE_TEACHER_IDS;
 
 /** Everything a child can discover, in the order a guide would show them. */
-export const DISCOVERABLE_IDS = [
-  'hoot',
-  'bookshelf',
-  'circuit',
-  'digit',
-  'rocket',
-  'nova',
-  'pippa',
-  'tavi',
-  'milo',
-  'tank',
-  'globe',
-  'museum',
-  'trophies',
-  'nature',
-  'greenhouse',
-  'artStudio',
-  'nook',
-] as const;
+export const DISCOVERABLE_IDS = (
+  [
+    'hoot',
+    'bookshelf',
+    'circuit',
+    'digit',
+    'rocket',
+    'nova',
+    'pippa',
+    'tavi',
+    'milo',
+    'tank',
+    'globe',
+    'museum',
+    'trophies',
+    'nature',
+    'greenhouse',
+    'artStudio',
+    'nook',
+  ] as const
+).filter((id) => !isTeacherId(id) || isTeacherAvailable(id));
 
 export interface DiscoveryContext {
   name: string;
