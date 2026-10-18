@@ -206,7 +206,11 @@ export function hiddenTeacherTests(id: 'milo' | 'tavi') {
     await unlockParent(page);
     if (info.project.name === 'phone') await page.getByRole('button', { name: 'Menu', exact: true }).click();
     await page.getByLabel('Viewing learner').selectOption('child_izzy');
-    if (info.project.name === 'phone') await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    if (info.project.name === 'phone') {
+      await page.reload();
+      await expect(page.locator('.p-side')).not.toHaveClass(/\bopen\b/);
+      await expect(page.getByLabel('Viewing learner')).toHaveValue('child_izzy');
+    }
     await expect(page.getByText(lesson.summary, { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: `${id === 'milo' ? 'Milo' : 'Tavi'} (1)`, exact: true })).toBeVisible();
     expect((await savedState(page)).slice(1).map((rows) => rows.filter((row) => (row as { id: string }).id.startsWith(lesson.id)))).toEqual([
