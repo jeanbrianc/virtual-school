@@ -1,3 +1,5 @@
+import { isTeacherAvailable } from '../../src/domain/teachers/registry';
+import { hiddenTeacherTests, restoredTeacherTest } from './fixtures/hiddenTeacher';
 import type { PerspectiveCamera, Vector3 } from 'three';
 import { writeFileSync } from 'node:fs';
 import { expect, test, type Page, type TestInfo, type Locator } from 'playwright/test';
@@ -301,7 +303,8 @@ async function copyTwoBeats(page: Page, info: TestInfo, gap: number) {
   }
 }
 
-test('muted keyboard/touch copy, fresh independent pattern, parent evidence, dedup and sibling isolation', async ({ page, context }, info) => {
+const run = restoredTeacherTest('milo');
+run('muted keyboard/touch copy, fresh independent pattern, parent evidence, dedup and sibling isolation', async ({ page, context }, info) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await loadSample(page);
@@ -361,7 +364,7 @@ test('muted keyboard/touch copy, fresh independent pattern, parent evidence, ded
   expect(errors).toEqual([]);
 });
 
-test('untimed recognition, hints, four beats chosen by parent, and existing teacher regressions', async ({ page, context }, info) => {
+run('untimed recognition, hints, four beats chosen by parent, and existing teacher regressions', async ({ page, context }, info) => {
   await loadSample(page);
   await page.goto(`${APP}#/parent/settings`);
   await unlockParent(page);
@@ -402,7 +405,7 @@ test('untimed recognition, hints, four beats chosen by parent, and existing teac
   }
 });
 
-test('audio fallback, mute mid-play, blur, skip, Escape, reload and focus restore never save unfinished input', async ({ page, context }, info) => {
+run('audio fallback, mute mid-play, blur, skip, Escape, reload and focus restore never save unfinished input', async ({ page, context }, info) => {
   await loadSample(page, true);
   await context.setOffline(true);
   await talkTo(page, 'milo');
@@ -451,7 +454,7 @@ test('audio fallback, mute mid-play, blur, skip, Escape, reload and focus restor
   expect((await records(page)).lessons).toHaveLength(0);
 });
 
-test('Milo is reachable through real floor taps with a visible model and touch/keyboard interaction affordance', async ({ page }, info) => {
+run('Milo is reachable through real floor taps with a visible model and touch/keyboard interaction affordance', async ({ page }, info) => {
   await loadSample(page);
   for (const point of [
     { x: -4.9, z: 6.8 },
@@ -473,3 +476,6 @@ test('Milo is reachable through real floor taps with a visible model and touch/k
   await waitForPlayable(page);
   expect((await records(page)).lessons).toHaveLength(0);
 });
+
+// Hidden defaults run positive regression assertions, with no skipped test results.
+if (!isTeacherAvailable('milo')) hiddenTeacherTests('milo');

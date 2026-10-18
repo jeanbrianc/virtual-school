@@ -212,6 +212,12 @@ export const TEACHER_REGISTRY = {
 } as const satisfies Record<string, TeacherRegistration>;
 export type TeacherId = keyof typeof TEACHER_REGISTRY;
 export const TEACHER_IDS = Object.keys(TEACHER_REGISTRY) as TeacherId[];
+/** Child-facing availability only. Retain every stable ID above for records and restoration. */
+const HIDDEN_TEACHER_IDS: readonly TeacherId[] = ['milo', 'tavi'];
+export const AVAILABLE_TEACHER_IDS = TEACHER_IDS.filter((id) => !HIDDEN_TEACHER_IDS.includes(id));
+export function isTeacherAvailable(id: unknown): boolean {
+  return isTeacherId(id) && AVAILABLE_TEACHER_IDS.includes(id);
+}
 export function isTeacherId(id: unknown): id is TeacherId {
   return typeof id === 'string' && Object.prototype.hasOwnProperty.call(TEACHER_REGISTRY, id);
 }
@@ -220,13 +226,13 @@ export function teacherRegistration(id: string): TeacherRegistration | undefined
 }
 const aliases: Record<string, TeacherId> = { rocket: 'digit', tank: 'nova' };
 export function teacherForInteraction(id: string): TeacherId | undefined {
-  if (isTeacherId(id)) return id;
-  return Object.prototype.hasOwnProperty.call(aliases, id) ? aliases[id] : undefined;
+  const teacher = isTeacherId(id) ? id : Object.prototype.hasOwnProperty.call(aliases, id) ? aliases[id] : undefined;
+  return isTeacherAvailable(teacher) ? teacher : undefined;
 }
 
 /** Registry-only routes: reject unknown teachers, cross-teacher and prototype keys. */
 export function teacherActivities(id: string): readonly TeacherActivityChoice[] {
-  return teacherRegistration(id)?.activities ?? [];
+  return isTeacherId(id) && isTeacherAvailable(id) ? TEACHER_REGISTRY[id].activities : [];
 }
 export function teacherActivity(id: string, activityId: string): TeacherActivityChoice | undefined {
   return teacherActivities(id).find((choice) => choice.id === activityId);

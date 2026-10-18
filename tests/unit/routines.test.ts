@@ -120,7 +120,7 @@ it('support, retry, incomplete, simpler and skip evidence stay honest; progressi
   assert.equal(cancelled.complete, false);
   assert.equal(cancelled.current, null);
 });
-it('reviewed Family skills are narrow, legacy sequencing remains untouched, and Tavi is discoverable in a clear scene position', () => {
+it('reviewed Family skills are narrow, legacy sequencing remains untouched, and hidden Tavi retains a clear scene position for restoration', () => {
   assert.deepEqual(
     skillsForLesson('everyday-sequencing')
       .map((s) => s.id)
@@ -129,7 +129,7 @@ it('reviewed Family skills are narrow, legacy sequencing remains untouched, and 
   );
   assert.ok(ROUTINE_SKILLS.every((id) => getSkill(id)?.standards.every((s) => s.framework === 'Family')));
   assert.equal(getSkill('reason.sequencing')!.standards[0]!.framework, 'ELOF');
-  assert.ok(DISCOVERABLE_IDS.includes('tavi'));
+  assert.equal(DISCOVERABLE_IDS.includes('tavi'), false);
   assert.equal(createTeacher('tavi', 0).id, 'tavi');
   const { x, z } = TEACHER_REGISTRY.tavi.scene;
   assert.ok(Math.abs(x) > 3.5 && z > 5, 'outside dance rug, tables and chalkboard');

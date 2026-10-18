@@ -18,8 +18,7 @@ at 15:47 UTC. It contains the eight earlier changes, not this candidate's additi
 
 - **Child mode** — an explorable, cozy 3D school. A learner walks around (keyboard,
   tap-to-walk, or a game controller), talks to the learner's teachers (Professor Hoot for
-  reading, Digit for math, Nova for science, Pippa for shapes, Tavi for pretend
-  picture steps and Milo for beats and pauses). Activities support taps and keys;
+  reading, Digit for math, Nova for science and Pippa for shapes). Activities support taps and keys;
   eligible teacher conversations also offer typing and optional speech. A learner
   can log real books for the personal bookshelf and see the world respond to
   recorded learning and participation.
@@ -29,6 +28,13 @@ at 15:47 UTC. It contains the eight earlier changes, not this candidate's additi
   and available teacher-conversation turns support parent recordkeeping.
 - **Learning Museum** — a warm family showcase (with a TV-friendly guided tour)
   for grandparents and visitors.
+
+**Temporarily hidden teachers:** Milo and Tavi are unavailable in the child-facing
+3D school, discovery and activity routes. Their profiles, curriculum, saved learning
+records and parent history remain intact. To restore them after review, remove
+their IDs from `HIDDEN_TEACHER_IDS` in `src/domain/teachers/registry.ts` and rerun
+all applicable checks. Their dormant flow browser scenarios remain in the suite;
+while hidden, those specs execute hidden-entry and history-preservation regressions.
 
 Everything is stored in the browser on your device (IndexedDB). On the family's own
 hosted site, **family sync** (opt-in) keeps every signed-in device's school the same

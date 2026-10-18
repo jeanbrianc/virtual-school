@@ -36,7 +36,7 @@ import { speakableText } from '../../domain/pronounce';
 import { browserFamily, knownOnDevice, type OnDeviceAnswer } from '../../domain/talk';
 import { talkPhrases } from '../../domain/teachers/chat';
 import { isAllowedHelperUrl, naturalVoicesOn } from '../../domain/teachers/chatRemote';
-import { TEACHER_REGISTRY, teacherActivities, teacherActivity, teacherForInteraction } from '../../domain/teachers/registry';
+import { isTeacherId, isTeacherAvailable, TEACHER_REGISTRY, teacherActivities, teacherActivity, teacherForInteraction } from '../../domain/teachers/registry';
 import { TEACHERS, type TeacherId } from '../../domain/teachers/teachers';
 import type { TranscriptLine } from '../../domain/types';
 import { toDay } from '../../domain/util/time';
@@ -426,6 +426,8 @@ export function ChildMode({ childId }: { childId: string }) {
       const d = dataRef.current;
       const game = gameRef.current;
       if (!d || !game || overlayRef.current) return;
+      // Stale/programmatic routes must not discover or record a temporarily hidden teacher.
+      if (isTeacherId(id) && !isTeacherAvailable(id)) return;
       setShowControls(false);
       const state = appStore.get().preview?.world ?? d.world;
       if (appStore.get().preview && (teacherForInteraction(id) || id === 'alphabet' || id === 'globe')) {

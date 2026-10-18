@@ -14,14 +14,13 @@ test('existing teachers keep their introductions and working offline activities'
     ['hoot', 'hoot'],
     ['digit', 'digit'],
     ['pippa', 'pippa'],
-    ['tavi', 'tavi'],
     ['nova', 'nova'],
-    ['milo', 'milo'],
   ]);
   for (const [id, name] of [
     ['hoot', 'Professor Hoot'],
     ['digit', 'Digit'],
     ['nova', 'Nova'],
+    ['pippa', 'Pippa'],
   ]) {
     await talkTo(page, id!);
     await expect(page.getByRole('dialog', { name: `Talking with ${name}` })).toBeVisible();
