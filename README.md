@@ -123,6 +123,13 @@ adapter are plans/offline sketches, not enabled services. See
 The classroom uses softer direct light and restrained glow so both rugs retain
 their colors and numbered stations remain readable across graphics settings.
 
+The **solar-system poster** in the Discovery Lab is interactive: tap a painted
+planet, or use the nearby “Explore the solar system” prompt, to open all eight
+planets with short offline facts and large touch/keyboard buttons. Close or
+Escape returns to the classroom. Exploration does not award lesson mastery.
+The aquarium uses faint, non-reflective glass and water so its colorful fish,
+including newly earned fish, remain visible without bright glare.
+
 ### Your own domain (AWS)
 
 The deployment scripts support private S3 hosting, CloudFront with HTTPS, a

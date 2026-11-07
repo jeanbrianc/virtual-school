@@ -8,6 +8,7 @@ import './styles/rhythm.css';
 import './styles/life-cycle.css';
 import './styles/pattern-progression.css';
 import './styles/weather.css';
+import './styles/solar-system.css';
 import './styles/parent.css';
 import './styles/showcase.css';
 

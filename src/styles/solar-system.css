@@ -1,0 +1,190 @@
+.solar-system-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(10 16 38 / 72%);
+  pointer-events: auto;
+}
+.solar-system-panel {
+  width: min(900px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  padding: clamp(18px, 3vw, 32px);
+  border: 2px solid #9faee0;
+  border-radius: 28px;
+  background: #15213d;
+  color: #f8f9ff;
+  box-shadow: 0 20px 80px #0006;
+}
+.solar-system-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.solar-system-header h2 {
+  margin: 4px 0;
+  font-size: clamp(22px, 4vw, 32px);
+}
+.solar-system-eyebrow {
+  margin: 0;
+  color: #cedafa;
+  font-size: 14px;
+}
+.solar-system-close {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  min-width: 48px;
+  min-height: 48px;
+  border: 2px solid #9faee0;
+  border-radius: 50%;
+  background: #263657;
+  color: white;
+  cursor: pointer;
+}
+.solar-system-intro {
+  margin: 12px 0 20px;
+}
+.solar-system-planets {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 8px;
+}
+.solar-system-planet-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 124px;
+  min-width: 44px;
+  padding: 12px 4px;
+  border: 2px solid #607399;
+  border-radius: 16px;
+  background: #223352;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.solar-system-planet-button small {
+  font-size: 10px;
+  font-weight: 400;
+  color: #dbe5fc;
+}
+.solar-system-planet-button:hover {
+  background: #344b76;
+}
+.solar-system-planet-button[aria-pressed='true'] {
+  border-color: #ffdc83;
+  background: #40516b;
+  box-shadow: inset 0 0 0 2px #ffdc83;
+}
+.solar-system-panel button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+.solar-system-orb {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #ffffff70, transparent 55%), var(--planet-color);
+  box-shadow: inset -8px -4px 12px #10193366;
+}
+.solar-system-orb-saturn::after {
+  content: '';
+  position: absolute;
+  inset: 32% -24%;
+  border: 4px solid #e6d6a9;
+  border-radius: 50%;
+  transform: rotate(-25deg);
+}
+.solar-system-orb-jupiter {
+  background: repeating-linear-gradient(170deg, #dfba92 0 12%, #b77e5e 14% 22%, #ecd5ad 24% 34%);
+}
+.solar-system-orb-earth {
+  background: radial-gradient(ellipse at 32% 28%, #72bc80 0 20%, transparent 22%), radial-gradient(ellipse at 68% 70%, #72bc80 0 17%, transparent 19%), #60b5ef;
+}
+.solar-system-facts {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: center;
+  gap: 24px;
+  margin-top: 24px;
+  padding: 24px;
+  border-radius: 20px;
+  background: #f5f2e9;
+  color: #25304b;
+}
+.solar-system-portrait {
+  display: grid;
+  place-items: center;
+  min-height: 150px;
+}
+.solar-system-portrait .solar-system-orb {
+  width: 112px;
+  height: 112px;
+  box-shadow: inset -18px -8px 25px #10193366;
+}
+.solar-system-portrait .solar-system-orb-saturn::after {
+  border-width: 9px;
+}
+.solar-system-facts .solar-system-eyebrow {
+  color: #4a5973;
+}
+.solar-system-facts h3 {
+  font-size: 32px;
+  margin: 4px 0;
+}
+.solar-system-tagline {
+  margin: 0 0 12px;
+  font-weight: 700;
+}
+.solar-system-facts ul {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.55;
+}
+.solar-system-facts li + li {
+  margin-top: 8px;
+}
+.solar-system-note {
+  color: #cedafa;
+  font-size: 13px;
+  margin: 18px 0 0;
+}
+@media (max-width: 700px) {
+  .solar-system-planets {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .solar-system-facts {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 20px;
+  }
+  .solar-system-portrait {
+    min-height: 120px;
+  }
+}
+@media (max-width: 380px) {
+  .solar-system-backdrop {
+    padding: 8px;
+  }
+  .solar-system-panel {
+    max-height: calc(100dvh - 16px);
+    padding: 14px;
+  }
+  .solar-system-planets {
+    gap: 6px;
+  }
+  .solar-system-planet-button {
+    font-size: 12px;
+  }
+}

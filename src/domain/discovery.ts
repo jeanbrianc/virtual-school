@@ -28,6 +28,7 @@ export const DISCOVERABLE_IDS = (
     'milo',
     'tank',
     'globe',
+    'solar-system',
     'museum',
     'trophies',
     'nature',
@@ -71,6 +72,14 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 export function describeDiscovery(id: string, ctx: DiscoveryContext): Discovery | null {
   const { name, world, snapshot } = ctx;
   switch (id) {
+    case 'solar-system':
+      return {
+        id,
+        icon: '🪐',
+        title: 'Our solar system',
+        text: 'The Sun is a star, and eight planets travel around it. Tap a planet on the poster to learn about it, then choose another planet to explore.',
+        action: { label: 'Explore the planets', target: 'solar-system', icon: '🪐' },
+      };
     case 'globe':
       return {
         id,
