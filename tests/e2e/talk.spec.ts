@@ -175,7 +175,7 @@ test('she tells Hoot about a book out loud and it goes on her shelf', async ({ p
     await page.getByTestId('choice-shelf').click();
 
     // A book Hoot doesn't know: how did it make her feel, then stars.
-    await expect(page.getByTestId('dialogue-line')).toContainText('How did the story make you feel?');
+    await expect(page.getByTestId('dialogue-line')).toContainText('How did the book make you feel?');
     await page.locator('.choices .choice').first().click();
     await expect(page.locator('.choices .choice').first()).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Next', exact: true }).click();

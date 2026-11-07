@@ -214,3 +214,58 @@ test('beginner state shapes fit phone sizes and preserve supported, skipped and 
   await page.reload();
   expect((await records(page)).filter((record) => record.lessonId === 'globe-states')).toEqual(saved);
 });
+
+test('whole US map fits laptop and phone frames with both insets and no map scrolling', async ({ page }, testInfo) => {
+  await enterSchool(page, 'sample');
+  await page.getByTestId('discover-ok').click();
+  await openGlobe(page);
+  await page.getByRole('button', { name: 'Choose another level or map', exact: true }).click();
+  await page.getByRole('button', { name: 'Whole US map · Level 2', exact: false }).click();
+  const map = page.getByRole('group', { name: 'United States map, Alaska and Hawaii shown as insets', exact: true });
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+    { width: 1100, height: 620 },
+    { width: 375, height: 812 },
+    { width: 667, height: 375 },
+  ]) {
+    await page.setViewportSize(viewport);
+    if (viewport.width < 700) await map.scrollIntoViewIfNeeded();
+    const bounds = await map.evaluate((svg) => {
+      const frame = svg.parentElement!;
+      const mapBox = svg.getBoundingClientRect();
+      const dialog = svg.closest('.dialogue')!;
+      const dialogBox = dialog.getBoundingClientRect();
+      return {
+        scrollWidth: frame.scrollWidth,
+        clientWidth: frame.clientWidth,
+        scrollHeight: frame.scrollHeight,
+        clientHeight: frame.clientHeight,
+        map: { top: mapBox.top, bottom: mapBox.bottom, left: mapBox.left, right: mapBox.right },
+        dialog: { top: dialogBox.top, bottom: dialogBox.bottom },
+        states: [...svg.querySelectorAll('path')].map((path) => {
+          const box = path.getBoundingClientRect();
+          return { name: path.getAttribute('aria-label'), top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+        }),
+      };
+    });
+    expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.clientWidth);
+    expect(bounds.scrollHeight).toBeLessThanOrEqual(bounds.clientHeight);
+    expect(bounds.states).toHaveLength(50);
+    for (const state of bounds.states) {
+      expect(state.left, state.name!).toBeGreaterThanOrEqual(bounds.map.left);
+      expect(state.right, state.name!).toBeLessThanOrEqual(bounds.map.right);
+      expect(state.top, state.name!).toBeGreaterThanOrEqual(bounds.map.top);
+      expect(state.bottom, state.name!).toBeLessThanOrEqual(bounds.map.bottom);
+    }
+    expect(bounds.map.top).toBeGreaterThanOrEqual(Math.max(0, bounds.dialog.top));
+    expect(bounds.map.bottom).toBeLessThanOrEqual(Math.min(viewport.height, bounds.dialog.bottom));
+    await page.screenshot({ path: testInfo.outputPath(`whole-us-${viewport.width}x${viewport.height}.png`) });
+  }
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByRole('button', { name: 'Michigan', exact: true }).press('Enter');
+  await expect(page.getByTestId('dialogue-line')).toContainText('Yes!');
+  await page.getByTestId('dialogue-close').click();
+  await openGlobe(page);
+  await expect(page.getByRole('group', { name: 'Three state shapes', exact: true })).toBeVisible();
+});

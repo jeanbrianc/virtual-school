@@ -512,7 +512,7 @@ test('custom-book reflections and parent-authored answers save without automatic
     await act(async () => h.tree.root.findByProps({ 'data-testid': 'pick-book-synthetic' }).props.onClick());
   };
   await choose();
-  assert.match(h.tree.root.findByType(DialogueShell).props.line, /don’t have checked/);
+  assert.equal(h.tree.root.findByType(DialogueShell).props.line, 'How did the book make you feel?');
   assert.equal(h.tree.root.findByProps({ 'data-testid': 'parent-story-prompt' }).props.children, 'Who brought the kite?');
   await act(async () => h.tree.root.findByProps({ 'data-testid': 'reflection-narration' }).props.onChange({ target: { value: 'Abandoned draft' } }));
   await h.back();
@@ -549,4 +549,32 @@ test('AI replies are visibly unverified and do not create story attempts', async
   assert.equal(h.saves.length, 0);
   await h.back();
   assert.equal(h.tree.root.findAllByProps({ 'data-testid': 'ai-story-source' }).length, 0);
+});
+
+test('a new custom book asks about feelings then stars and saves without a missing-question disclaimer', async (t) => {
+  const h = await harness(t);
+  await h.pick('finish');
+  await h.title('Synthetic moon adventure');
+  await h.submit();
+  assert.equal(h.tree.root.findByType(DialogueShell).props.line, 'How did the book make you feel?');
+  assert.equal(h.tree.root.findAllByProps({ 'data-testid': 'story-hint' }).length, 0);
+  await h.pick('Exciting');
+  await act(async () => h.button('Next').props.onClick());
+  assert.equal(h.tree.root.findByType(DialogueShell).props.line, 'How many stars would you give it?');
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'star-4' }).props.onClick());
+  await act(async () => h.tree.root.findByProps({ 'data-testid': 'rating-next' }).props.onClick());
+  await h.tick(900);
+  assert.equal(h.saves.length, 1);
+  const saved = h.saves[0]!;
+  assert.equal(saved.newBook?.title, 'Synthetic moon adventure');
+  assert.equal(saved.feeling, 'Exciting');
+  assert.equal(saved.rating, 4);
+  assert.deepEqual(saved.answers, []);
+  assert.equal(saved.problems, undefined);
+  const teacherLines = saved.transcript.filter((line) => line.speaker === 'teacher').map((line) => line.text);
+  assert.deepEqual(
+    teacherLines.filter((line) => line.startsWith('How ')),
+    ['How did the book make you feel?', 'How many stars would you give it?'],
+  );
+  assert.ok(teacherLines.every((line) => !/don’t have|not loaded|checked story questions/.test(line)));
 });

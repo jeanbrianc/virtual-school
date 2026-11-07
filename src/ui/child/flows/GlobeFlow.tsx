@@ -91,7 +91,15 @@ export function GlobeFlow({ speech, onClose, onRecord }: { speech: Speech; onClo
     })();
   };
   return (
-    <DialogueShell teacher="nova" line={line} speech={speech} onClose={onClose} closeDisabled={saving} wide>
+    <DialogueShell
+      teacher="nova"
+      line={line}
+      speech={speech}
+      onClose={onClose}
+      closeDisabled={saving}
+      wide
+      className={mode === 'states' || mode === 'countries' ? 'dialogue-geography' : ''}
+    >
       {saving && <p role="status">Saving your learning…</p>}
       {!mode || complete ? (
         <Choices
@@ -104,14 +112,16 @@ export function GlobeFlow({ speech, onClose, onRecord }: { speech: Speech; onClo
         />
       ) : (
         <>
-          <p>🌟 {round + (found ? 1 : 0)} / 5 rounds explored</p>
-          {mode === 'shapes' && <p>Level 1 · Three state shapes</p>}
-          {mode === 'states' && <p>Level 2 · Whole US map</p>}
-          {speech.canSpeak && (
-            <button type="button" className="btn" onClick={() => speech.speak(question)}>
-              Read the question again
-            </button>
-          )}
+          <div className="geography-toolbar">
+            <p>🌟 {round + (found ? 1 : 0)} / 5 rounds explored</p>
+            {mode === 'shapes' && <p>Level 1 · Three state shapes</p>}
+            {mode === 'states' && <p>Level 2 · Whole US map</p>}
+            {speech.canSpeak && (
+              <button type="button" className="btn" onClick={() => speech.speak(question)}>
+                Read the question again
+              </button>
+            )}
+          </div>
           {mode === 'shapes' ? (
             <>
               <div className="geography-shape-choices" role="group" aria-label="Three state shapes">
@@ -126,7 +136,7 @@ export function GlobeFlow({ speech, onClose, onRecord }: { speech: Speech; onClo
                     aria-label={showNames || found ? region.name : `State shape ${index + 1}`}
                   >
                     <svg viewBox={stateShapeViewBox(region.path)} aria-hidden="true" focusable="false">
-                      <path d={region.path} />
+                      <path d={region.path} fillRule="evenodd" />
                     </svg>
                     <span>{showNames || found ? region.name : `Shape ${index + 1}`}</span>
                   </button>
@@ -144,6 +154,7 @@ export function GlobeFlow({ speech, onClose, onRecord }: { speech: Speech; onClo
               <div className="geography-map">
                 <svg
                   viewBox={mode === 'states' ? '0 0 850 490' : '0 0 720 360'}
+                  preserveAspectRatio="xMidYMid meet"
                   role="group"
                   aria-label={mode === 'states' ? 'United States map, Alaska and Hawaii shown as insets' : 'World map of eleven introductory countries'}
                 >
@@ -153,6 +164,7 @@ export function GlobeFlow({ speech, onClose, onRecord }: { speech: Speech; onClo
                       d={region.path}
                       fill={(found || hint) && region.name === target ? '#ffd166' : ['#a8d8c0', '#b8d7ef', '#e7c5dd', '#e9dda9'][i % 4]}
                       stroke="#49645c"
+                      fillRule="evenodd"
                       strokeWidth={(found || hint) && region.name === target ? 3 : 0.7}
                       role="button"
                       tabIndex={found || saving ? -1 : 0}
@@ -173,7 +185,7 @@ export function GlobeFlow({ speech, onClose, onRecord }: { speech: Speech; onClo
                 </svg>
               </div>
               {mode === 'countries' && <p>Eleven introductory countries are shown. Small islands and boundaries are simplified.</p>}
-              <p className="stage-tip">Scroll the map, or choose any place from the labeled list below.</p>
+              <p className="stage-tip">Tap a place on the map, or choose it from the labeled list below.</p>
               <select aria-label="Pick a place on the map" value="" disabled={found || saving} onChange={(e) => pick(e.target.value)}>
                 <option value="">Choose a place…</option>
                 {regions.map((r) => (
