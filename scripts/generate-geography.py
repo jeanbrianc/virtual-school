@@ -9,7 +9,7 @@ import urllib.request
 
 BASE = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/'
 SOURCES = {
-    'states': ('ne_110m_admin_1_states_provinces.geojson', '0067dec6a2c4f9c7a644bf7a9a46163d8d881595953326d0c67d89934190aefe'),
+    'states': ('ne_50m_admin_1_states_provinces_lakes.geojson', 'b92c3f709b691240f6320e5cd7fade78cedfa3b91ecff14cecd3de0616c764b9'),
     'countries': ('ne_110m_admin_0_countries.geojson', '6866c877d39cba9c357620878839b336d569f8c662d3cfab4cb1dbe2d39c977f'),
 }
 COUNTRIES = ['Canada', 'United States of America', 'Mexico', 'Brazil', 'Australia', 'India', 'China', 'France', 'Japan', 'Egypt', 'South Africa']
@@ -63,7 +63,7 @@ def main():
     parser.add_argument('--countries-source')
     parser.add_argument('--output', default=str(Path(__file__).resolve().parents[1] / 'src/domain/geography/maps.json'))
     args = parser.parse_args()
-    states = [f for f in read_source('states', args.states_source) if f['properties']['name'] != 'District of Columbia']
+    states = [f for f in read_source('states', args.states_source) if f['properties']['adm0_a3'] == 'USA' and f['properties']['name'] != 'District of Columbia']
     assert len(states) == 50 and len({f['properties']['name'] for f in states}) == 50
     mainland = [f for f in states if f['properties']['name'] not in ('Alaska', 'Hawaii')]
     mainland_project = fitted(mainland, (10, 10, 830, 350))

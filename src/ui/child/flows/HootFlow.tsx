@@ -303,7 +303,7 @@ export function HootFlow(props: HootFlowProps) {
     } else {
       setStep({ kind: 'feeling' });
       runRef.current = null;
-      say('I don’t have checked story questions for this book. You can tell me your own ideas! How did the story make you feel?', 'thinking');
+      say('How did the book make you feel?', 'thinking');
     }
   };
 

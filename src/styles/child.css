@@ -2585,17 +2585,45 @@ button.treasure {
   }
 }
 
-/* Map scroll stays inside the sheet; every shape has a full-size list alternative. */
+/* Scale the complete map into its frame, including the Alaska/Hawaii insets.
+   The labeled list remains a full-size alternative for small states. */
+.dialogue-geography {
+  max-height: calc(100dvh - 24px);
+  bottom: 12px;
+}
+.dialogue-geography .dialogue-line {
+  min-height: 1.4em;
+  font-size: 1.2rem;
+  margin: 8px 0;
+}
+.geography-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+.geography-toolbar p {
+  margin: 0;
+}
+.dialogue-geography .choices {
+  margin-top: 8px;
+}
+.dialogue-geography .choice {
+  min-height: 48px;
+  padding: 8px 12px;
+  font-size: 1rem;
+}
 .geography-map {
-  overflow: auto;
-  max-height: 32vh;
+  width: 100%;
+  height: clamp(120px, min(38dvh, calc(100dvh - 430px)), 380px);
   background: #e4f3fa;
   border-radius: 18px;
 }
 .geography-map svg {
   display: block;
   width: 100%;
-  min-width: 640px;
+  height: 100%;
 }
 .geography-map path {
   cursor: pointer;

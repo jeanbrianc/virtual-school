@@ -47,3 +47,38 @@ test('unfinished geography is not a completion; historical unknown lesson IDs re
   assert.equal(snap.lessonCompletions['retired-unknown'], 1);
   assert.equal(snap.masteredSkills, 0);
 });
+
+test('state paths stay within the full-map viewBox, including Alaska and Hawaii', () => {
+  for (const state of maps.states) {
+    for (const pair of state.path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)) {
+      const x = Number(pair[1]);
+      const y = Number(pair[2]);
+      assert.ok(x >= 0 && x <= 850 && y >= 0 && y <= 490, `${state.name}: ${x},${y}`);
+    }
+  }
+});
+
+test('Michigan keeps both land peninsulas without filling the Great Lakes', () => {
+  const michigan = maps.states.find((state) => state.name === 'Michigan')!;
+  const rings = michigan.path
+    .split('M')
+    .filter(Boolean)
+    .map((ring) => [...ring.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((pair) => [Number(pair[1]), Number(pair[2])] as const));
+  const contains = (x: number, y: number) => {
+    let inside = false;
+    for (const ring of rings) {
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const [xi, yi] = ring[i]!;
+        const [xj, yj] = ring[j]!;
+        if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+      }
+    }
+    return inside;
+  };
+  // Geographic samples transformed by generate-geography.py's mainland projection.
+  assert.equal(contains(551.7, 89.9), true, 'Lower Peninsula (-84.6, 43.7)');
+  assert.equal(contains(529.2, 54.7), true, 'Upper Peninsula (-86.6, 46.2)');
+  assert.equal(contains(528.1, 85.7), false, 'Lake Michigan (-86.7, 44)');
+  assert.equal(contains(566.4, 75.8), false, 'Lake Huron (-83.3, 44.7)');
+  assert.equal(contains(550.0, 60.2), false, 'Straits of Mackinac (-84.75, 45.81)');
+});

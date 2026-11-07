@@ -23,6 +23,7 @@ export function DialogueShell({
   speech,
   wide = false,
   closeDisabled = false,
+  className = '',
 }: {
   teacher: TeacherId;
   line: string;
@@ -32,6 +33,7 @@ export function DialogueShell({
   speech: Speech;
   wide?: boolean;
   closeDisabled?: boolean;
+  className?: string;
 }) {
   const t = TEACHERS[teacher];
   const [shown, setShown] = useState('');
@@ -58,7 +60,7 @@ export function DialogueShell({
   }, [line]);
 
   return (
-    <div className={`dialogue ${wide ? 'dialogue-wide' : ''}`} role="dialog" aria-label={`Talking with ${t.name}`} data-teacher={teacher}>
+    <div className={`dialogue ${wide ? 'dialogue-wide' : ''} ${className}`} role="dialog" aria-label={`Talking with ${t.name}`} data-teacher={teacher}>
       <div className="dialogue-portrait" style={{ ['--teacher-color' as string]: t.accent }}>
         <TeacherPortrait id={teacher} mood={mood} size={112} />
       </div>

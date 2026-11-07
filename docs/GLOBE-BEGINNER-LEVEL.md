@@ -10,7 +10,7 @@ outlines. There is no countdown, unlocking rule or reading-based placement.
   Hawaii and Louisiana. Each adventure has five distinct targets; Florida is the
   welcoming first target and button positions/distractors vary. Each prompt has
   exactly one correct outline and two distinct other states.
-- State geometry is the existing generated Natural Earth public-domain asset.
+- State geometry uses generated Natural Earth public-domain land outlines, with lakes removed so Michigan keeps its recognizable mitten and separate Upper Peninsula.
   Each outline keeps its orientation and aspect ratio, scaled to its own card.
   Separate scales help recognition; they do not compare geographic size. Existing
   Alaska/Hawaii geometry retains its documented map projection limitations.
@@ -55,3 +55,12 @@ the PR. Adding a test is not evidence that its browser run passed.
 
 Owner approval and independent review remain required before merge/deployment.
 No production learner data or billable provider calls are used in tests.
+
+## Whole-map screen fit
+
+Level 2 scales the entire United States, including Alaska and Hawaii insets, into
+a viewport-height-aware frame. The map itself never needs scrolling. The nearby
+labeled list remains a larger target for small states. The globe toolbar and
+dialog use a compact layout on laptops; very short phone screens may still
+scroll the surrounding dialog to reach controls. The browser suite checks map
+bounds at 1440×900, 1280×720, 1100×620, 375×812 and 667×375.

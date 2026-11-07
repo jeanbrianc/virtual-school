@@ -12,6 +12,7 @@ test('Hoot completes without microphone, cancels safely, and remembers returning
   await expect(page.getByTestId('dialogue-line')).toContainText('first book');
   await page.getByTestId('new-book-title').fill('Synthetic moon story');
   await page.getByTestId('new-book-save').click();
+  await expect(page.getByTestId('dialogue-line')).toContainText('How did the book make you feel?');
   const feelings = page.locator('.choices-emoji button');
   await expect(feelings).toHaveCount(6);
   for (const button of await feelings.all()) {
@@ -22,6 +23,7 @@ test('Hoot completes without microphone, cancels safely, and remembers returning
   await feelings.first().click();
   await expect(feelings.first()).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(page.getByTestId('dialogue-line')).toContainText('How many stars would you give it?');
   for (let n = 1; n <= 5; n++) {
     const button = page.getByTestId(`star-${n}`);
     const box = await button.boundingBox();
