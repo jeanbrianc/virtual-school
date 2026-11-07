@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { createRng, type Rng } from '../../domain/util/random';
 import { ROUNDED, SERIF } from '../../shared/coverPainter';
 import { KID_ART_SIZE, paintKidArt } from '../../shared/kidArtPainter';
+import { SOLAR_POSTER_PLANETS } from '../../shared/solarPoster';
 import { PALETTE } from '../palette';
 
 type Paint = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
@@ -456,27 +457,29 @@ export function posterTexture(kind: 'numberline' | 'shapes' | 'solar' | 'plants'
         ctx.beginPath();
         ctx.arc(-40, h / 2, 150, 0, Math.PI * 2);
         ctx.fill();
-        const planets: [number, string][] = [
-          [10, '#b9a38c'],
-          [16, '#e9c07b'],
-          [17, '#5aa0d6'],
-          [13, '#d9774b'],
-          [34, '#d9b38c'],
-          [30, '#e8d29a'],
-          [22, '#9fd6e0'],
-          [21, '#4f7bd6'],
-        ];
-        let x = 150;
-        planets.forEach(([r, c]) => {
-          ctx.fillStyle = c;
+        SOLAR_POSTER_PLANETS.forEach(({ id, name, x, y, radius, color }, index) => {
+          ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.arc(x, h / 2, r, 0, Math.PI * 2);
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
           ctx.fill();
-          x += r * 2 + 30;
+          if (id === 'saturn') {
+            ctx.strokeStyle = '#e8d29a';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.ellipse(x, y, 44, 12, -0.35, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#f3e6cf';
+          ctx.font = `600 17px ${ROUNDED}`;
+          ctx.fillText(name, x, 322 + (index % 2) * 18);
         });
         ctx.font = `600 40px ${ROUNDED}`;
         ctx.fillStyle = '#f3e6cf';
         ctx.fillText('Our Solar System', w / 2, 50);
+        ctx.font = `600 26px ${ROUNDED}`;
+        ctx.fillText('Tap a planet to explore!', w / 2, 420);
+        ctx.font = `20px ${ROUNDED}`;
+        ctx.fillText('Sizes and distances are not to scale.', w / 2, 463);
         break;
       }
       case 'plants': {

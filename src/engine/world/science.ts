@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { createRng } from '../../domain/util/random';
+import { solarPosterPlanetAt } from '../../shared/solarPoster';
 import { ease } from '../core/tween';
 import { box, cone, contactShadow, cyl, glassMat, group, mat, rbox, sphere, torus, uniqueMat } from '../render/kit';
 import { posterTexture } from '../render/textures';
@@ -125,9 +126,29 @@ export function buildScience(ctx: BuildContext): void {
   const plantPoster = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 1.18), new THREE.MeshStandardMaterial({ map: posterTexture('plants'), roughness: 0.9 }));
   plantPoster.position.set(5.95, 2.45, -9.8);
   ctx.mount('north', plantPoster);
-  const solar = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.0), new THREE.MeshStandardMaterial({ map: posterTexture('solar'), roughness: 0.9 }));
+  const solar = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.2), new THREE.MeshStandardMaterial({ map: posterTexture('solar'), roughness: 0.9 }));
+  solar.name = 'solar-system-poster';
+  solar.userData.dynamic = true; // Retain this mesh and its UVs for pointer picking.
   solar.position.set(12.95, 2.45, -9.8);
   ctx.mount('north', solar);
+  ctx.interact({
+    id: 'solar-system',
+    kind: 'object',
+    label: 'Explore the solar system',
+    icon: '🪐',
+    position: new THREE.Vector3(12.95, 0, -9.8),
+    approach: new THREE.Vector3(12.5, 0, -8.5),
+    radius: 2.0,
+    object: solar,
+    markerHeight: 3.35,
+    pointerSurface: {
+      mesh: solar,
+      resolveId: (uv) => {
+        const planet = solarPosterPlanetAt(uv.x, uv.y);
+        return planet ? `solar-system:${planet}` : 'solar-system';
+      },
+    },
+  });
 
   // Windowsill plants (count grows with plant learning).
   const sill = new THREE.Group();
@@ -198,11 +219,19 @@ export function buildScience(ctx: BuildContext): void {
 
   // Aquarium on the east wall.
   const aq = new THREE.Group();
+  aq.name = 'classroom-aquarium';
   aq.add(rbox(0.6, 0.8, 1.6, 0.02, mat(PALETTE.walnut, { roughness: 0.6 }), 0, 0.4, 0));
-  aq.add(box(0.55, 0.62, 1.5, glassMat('#dff7ff', 0.22), 0, 1.12, 0));
-  aq.add(
-    box(0.5, 0.5, 1.45, uniqueMat('#5fb8d6', { transparent: true, opacity: 0.45, emissive: '#1d6f86', emissiveIntensity: 0.25, roughness: 0.05 }), 0, 1.07, 0),
-  );
+  // Unlit, single-sided tint avoids the environment's bright clearcoat and
+  // doubled front/back reflections washing out the fish, even with bloom on.
+  const glass = box(0.55, 0.62, 1.5, new THREE.MeshBasicMaterial({ color: '#dff7ff', transparent: true, opacity: 0.07, depthWrite: false }), 0, 1.12, 0);
+  glass.name = 'aquarium-glass';
+  glass.userData.dynamic = true;
+  glass.castShadow = glass.receiveShadow = false;
+  const water = box(0.5, 0.5, 1.45, new THREE.MeshBasicMaterial({ color: '#5fb8d6', transparent: true, opacity: 0.12, depthWrite: false }), 0, 1.07, 0);
+  water.name = 'aquarium-water';
+  water.userData.dynamic = true;
+  water.castShadow = water.receiveShadow = false;
+  aq.add(glass, water);
   aq.add(box(0.5, 0.06, 1.45, mat('#e8d4a8', { roughness: 1 }), 0, 0.84, 0));
   for (let i = 0; i < 5; i++) {
     const weed = cyl(0.015, 0.02, 0.25 + (i % 3) * 0.1, mat('#4f9a5a'), 0, 0.98 + (i % 3) * 0.05, -0.6 + i * 0.3, 6);
@@ -210,10 +239,11 @@ export function buildScience(ctx: BuildContext): void {
     aq.add(weed);
   }
   aq.add(rbox(0.6, 0.06, 1.6, 0.02, mat(PALETTE.walnut), 0, 1.46, 0));
-  const aqLight = new THREE.PointLight('#8fe3ff', 2.2, 3, 2);
+  const aqLight = new THREE.PointLight('#bdefff', 0.35, 2, 2);
   aqLight.position.set(-0.4, 1.2, 0);
   aq.add(aqLight);
   const fishGroup = new THREE.Group();
+  fishGroup.name = 'aquarium-fish';
   fishGroup.userData.dynamic = true;
   aq.add(fishGroup);
   aq.position.set(13.5, 0, -7.9);
@@ -230,14 +260,19 @@ export function buildScience(ctx: BuildContext): void {
       fishGroup.clear();
       for (let i = 0; i < fishCount; i++) {
         const c = fishColors[i % fishColors.length] ?? '#ff8c42';
-        const f = group(sphere(0.045, mat(c, { roughness: 0.4 }), 0, 0, 0, 12), cone(0.035, 0.05, mat(c), 0, 0, -0.06, 6));
+        const f = group(sphere(0.055, mat(c, { roughness: 0.85 }), 0, 0, 0, 12), cone(0.04, 0.055, mat(c), 0, 0, -0.07, 6));
+        f.name = `aquarium-fish-${i + 1}`;
         (f.children[0] as THREE.Object3D).scale.set(0.6, 1, 1.4);
         (f.children[1] as THREE.Object3D).rotation.x = -Math.PI / 2;
+        for (const side of [-1, 1]) {
+          f.add(sphere(0.011, mat('#fff8eb'), side * 0.029, 0.012, 0.036, 8));
+          f.add(sphere(0.006, mat('#253341'), side * 0.038, 0.013, 0.038, 8));
+        }
         f.userData.phase = i * 1.7;
         f.userData.depth = 0.95 + (i % 4) * 0.08;
         fishGroup.add(f);
         if (animate && prev >= 0 && i >= prev) {
-          ctx.particles.sparkle(new THREE.Vector3(13.4, 1.2, -7.9), { count: 30, color: '#8fe3ff' });
+          ctx.particles.sparkle(new THREE.Vector3(13.4, 1.2, -7.9), { count: 10, color: '#8fe3ff' });
         }
       }
     },

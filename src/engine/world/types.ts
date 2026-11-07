@@ -22,6 +22,8 @@ export interface InteractableDef {
   markerHeight: number;
   enabled: boolean;
   seat?: SeatAnchor;
+  /** Optional painted surface with sub-targets, e.g. the planets on a poster. */
+  pointerSurface?: { mesh: THREE.Mesh; resolveId(uv: THREE.Vector2): string };
 }
 
 /** A piece of the world that reacts to WorldState changes. */

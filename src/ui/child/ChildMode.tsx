@@ -51,6 +51,7 @@ import { useStore } from '../../state/store';
 import { Icon } from '../shared/Icon';
 import type { Speech } from './DialogueShell';
 import { GlobeFlow } from './flows/GlobeFlow';
+import { SolarSystemFlow } from './flows/SolarSystemFlow';
 import { recordPractice } from '../../services/practiceService';
 import { routineSpeech } from './flows/routineSpeech';
 import { RoutineFlow } from './flows/RoutineFlow';
@@ -122,6 +123,7 @@ export function useChildSpeechProbe(talkMode: TalkMode) {
 type Overlay =
   | { kind: 'activities'; teacher: TeacherId; returnTo: { kind: 'lesson'; teacher: TeacherId; lessonId: string; startTier: number } }
   | { kind: 'globe' }
+  | { kind: 'solar-system'; planetId?: string }
   | { kind: 'keyboard' }
   | { kind: 'routine' }
   | { kind: 'rhythm' }
@@ -429,6 +431,13 @@ export function ChildMode({ childId }: { childId: string }) {
       // Stale/programmatic routes must not discover or record a temporarily hidden teacher.
       if (isTeacherId(id) && !isTeacherAvailable(id)) return;
       setShowControls(false);
+      if (id === 'solar-system' || id.startsWith('solar-system:')) {
+        // Open immediately on the chosen planet, without a first-visit card.
+        game.setInputEnabled(false);
+        setOverlay({ kind: 'solar-system', planetId: id.split(':')[1] });
+        void discover('solar-system');
+        return;
+      }
       const state = appStore.get().preview?.world ?? d.world;
       if (appStore.get().preview && (teacherForInteraction(id) || id === 'alphabet' || id === 'globe')) {
         setHint({ icon: '✨', title: 'Preview mode', text: 'This is a peek at the future school. Lessons are paused in preview.' });
@@ -1110,6 +1119,7 @@ export function ChildMode({ childId }: { childId: string }) {
               }}
             />
           )}
+          {overlay?.kind === 'solar-system' && <SolarSystemFlow initialPlanetId={overlay.planetId} onClose={closeSheet} />}
           {overlay?.kind === 'hoot' && (
             <HootFlow
               childName={data.child.name}

@@ -83,6 +83,7 @@ export class InteractionSystem {
   focused: InteractableDef | null = null;
   hovered: InteractableDef | null = null;
   private raycaster = new THREE.Raycaster();
+  private surfaceRaycaster = new THREE.Raycaster();
   private time = 0;
   private viewportHeight = 720;
   private fresh = new Set<string>();
@@ -202,13 +203,31 @@ export class InteractionSystem {
       }
     }
     if (nearest) return nearest;
+    // Painted wall targets use the actual mesh and UVs, rather than a floor
+    // cylinder. Preserve the parent definition's walk-to point and radius.
+    let painted: { def: InteractableDef; distance: number } | null = null;
+    this.surfaceRaycaster.setFromCamera(ndc, camera);
+    for (const def of this.defs) {
+      const surface = def.pointerSurface;
+      if (!def.enabled || !surface) continue;
+      let visible = true;
+      for (let node: THREE.Object3D | null = surface.mesh; node; node = node.parent) visible &&= node.visible;
+      if (!visible) continue;
+      const hit = this.surfaceRaycaster.intersectObject(surface.mesh, false)[0];
+      if (hit?.uv && (!painted || hit.distance < painted.distance)) {
+        painted = { def: { ...def, id: surface.resolveId(hit.uv) }, distance: hit.distance };
+      }
+    }
     this.raycaster.setFromCamera(ndc, camera);
     const hits = this.raycaster.intersectObjects(this.proxies, false);
     for (const h of hits) {
       const def = this.byId(h.object.userData.interactId as string);
-      if (def?.enabled) return def;
+      if (def?.enabled) {
+        if (painted && (def.object === painted.def.object || h.distance >= painted.distance)) return painted.def;
+        return def;
+      }
     }
-    return null;
+    return painted?.def ?? null;
   }
 
   pickFloor(ndc: THREE.Vector2, camera: THREE.Camera): THREE.Vector3 | null {
@@ -229,7 +248,7 @@ export class InteractionSystem {
     for (const d of this.defs) {
       const m = this.markers.get(d.id);
       if (!m) continue;
-      const isFocus = this.focused?.id === d.id || this.hovered?.id === d.id;
+      const isFocus = this.focused?.id === d.id || this.hovered?.id === d.id || !!this.hovered?.id.startsWith(`${d.id}:`);
       const dist = Math.hypot(d.position.x - player.x, d.position.z - player.z);
       const near = dist < 9;
       const fresh = this.fresh.has(d.id);

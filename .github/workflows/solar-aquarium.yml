@@ -1,0 +1,49 @@
+name: Solar poster and aquarium review
+on:
+  pull_request:
+    paths:
+      - 'src/domain/solarSystem.ts'
+      - 'src/shared/solarPoster.ts'
+      - 'src/engine/world/science.ts'
+      - 'src/engine/systems/interaction.ts'
+      - 'src/engine/render/textures.ts'
+      - 'src/ui/child/flows/SolarSystemFlow.tsx'
+      - 'src/styles/solar-system.css'
+      - 'tests/e2e/solar-aquarium.spec.ts'
+      - 'tests/unit/science-interactions.test.ts'
+      - '.github/workflows/solar-aquarium.yml'
+permissions:
+  contents: read
+concurrency:
+  group: solar-aquarium-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [desktop, phone]
+    env:
+      PLAYWRIGHT_SAFE_ARTIFACTS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- tests/e2e/solar-aquarium.spec.ts --project=${{ matrix.project }}
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: solar-aquarium-${{ matrix.project }}-${{ github.event.pull_request.head.sha }}
+          path: test-results/**/*.png
+          retention-days: 7
+          if-no-files-found: error
